@@ -33,6 +33,7 @@ func setup_shooter_visuals():
 	if has_node("Polygon2D"):
 		var poly = $Polygon2D
 		poly.color = Color(1.0, 0.1, 0.4) # Neon Pink
+		poly.modulate = Color(1.8, 1.2, 1.5, 1.0) # Glow
 		poly.polygon = PackedVector2Array([
 			Vector2(20, 0),   # Front
 			Vector2(0, 15),   # Left wing

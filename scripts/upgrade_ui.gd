@@ -6,6 +6,7 @@ extends CanvasLayer
 @onready var upgrade_button_scene = preload("res://scenes/upgrade_button.tscn")
 
 func _ready():
+	add_to_group("upgrade_ui")
 	visible = false
 	process_mode = PROCESS_MODE_ALWAYS
 	

@@ -29,6 +29,7 @@ func setup_visuals():
 	if has_node("Polygon2D"):
 		var poly = $Polygon2D
 		poly.color = Color(1.0, 0.1, 0.4) # Neon Pink
+		poly.modulate = Color(1.8, 1.2, 1.5, 1.0) # Glow
 		var points = PackedVector2Array([
 			Vector2(40, 40),
 			Vector2(-40, 40),

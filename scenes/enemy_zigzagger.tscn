@@ -1,0 +1,20 @@
+[gd_scene load_steps=4 format=3 uid="uid://cyspvet765o8i"]
+
+[ext_resource type="Script" uid="uid://c25as0see0b0d" path="res://scripts/enemy_zigzagger.gd" id="1_7l66f"]
+[ext_resource type="PackedScene" uid="uid://bjumygplv6k07" path="res://scenes/bullet.tscn" id="2_8arsc"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_drifter"]
+radius = 15.0
+
+[node name="EnemyZigzagger" type="CharacterBody2D"]
+collision_layer = 4
+collision_mask = 3
+script = ExtResource("1_7l66f")
+bullet_scene = ExtResource("2_8arsc")
+
+[node name="Polygon2D" type="Polygon2D" parent="."]
+color = Color(1, 0.1, 0.4, 1)
+polygon = PackedVector2Array(15, 0, -10, 10, -10, -10)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_drifter")

@@ -17,30 +17,30 @@ var chain_lightning: bool = false
 var chain_range: float = 100.0
 
 # Internal
+var hit_enemies: Array[RID] = [] # NEW: Avoid hitting same enemy multiple times
 var hits_remaining: int
 var time_alive: float = 0.0
 var nearest_enemy: Node2D = null
-var fired_by_enemy: bool = false # NEW: Track who fired
+var fired_by_enemy: bool = false 
 
 @onready var sprite: Polygon2D = $BulletSprite
 @onready var collision: CollisionPolygon2D = $CollisionPolygon2D
 
 func _ready():
-	hits_remaining = pierce + 1  # Pierce 0 = hit 1 enemy, pierce 1 = hit 2 enemies
+	hits_remaining = pierce + 1
 	body_entered.connect(_on_body_entered)
 	setup_bullet_shape()
-	
-	# Connect to screen notifier for auto-cleanup
-	if has_node("VisibleOnScreenNotifier2D"):
-		$VisibleOnScreenNotifier2D.screen_exited.connect(_on_screen_exited)
 
 func _physics_process(delta: float):
 	time_alive += delta
 	
-	# Auto-destroy after lifetime
 	if time_alive >= lifetime:
 		queue_free()
 		return
+	
+	# Bounce logic
+	if bounces > 0:
+		handle_screen_bounce()
 	
 	# Homing behavior
 	if homing_strength > 0.0:
@@ -49,11 +49,27 @@ func _physics_process(delta: float):
 			var desired_direction = (nearest_enemy.global_position - global_position).normalized()
 			direction = direction.lerp(desired_direction, homing_strength * delta * 5.0).normalized()
 	
-	# Move bullet
 	global_position += direction * speed * delta
-	
-	# Rotate sprite to face direction
 	rotation = direction.angle()
+
+func handle_screen_bounce():
+	var screen_rect = get_viewport_rect()
+	var pos = global_position
+	
+	var margin = 10.0
+	if pos.x < margin and direction.x < 0:
+		direction.x *= -1
+		bounces -= 1
+	elif pos.x > screen_rect.size.x - margin and direction.x > 0:
+		direction.x *= -1
+		bounces -= 1
+		
+	if pos.y < margin and direction.y < 0:
+		direction.y *= -1
+		bounces -= 1
+	elif pos.y > screen_rect.size.y - margin and direction.y > 0:
+		direction.y *= -1
+		bounces -= 1
 
 func setup_bullet_shape():
 	# Simple diamond/arrow shape - Made 50% bigger
@@ -84,24 +100,23 @@ func find_nearest_enemy():
 
 func _on_body_entered(body: Node):
 	if body.is_in_group("enemies"):
-		if not fired_by_enemy: # Only player bullets hit enemies
-			hit_enemy(body)
+		if not fired_by_enemy:
+			if not hit_enemies.has(body.get_rid()):
+				hit_enemies.append(body.get_rid())
+				hit_enemy(body)
 	elif body.is_in_group("player"):
-		if fired_by_enemy: # Only enemy bullets hit player
+		if fired_by_enemy:
 			hit_player(body)
 
 func hit_player(player_node: Node):
 	if player_node.has_method("take_damage"):
 		player_node.take_damage(damage)
-		# Bullets always disappear on contact with player
 		queue_free()
 
 func hit_enemy(enemy: Node):
-	# Deal damage
 	if enemy.has_method("take_damage"):
 		enemy.take_damage(damage)
 	
-	# Special effects
 	if explodes_on_hit:
 		create_explosion()
 	
@@ -111,13 +126,11 @@ func hit_enemy(enemy: Node):
 	if splits_on_hit:
 		split_bullet()
 	
-	# Handle pierce/destruction
 	hits_remaining -= 1
 	if hits_remaining <= 0:
 		queue_free()
 
 func create_explosion():
-	# Find all enemies in radius and damage them
 	var enemies = get_tree().get_nodes_in_group("enemies")
 	for enemy in enemies:
 		if not is_instance_valid(enemy):
@@ -125,29 +138,74 @@ func create_explosion():
 		var distance = global_position.distance_to(enemy.global_position)
 		if distance <= explosion_radius:
 			if enemy.has_method("take_damage"):
-				enemy.take_damage(damage * 0.5)  # Explosion does 50% damage
+				enemy.take_damage(damage * 0.5)
 	
-	# TODO: Spawn explosion particle effect
 	spawn_explosion_visual()
 
 func spawn_explosion_visual():
-	# Create simple explosion circle visual
-	var explosion = Polygon2D.new()
-	get_parent().add_child(explosion)
-	explosion.global_position = global_position
-	explosion.color = Color(1, 0.5, 0, 0.7)
-	
-	# Circle shape
+	# Use a list to track all created effects for safety
+	var effects = []
+
+	# 1. THE CORE FLASH (Cyan/White)
+	var flash = Polygon2D.new()
+	get_tree().current_scene.add_child(flash) # Parent to scene, not parent (which might be deleted)
+	flash.global_position = global_position
+	flash.color = Color(1, 1, 1, 1)
 	var points = PackedVector2Array()
 	for i in range(16):
-		var angle = (TAU / 16) * i
-		points.append(Vector2(explosion_radius, 0).rotated(angle))
-	explosion.polygon = points
+		points.append(Vector2(5, 0).rotated(TAU/16 * i))
+	flash.polygon = points
+	effects.append(flash)
 	
-	# Fade out and delete
-	var tween = create_tween()
-	tween.tween_property(explosion, "modulate:a", 0.0, 0.3)
-	tween.tween_callback(explosion.queue_free)
+	# Use scene tree tween so it survives bullet deletion
+	var flash_tween = get_tree().create_tween().set_parallel(true)
+	flash_tween.tween_property(flash, "scale", Vector2(explosion_radius/4.0, explosion_radius/4.0), 0.1)
+	flash_tween.tween_property(flash, "modulate", Color(0, 0.8, 1, 0), 0.2).set_delay(0.05)
+	flash_tween.set_parallel(false)
+	flash_tween.tween_callback(flash.queue_free)
+	
+	# 2. INNER SPARKS (Orange/Yellow)
+	var sparks = CPUParticles2D.new()
+	get_tree().current_scene.add_child(sparks)
+	sparks.global_position = global_position
+	sparks.amount = 25
+	sparks.one_shot = true
+	sparks.explosiveness = 1.0
+	sparks.spread = 180.0
+	sparks.gravity = Vector2.ZERO
+	sparks.initial_velocity_min = 100.0
+	sparks.initial_velocity_max = 250.0
+	sparks.scale_amount_min = 2.0
+	sparks.scale_amount_max = 5.0
+	sparks.color = Color(1.0, 0.5, 0.0) # Bright Orange
+	sparks.emitting = true
+	effects.append(sparks)
+	
+	# 3. OUTER SHOCKWAVE (Purple/Magenta)
+	var wave = CPUParticles2D.new()
+	get_tree().current_scene.add_child(wave)
+	wave.global_position = global_position
+	wave.amount = 15
+	wave.one_shot = true
+	wave.explosiveness = 1.0
+	wave.spread = 180.0
+	wave.gravity = Vector2.ZERO
+	wave.initial_velocity_min = 200.0
+	wave.initial_velocity_max = 350.0
+	wave.scale_amount_min = 3.0
+	wave.scale_amount_max = 6.0
+	wave.color = Color(0.8, 0.0, 1.0) # Neon Purple
+	wave.emitting = true
+	effects.append(wave)
+
+	# Safety cleanup for particles
+	get_tree().create_timer(1.0).timeout.connect(sparks.queue_free)
+	get_tree().create_timer(1.0).timeout.connect(wave.queue_free)
+	
+	# Screen shake
+	var player = get_tree().get_first_node_in_group("player")
+	if player and player.has_method("add_shake"):
+		player.add_shake(12.0)
 
 func chain_to_nearby_enemies(source_enemy: Node):
 	var enemies = get_tree().get_nodes_in_group("enemies")

@@ -20,6 +20,7 @@ signal level_up_ready
 @export var energy_consumption: float = 50.0 # Per second
 @export var energy_recovery: float = 25.0 # Per second
 var current_energy: float = 100.0
+var regen_delay_timer: float = 0.0 # NEW: Delay after running out
 var is_dashing: bool = false
 var dash_direction: Vector2 = Vector2.ZERO
 
@@ -59,6 +60,7 @@ var ghost_timer: float = 0.0
 @export var ghost_delay: float = 0.05
 
 var shake_intensity: float = 0.0
+var is_unpausing: bool = false # NEW: Prevent movement during unpause animation
 
 func _ready():
 	add_to_group("player")
@@ -84,6 +86,10 @@ func _ready():
 	health_changed.emit(current_hearts, max_hearts)
 	xp_changed.emit(xp, xp_to_next_level)
 	energy_changed.emit(current_energy, max_energy)
+	
+	# DASH TUTORIAL
+	if has_node("/root/GlobalData") and get_node("/root/GlobalData").show_tutorial:
+		show_dash_tutorial()
 	
 	# Spawn Protection
 	iframe_timer = 2.0 
@@ -111,13 +117,37 @@ func spawn_intro_particles():
 	particles.emitting = true
 	get_tree().create_timer(1.5).timeout.connect(particles.queue_free)
 
+func show_dash_tutorial():
+	var canvas = CanvasLayer.new()
+	add_child(canvas)
+	
+	var label = Label.new()
+	var use_mouse = get_node("/root/GlobalData").use_mouse_controls
+	label.text = "SPACE or LEFT CLICK to DASH" if use_mouse else "SPACE to DASH"
+	label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	label.position.y -= 100
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 32)
+	label.add_theme_color_override("font_outline_color", Color.BLACK)
+	label.add_theme_constant_override("outline_size", 8)
+	canvas.add_child(label)
+	
+	# Fade in and out
+	label.modulate.a = 0
+	var tween = create_tween()
+	tween.tween_property(label, "modulate:a", 1.0, 0.5)
+	tween.tween_interval(4.0)
+	tween.tween_property(label, "modulate:a", 0.0, 0.5)
+	tween.tween_callback(canvas.queue_free)
+
 func _physics_process(delta: float):
 	# Pause Input (Always check this first)
 	if Input.is_action_just_pressed("ui_cancel"):
 		toggle_pause()
 		return # Stop processing this frame to avoid double-triggers
 	
-	if get_tree().paused:
+	if get_tree().paused or is_unpausing:
 		return
 		
 	iframe_timer -= delta
@@ -154,10 +184,11 @@ func _physics_process(delta: float):
 		add_shake(2.0)
 		
 		current_energy -= energy_consumption * delta
-		if current_energy < 0: 
+		if current_energy <= 0: 
 			current_energy = 0
 			is_dashing = false
 			modulate = Color(1, 1, 1, 1)
+			regen_delay_timer = 0.5 # Set delay only on full depletion
 		energy_changed.emit(current_energy, max_energy)
 	else:
 		if is_dashing:
@@ -165,14 +196,12 @@ func _physics_process(delta: float):
 			modulate = Color(1, 1, 1, 1)
 		
 		if current_energy < max_energy:
-			current_energy += energy_recovery * delta
-			if current_energy > max_energy: current_energy = max_energy
-			energy_changed.emit(current_energy, max_energy)
-		
-		if current_energy < max_energy:
-			current_energy += energy_recovery * delta
-			if current_energy > max_energy: current_energy = max_energy
-			energy_changed.emit(current_energy, max_energy)
+			if regen_delay_timer > 0:
+				regen_delay_timer -= delta
+			else:
+				current_energy += energy_recovery * delta
+				if current_energy > max_energy: current_energy = max_energy
+				energy_changed.emit(current_energy, max_energy)
 
 	handle_movement(delta)
 	handle_rotation(delta)
@@ -378,8 +407,14 @@ func add_shake(intensity: float):
 	shake_intensity = intensity
 
 func toggle_pause():
+	# NEVER allow unpausing if the Upgrade UI is open
+	var upgrade_ui = get_tree().get_first_node_in_group("upgrade_ui")
+	if upgrade_ui and upgrade_ui.visible:
+		return
+		
 	if get_tree().paused:
 		# Unpausing: Animate fragments back together
+		is_unpausing = true # Prevent movement during animation
 		if has_node("PauseCanvas"):
 			var canvas = $PauseCanvas
 			var menu_ui = canvas.get_node_or_null("PauseMenuUI")
@@ -408,10 +443,17 @@ func toggle_pause():
 			unpause_tween.tween_interval(0.1) 
 			unpause_tween.tween_callback(func():
 				get_tree().paused = false
+				is_unpausing = false # Re-enable movement
+				
+				# Prevent camera "catch-up" sweep
+				if camera:
+					camera.reset_smoothing()
+					
 				canvas.queue_free()
 			)
 		else:
 			get_tree().paused = false
+			is_unpausing = false
 	else:
 		pause_game_fractured()
 

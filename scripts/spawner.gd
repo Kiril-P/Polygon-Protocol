@@ -1,7 +1,7 @@
 extends Node2D
 
 @export var enemy_types: Array[PackedScene] = []
-@export var spawn_rate: float = 1.0 # Reduced from 2.0 to 1.0
+@export var spawn_rate: float = 2.0
 @export var spawn_radius: float = 700.0 # Distance from player to spawn
 
 var spawn_timer: float = 0.0
@@ -18,8 +18,8 @@ func _process(delta: float):
 	if time_passed < spawn_delay:
 		return
 
-	# Gradually increase spawn rate (10% every minute instead of 15%)
-	var current_spawn_rate = spawn_rate * (1.0 + ((time_passed - spawn_delay) / 60.0) * 0.10)
+	# Gradually increase spawn rate (Increasing scaling hardness)
+	var current_spawn_rate = spawn_rate * (1.0 + ((time_passed - spawn_delay) / 60.0) * 0.5)
 	
 	spawn_timer += delta
 	if spawn_timer >= 1.0 / current_spawn_rate:
@@ -35,27 +35,32 @@ func spawn_enemy():
 		if not player:
 			return
 
-	# Pickup random enemy based on time
-	var index = 0
-	var rand = randf()
+	var available_indices = []
 	
-	# 0: Chaser, 1: Drifter (Easy), 2: Shooter (Hard), 3: Spinner, 4: Tank
-	if time_passed < 45: # Very early: 100% Chaser
-		index = 0
-	elif time_passed < 90: # Early: Introduce Drifter
-		index = 0 if rand < 0.6 else 1
-	elif time_passed < 180: # Mid: More Drifters, still no shooters
-		index = 0 if rand < 0.4 else 1
-	elif time_passed < 300: # Late Mid: Shooters finally appear
-		if rand < 0.3: index = 0
-		elif rand < 0.6: index = 1
-		else: index = 2
-	else: # End Game: All types including Spinner and Tank
-		if rand < 0.2: index = 0
-		elif rand < 0.4: index = 1
-		elif rand < 0.6: index = 2
-		elif rand < 0.8: index = 3
-		else: index = 4
+	# 0: Chaser, 1: Fairy, 2: Shooter, 3: Spinner, 4: Tank, 5: Zigzagger
+	if time_passed < 40: # Phase 1: Early Game Stagger (0-40s)
+		available_indices.append(0) # Chasers (3s+)
+		if time_passed >= 10:
+			available_indices.append(1) # Fairies at 10s
+		if time_passed >= 25:
+			available_indices.append(5) # Zigzaggers at 25s
+			
+	elif time_passed < 80: # Phase 2: Mid Game Stagger (40-80s)
+		# Early enemies still possible but less common
+		available_indices.append_array([0, 1, 5])
+		
+		# Introduce mid/late enemies one by one
+		if time_passed >= 42:
+			for i in range(3): available_indices.append(3) # Spinners at 42s
+		if time_passed >= 55:
+			for i in range(3): available_indices.append(4) # Tanks at 55s
+		if time_passed >= 65:
+			for i in range(4): available_indices.append(2) # Shooters at 65s (Late game threat)
+	else: # Phase 3: Total Chaos (80s+)
+		# Full weighted mix
+		available_indices = [0, 1, 5, 2, 2, 3, 3, 4, 4]
+
+	var index = available_indices[randi() % available_indices.size()]
 	
 	# Safety check for array size
 	index = clamp(index, 0, enemy_types.size() - 1)
