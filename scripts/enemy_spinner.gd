@@ -1,10 +1,10 @@
 extends CharacterBody2D
 
-@export var speed: float = 100.0
+@export var speed: float = 120.0
 @export var health: float = 40.0
 @export var damage: float = 10.0
 @export var xp_value: int = 25
-@export var fire_rate: float = 0.5
+@export var fire_rate: float = 0.25
 @export var bullet_scene: PackedScene
 
 var player: Node2D = null
@@ -30,6 +30,7 @@ func setup_visuals():
 	if has_node("Polygon2D"):
 		var poly = $Polygon2D
 		poly.color = Color(1.0, 0.1, 0.4) # Neon Pink
+		poly.modulate = Color(1.8, 1.2, 1.5, 1.0) # Strong Pink Glow
 		var points = PackedVector2Array()
 		for i in range(5):
 			var angle = (TAU / 5) * i

@@ -6,16 +6,19 @@ extends Control
 
 @onready var options_menu = $OptionsMenu
 @onready var controls_button = $OptionsMenu/VBoxContainer/ControlsButton
+@onready var tutorial_button = $OptionsMenu/VBoxContainer/TutorialButton # You might need to add this in editor
+@onready var quit_button = $VBoxContainer/QuitButton # You might need to add this in editor
 @onready var close_options_button = $OptionsMenu/VBoxContainer/CloseOptionsButton
 
 func _ready():
 	options_menu.visible = false
 	update_controls_button_text()
+	update_tutorial_button_text()
 	create_menu_juice()
 	setup_button_animations()
 
 func setup_button_animations():
-	var buttons = [start_button, upgrade_button, options_button, controls_button, close_options_button]
+	var buttons = [start_button, upgrade_button, options_button, controls_button, tutorial_button, quit_button, close_options_button]
 	for btn in buttons:
 		if not btn: continue
 		
@@ -48,6 +51,11 @@ func update_controls_button_text():
 		var use_mouse = get_node("/root/GlobalData").use_mouse_controls
 		controls_button.text = "INPUT: MOUSE" if use_mouse else "INPUT: WASD"
 
+func update_tutorial_button_text():
+	if tutorial_button and has_node("/root/GlobalData"):
+		var show = get_node("/root/GlobalData").show_tutorial
+		tutorial_button.text = "TUTORIAL: ON" if show else "TUTORIAL: OFF"
+
 func create_menu_juice():
 	# Background elements: Mix of shapes and "Enemies"
 	for i in range(12):
@@ -70,8 +78,11 @@ func spawn_menu_shape():
 	
 	poly.polygon = pts
 	# Palette: Neon Cyan, Neon Magenta, Neon Purple
-	var colors = [Color(0.0, 0.8, 1.0, 0.05), Color(1.0, 0.0, 1.0, 0.05), Color(0.7, 0.2, 1.0, 0.05)]
+	var colors = [Color(0.0, 0.8, 1.0, 0.1), Color(1.0, 0.0, 1.0, 0.1), Color(0.7, 0.2, 1.0, 0.1)]
 	poly.color = colors[randi() % colors.size()]
+	# Add Glow to background shapes
+	poly.modulate = Color(1.5, 1.5, 1.5, 1.0)
+	
 	poly.position = Vector2(randf_range(0, 1152), randf_range(0, 648))
 	
 	animate_menu_shape(poly)
@@ -110,6 +121,9 @@ func spawn_menu_enemy():
 	
 	poly.polygon = pts
 	poly.color = Color(1, 0.2, 0.2, 0.3) if not is_tank else Color(0.2, 0.8, 0.2, 0.3)
+	# Add Glow to menu enemies
+	poly.modulate = Color(2.0, 1.5, 1.5, 1.0) if not is_tank else Color(1.5, 2.0, 1.5, 1.0)
+	
 	enemy.position = Vector2(randf_range(0, 1152), randf_range(0, 648))
 	enemy.custom_minimum_size = Vector2(e_size * 2, e_size * 2)
 	poly.position = Vector2(e_size, e_size) # Center poly in button
@@ -236,3 +250,13 @@ func _on_controls_button_pressed():
 		gd.use_mouse_controls = !gd.use_mouse_controls
 		gd.save_game()
 		update_controls_button_text()
+
+func _on_tutorial_button_pressed():
+	if has_node("/root/GlobalData"):
+		var gd = get_node("/root/GlobalData")
+		gd.show_tutorial = !gd.show_tutorial
+		gd.save_game()
+		update_tutorial_button_text()
+
+func _on_quit_button_pressed():
+	get_tree().quit()

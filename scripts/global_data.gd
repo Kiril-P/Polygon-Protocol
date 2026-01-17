@@ -5,7 +5,8 @@ const SAVE_PATH = "user://save_game.dat"
 
 # Meta-progression variables
 var total_shards: int = 0
-var use_mouse_controls: bool = false
+var use_mouse_controls: bool = true
+var show_tutorial: bool = true
 var permanent_upgrades = {
 	"starting_hearts": 0,
 	"dash_mastery": 0,
@@ -35,7 +36,8 @@ func save_game():
 		var data = {
 			"total_shards": total_shards,
 			"permanent_upgrades": permanent_upgrades,
-			"use_mouse_controls": use_mouse_controls
+			"use_mouse_controls": use_mouse_controls,
+			"show_tutorial": show_tutorial
 		}
 		file.store_var(data)
 
@@ -47,4 +49,5 @@ func load_game():
 			if data:
 				total_shards = data.get("total_shards", 0)
 				permanent_upgrades = data.get("permanent_upgrades", permanent_upgrades)
-				use_mouse_controls = data.get("use_mouse_controls", false)
+				use_mouse_controls = data.get("use_mouse_controls", true)
+				show_tutorial = data.get("show_tutorial", true)

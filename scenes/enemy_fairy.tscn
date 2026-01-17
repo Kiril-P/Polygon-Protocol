@@ -1,15 +1,18 @@
 [gd_scene load_steps=4 format=3 uid="uid://cx8q2j1j8j8j8"]
 
-[ext_resource type="Script" path="res://scripts/enemy_drifter.gd" id="1_drifter"]
-[ext_resource type="PackedScene" uid="uid://bmk2qcp3sulkl" path="res://scenes/xp_gem.tscn" id="2_md0e3"]
+[ext_resource type="Script" uid="uid://bj65yig4q4gl1" path="res://scripts/enemy_fairy.gd" id="1_7l66f"]
+[ext_resource type="PackedScene" uid="uid://bjumygplv6k07" path="res://scenes/bullet.tscn" id="2_8arsc"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_drifter"]
 radius = 15.0
 
-[node name="EnemyDrifter" type="CharacterBody2D"]
+[node name="EnemyFairy" type="CharacterBody2D"]
 collision_layer = 4
 collision_mask = 3
-script = ExtResource("1_drifter")
+script = ExtResource("1_7l66f")
+bullet_scene = ExtResource("2_8arsc")
+stop_distance = 575.0
+
 [node name="Polygon2D" type="Polygon2D" parent="."]
 color = Color(1, 0.1, 0.4, 1)
 polygon = PackedVector2Array(15, 0, -10, 10, -10, -10)

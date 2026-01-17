@@ -151,6 +151,23 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 30
 text = "CORE OPTIONS"
 
+[node name="QuitButton" type="Button" parent="."]
+custom_minimum_size = Vector2(100, 70)
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -272.25
+offset_top = -126.82501
+offset_right = -72.25
+offset_bottom = -56.824768
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_font_sizes/font_size = 30
+text = "QUIT"
+
 [node name="OptionsMenu" type="ColorRect" parent="."]
 visible = false
 layout_mode = 1
@@ -190,6 +207,13 @@ size_flags_horizontal = 4
 theme_override_font_sizes/font_size = 18
 text = "INPUT: WASD"
 
+[node name="TutorialButton" type="Button" parent="OptionsMenu/VBoxContainer"]
+custom_minimum_size = Vector2(250, 50)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 18
+text = "TUTORIAL: ON"
+
 [node name="CloseOptionsButton" type="Button" parent="OptionsMenu/VBoxContainer"]
 custom_minimum_size = Vector2(200, 40)
 layout_mode = 2
@@ -220,5 +244,7 @@ glitch_chance = 0.004
 [connection signal="pressed" from="VBoxContainer/StartButton" to="." method="_on_start_button_pressed"]
 [connection signal="pressed" from="VBoxContainer/UpgradeButton" to="." method="_on_upgrade_button_pressed"]
 [connection signal="pressed" from="VBoxContainer/OptionsButton" to="." method="_on_options_button_pressed"]
+[connection signal="pressed" from="QuitButton" to="." method="_on_quit_button_pressed"]
 [connection signal="pressed" from="OptionsMenu/VBoxContainer/ControlsButton" to="." method="_on_controls_button_pressed"]
+[connection signal="pressed" from="OptionsMenu/VBoxContainer/TutorialButton" to="." method="_on_tutorial_button_pressed"]
 [connection signal="pressed" from="OptionsMenu/VBoxContainer/CloseOptionsButton" to="." method="_on_close_options_button_pressed"]

@@ -18,6 +18,8 @@ func _ready():
 	
 	if has_node("Polygon2D"):
 		$Polygon2D.color = Color(1.0, 0.1, 0.4) # Neon Red/Pink
+		# Add Glow
+		$Polygon2D.modulate = Color(1.5, 1.2, 1.2, 1.0) 
 	# But keep collision with world (Layer 1)
 	set_collision_mask_value(2, false)
 	set_collision_layer_value(3, true)
