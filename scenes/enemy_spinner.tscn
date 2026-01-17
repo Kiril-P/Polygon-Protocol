@@ -1,0 +1,22 @@
+[gd_scene load_steps=5 format=3 uid="uid://5e72dda4g4vr"]
+
+[ext_resource type="Script" uid="uid://dyov7qhdpsmkg" path="res://scripts/enemy_spinner.gd" id="1_x8yu0"]
+[ext_resource type="PackedScene" uid="uid://bjumygplv6k07" path="res://scenes/bullet.tscn" id="2_6oyq7"]
+[ext_resource type="PackedScene" uid="uid://bmk2qcp3sulkl" path="res://scenes/xp_gem.tscn" id="2_x8yu0"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_7p1mj"]
+size = Vector2(30, 30)
+
+[node name="Enemy" type="CharacterBody2D"]
+collision_layer = 4
+collision_mask = 3
+script = ExtResource("1_x8yu0")
+bullet_scene = ExtResource("2_6oyq7")
+xp_gem_scene = ExtResource("2_x8yu0")
+
+[node name="Polygon2D" type="Polygon2D" parent="."]
+color = Color(0.8791834, 0, 0.17410749, 1)
+polygon = PackedVector2Array(15, 15, -15, 15, -15, -15, 15, -15)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_7p1mj")

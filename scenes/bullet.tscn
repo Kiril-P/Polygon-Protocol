@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3 uid="uid://bjumygplv6k07"]
+
+[ext_resource type="Script" uid="uid://knefoku635mt" path="res://scripts/bullet.gd" id="1_mkf8s"]
+
+[node name="Bullet" type="Area2D" groups=["player_bullets"]]
+collision_layer = 3
+collision_mask = 4
+script = ExtResource("1_mkf8s")
+
+[node name="BulletSprite" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(8, 0, 2, 3, -4, 0, 2, -3)
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="."]
+polygon = PackedVector2Array(8, 0, 2, 3, -4, 0, 2, -3)
+
+[node name="VisibleOnScreenNotifier2D" type="VisibleOnScreenNotifier2D" parent="."]
