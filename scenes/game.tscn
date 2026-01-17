@@ -1,0 +1,36 @@
+[gd_scene load_steps=11 format=3 uid="uid://f2ddmfkkhhru"]
+
+[ext_resource type="PackedScene" uid="uid://b6b5cvp68bng7" path="res://scenes/player.tscn" id="1_uwrxv"]
+[ext_resource type="Script" uid="uid://b5rlodbs4ga30" path="res://scripts/spawner.gd" id="2_lnu2h"]
+[ext_resource type="PackedScene" uid="uid://kqqwyvtt77ry" path="res://scenes/enemy.tscn" id="2_yqjtg"]
+[ext_resource type="PackedScene" uid="uid://cx8q2j1j8j8j8" path="res://scenes/enemy_drifter.tscn" id="3_drifter"]
+[ext_resource type="PackedScene" uid="uid://dq6u3o4hdr0rx" path="res://scenes/upgrade_ui.tscn" id="4_lbhrr"]
+[ext_resource type="PackedScene" uid="uid://i0kn8jpr7ati" path="res://scenes/enemy_shooter.tscn" id="4_p57ef"]
+[ext_resource type="PackedScene" uid="uid://5e72dda4g4vr" path="res://scenes/enemy_spinner.tscn" id="5_0tnpc"]
+[ext_resource type="PackedScene" uid="uid://bfq122qkhqsi6" path="res://scenes/hud.tscn" id="5_iywne"]
+[ext_resource type="PackedScene" uid="uid://di3xivgn03e8r" path="res://scenes/death_screen.tscn" id="6_u5sy4"]
+[ext_resource type="PackedScene" uid="uid://5jpyddyo4ed6" path="res://scenes/enemy_tank.tscn" id="6_vtaks"]
+
+[sub_resource type="Environment" id="Environment_mwb40"]
+background_mode = 3
+glow_enabled = true
+glow_intensity = 1.2
+glow_bloom = 0.2
+glow_blend_mode = 0
+
+[node name="GameScene" type="Node2D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_mwb40")
+
+[node name="CharacterBody2D" parent="." instance=ExtResource("1_uwrxv")]
+
+[node name="Spawner" type="Node2D" parent="."]
+script = ExtResource("2_lnu2h")
+enemy_types = Array[PackedScene]([ExtResource("2_yqjtg"), ExtResource("3_drifter"), ExtResource("4_p57ef"), ExtResource("5_0tnpc"), ExtResource("6_vtaks")])
+
+[node name="HUD" parent="." instance=ExtResource("5_iywne")]
+
+[node name="UpgradeUI" parent="." instance=ExtResource("4_lbhrr")]
+
+[node name="DeathScreen" parent="." instance=ExtResource("6_u5sy4")]

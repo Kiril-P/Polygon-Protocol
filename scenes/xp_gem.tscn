@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3 uid="uid://bmk2qcp3sulkl"]
+
+[ext_resource type="Script" uid="uid://cf0ipmchkhmo8" path="res://scripts/xp_gem.gd" id="1_2i32e"]
+
+[node name="XPGem" type="Area2D"]
+script = ExtResource("1_2i32e")
+
+[node name="Polygon2D" type="Polygon2D" parent="."]
+color = Color(0.07058824, 1, 0, 1)
+polygon = PackedVector2Array(10, 0, 0, -14, -10, 0, 0, 14)
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="."]
+polygon = PackedVector2Array(10, 0, 0, -14, -10, 0, 0, 14)

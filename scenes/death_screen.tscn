@@ -1,0 +1,82 @@
+[gd_scene load_steps=2 format=3 uid="uid://di3xivgn03e8r"]
+
+[ext_resource type="Script" uid="uid://w52f6xc5cv3e" path="res://scripts/death_screen.gd" id="1_uyutr"]
+
+[node name="DeathScreen" type="CanvasLayer"]
+process_mode = 3
+script = ExtResource("1_uyutr")
+
+[node name="Control" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BG" type="ColorRect" parent="Control"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.12, 0, 0, 0.8)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Control"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -150.0
+offset_right = 200.0
+offset_bottom = 150.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="TitleLabel" type="Label" parent="Control/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 12
+theme_override_font_sizes/font_size = 64
+text = "ENTITY DELETED"
+horizontal_alignment = 1
+
+[node name="StatsLabel" type="Label" parent="Control/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "LEVEL: 0
+SHARDS: 0"
+horizontal_alignment = 1
+
+[node name="TotalShardsLabel" type="Label" parent="Control/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "TOTAL SHARDS: 0"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="Control/VBoxContainer"]
+layout_mode = 2
+
+[node name="RestartButton" type="Button" parent="Control/VBoxContainer"]
+custom_minimum_size = Vector2(250, 50)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 24
+text = "REINITIALIZE"
+
+[node name="MenuButton" type="Button" parent="Control/VBoxContainer"]
+custom_minimum_size = Vector2(250, 50)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 18
+text = "RETURN TO CORE"
+
+[connection signal="pressed" from="Control/VBoxContainer/RestartButton" to="." method="_on_restart_pressed"]
+[connection signal="pressed" from="Control/VBoxContainer/MenuButton" to="." method="_on_main_menu_pressed"]
