@@ -1,8 +1,34 @@
-[gd_scene load_steps=4 format=3 uid="uid://fu0f367iflkj"]
+[gd_scene load_steps=6 format=3 uid="uid://fu0f367iflkj"]
 
 [ext_resource type="Script" uid="uid://iymbvvihoeli" path="res://scripts/main_menu.gd" id="1_l6cm7"]
-[ext_resource type="FontFile" uid="uid://dm78qf6td2fco" path="res://assets/kenney_ui-pack-space-expansion/Font/Kenney Future Narrow.ttf" id="2_bqqt6"]
 [ext_resource type="Script" uid="uid://bu7rsaxs6ij48" path="res://scripts/title_pulse.gd" id="2_ekxnf"]
+[ext_resource type="Script" uid="uid://dhgjjcftfevfx" path="res://scripts/background_scroller.gd" id="3_scroller"]
+
+[sub_resource type="Shader" id="Shader_grid"]
+code = "shader_type canvas_item;
+
+uniform vec2 grid_size = vec2(100.0, 100.0);
+uniform vec4 line_color : source_color = vec4(0.0, 0.5, 1.0, 0.1);
+uniform float line_thickness : hint_range(0.0, 10.0) = 1.0;
+uniform vec2 offset = vec2(0.0, 0.0);
+
+void fragment() {
+    vec2 uv = FRAGCOORD.xy + offset;
+    vec2 grid = mod(uv, grid_size);
+    
+    float line_x = step(grid.x, line_thickness);
+    float line_y = step(grid.y, line_thickness);
+    
+    float mask = max(line_x, line_y);
+    COLOR = line_color * mask;
+}"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_grid"]
+shader = SubResource("Shader_grid")
+shader_parameter/grid_size = Vector2(100, 100)
+shader_parameter/line_color = Color(0, 0.5, 1, 0.05)
+shader_parameter/line_thickness = 1.0
+shader_parameter/offset = Vector2(0, 0)
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -13,14 +39,84 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_l6cm7")
 
-[node name="ColorRect" type="ColorRect" parent="."]
+[node name="Background" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.21712735, 0.05077961, 0.34451854, 1)
+mouse_filter = 2
+
+[node name="BaseColor" type="ColorRect" parent="Background"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0156863, 0.0156863, 0.0588235, 1)
+
+[node name="DistantNebula" type="CPUParticles2D" parent="Background"]
+position = Vector2(576, 324)
+amount = 4
+lifetime = 15.0
+preprocess = 5.0
+randomness = 0.2
+emission_shape = 3
+emission_rect_extents = Vector2(800, 800)
+gravity = Vector2(0, 0)
+initial_velocity_min = 5.0
+initial_velocity_max = 10.0
+scale_amount_min = 50.0
+scale_amount_max = 150.0
+color = Color(0.4, 0, 0.8, 0.03)
+
+[node name="StarField" type="CPUParticles2D" parent="Background"]
+position = Vector2(576, 324)
+amount = 200
+lifetime = 20.0
+preprocess = 10.0
+randomness = 1.0
+emission_shape = 3
+emission_rect_extents = Vector2(1200, 1200)
+direction = Vector2(1, 1)
+spread = 180.0
+gravity = Vector2(0, 0)
+initial_velocity_min = 1.0
+initial_velocity_max = 5.0
+scale_amount_min = 0.5
+scale_amount_max = 1.5
+color = Color(1, 1, 1, 0.2)
+hue_variation_min = -0.1
+hue_variation_max = 0.1
+
+[node name="Grid" type="ColorRect" parent="Background"]
+material = SubResource("ShaderMaterial_grid")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("3_scroller")
+auto_scroll = Vector2(20, 10)
+
+[node name="CyberDust" type="CPUParticles2D" parent="Background"]
+position = Vector2(576, 324)
+amount = 40
+lifetime = 10.0
+preprocess = 5.0
+randomness = 0.5
+emission_shape = 3
+emission_rect_extents = Vector2(1000, 1000)
+direction = Vector2(-1, -1)
+spread = 20.0
+gravity = Vector2(0, 0)
+initial_velocity_min = 10.0
+initial_velocity_max = 30.0
+scale_amount_max = 3.0
+color = Color(0, 1, 1, 0.1)
 
 [node name="VBoxContainer" type="VBoxContainer" parent="."]
 layout_mode = 1
@@ -38,24 +134,21 @@ grow_vertical = 2
 theme_override_constants/separation = 25
 
 [node name="StartButton" type="Button" parent="VBoxContainer"]
-custom_minimum_size = Vector2(300, 60)
+custom_minimum_size = Vector2(350, 70)
 layout_mode = 2
-theme_override_fonts/font = ExtResource("2_bqqt6")
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 30
 text = "START EXPEDITION"
 
 [node name="UpgradeButton" type="Button" parent="VBoxContainer"]
-custom_minimum_size = Vector2(300, 60)
+custom_minimum_size = Vector2(350, 70)
 layout_mode = 2
-theme_override_fonts/font = ExtResource("2_bqqt6")
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 30
 text = "EVOLUTION VAULT"
 
 [node name="OptionsButton" type="Button" parent="VBoxContainer"]
-custom_minimum_size = Vector2(300, 60)
+custom_minimum_size = Vector2(350, 70)
 layout_mode = 2
-theme_override_fonts/font = ExtResource("2_bqqt6")
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 30
 text = "CORE OPTIONS"
 
 [node name="OptionsMenu" type="ColorRect" parent="."]
@@ -86,7 +179,6 @@ alignment = 1
 
 [node name="Label" type="Label" parent="OptionsMenu/VBoxContainer"]
 layout_mode = 2
-theme_override_fonts/font = ExtResource("2_bqqt6")
 theme_override_font_sizes/font_size = 32
 text = "OPTIONS"
 horizontal_alignment = 1
@@ -95,7 +187,6 @@ horizontal_alignment = 1
 custom_minimum_size = Vector2(250, 50)
 layout_mode = 2
 size_flags_horizontal = 4
-theme_override_fonts/font = ExtResource("2_bqqt6")
 theme_override_font_sizes/font_size = 18
 text = "INPUT: WASD"
 
@@ -103,7 +194,6 @@ text = "INPUT: WASD"
 custom_minimum_size = Vector2(200, 40)
 layout_mode = 2
 size_flags_horizontal = 4
-theme_override_fonts/font = ExtResource("2_bqqt6")
 theme_override_font_sizes/font_size = 16
 text = "BACK"
 
@@ -112,20 +202,20 @@ layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -65.5
-offset_top = 93.0
-offset_right = 65.5
-offset_bottom = 116.0
+offset_left = -489.0
+offset_top = 134.0
+offset_right = 489.0
+offset_bottom = 299.0
 grow_horizontal = 2
-theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_constants/outline_size = 10
-theme_override_fonts/font = ExtResource("2_bqqt6")
-theme_override_font_sizes/font_size = 60
+theme_override_colors/font_outline_color = Color(0, 1, 1, 1)
+theme_override_constants/outline_size = 12
+theme_override_font_sizes/font_size = 120
 text = "Polygon Protocol"
 horizontal_alignment = 1
+vertical_alignment = 1
 script = ExtResource("2_ekxnf")
 glow_speed = 1.0
-glitch_chance = 0.001
+glitch_chance = 0.004
 
 [connection signal="pressed" from="VBoxContainer/StartButton" to="." method="_on_start_button_pressed"]
 [connection signal="pressed" from="VBoxContainer/UpgradeButton" to="." method="_on_upgrade_button_pressed"]

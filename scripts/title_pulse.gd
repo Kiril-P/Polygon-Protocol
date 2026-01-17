@@ -1,7 +1,7 @@
 extends Label
 
 @export var glow_speed: float = 2.0
-@export var glitch_chance: float = 0.01
+@export var glitch_chance: float = 0.02
 
 var time: float = 0.0
 var base_pos: Vector2
@@ -12,30 +12,49 @@ func _ready():
 	base_scale = scale
 	pivot_offset = size / 2
 	
-	# Set a very sharp neon outline - Palette: Neon Cyan
-	add_theme_color_override("font_outline_color", Color(0.0, 0.8, 1.0, 0.5))
-	add_theme_constant_override("outline_size", 12)
+	# Initial appearance animation
+	modulate.a = 0
+	scale = base_scale * 1.5
+	var intro = create_tween().set_parallel(true)
+	intro.tween_property(self, "modulate:a", 1.0, 1.0).set_trans(Tween.TRANS_QUINT)
+	intro.tween_property(self, "scale", base_scale, 1.2).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	
+	# Neon styling
+	add_theme_color_override("font_outline_color", Color(0.0, 1.0, 1.0, 0.8))
+	add_theme_constant_override("outline_size", 16)
+	add_theme_color_override("font_shadow_color", Color(0.5, 0, 1, 0.5))
+	add_theme_constant_override("shadow_offset_x", 4)
+	add_theme_constant_override("shadow_offset_y", 4)
 
 func _process(delta: float):
 	time += delta
 	
-	# 1. High-Quality Digital Glow Pulse
-	# Using an exponential sine for a "sharper" pulse feel
-	var pulse = pow(sin(time * glow_speed), 2.0)
-	var glow_color = Color(0.0, 0.8, 1.0) # Sharp Neon Cyan
+	# 1. Cyber Glow Pulse
+	var pulse = (sin(time * glow_speed) + 1.0) / 2.0
+	var cyan = Color(0.0, 1.0, 1.0)
+	var magenta = Color(1.0, 0.0, 1.0)
 	
-	# Interpolate between a normal state and a super-bright "overdriven" state
-	modulate = Color.WHITE.lerp(glow_color * 2.5, pulse * 0.6)
+	# Cycle between Cyan and a bit of Magenta for that Retrowave feel
+	var target_color = cyan.lerp(magenta, 0.2 * pulse)
+	add_theme_color_override("font_outline_color", target_color.lerp(Color.WHITE, 0.3 * pulse))
 	
-	# 2. Subtle "Digital Jitter" instead of goofy floating
-	# Very small, very fast offsets to give it a "hardware" feel
+	# 2. Glitch Effect
 	if randf() < glitch_chance:
-		position = base_pos + Vector2(randf_range(-2, 2), randf_range(-1, 1))
-		scale = base_scale * Vector2(randf_range(0.98, 1.02), randf_range(0.98, 1.02))
+		# Random position "jumps"
+		position = base_pos + Vector2(randf_range(-8, 8), randf_range(-3, 3))
+		# Random text corruption feel (using scale)
+		scale.x = base_scale.x * randf_range(0.9, 1.2)
+		modulate = Color(2, 2, 2, 1) # Flash white
+		
+		# Occasional "split" feel
+		if randf() < 0.5:
+			text = "P0lygon Pr0t0col"
 	else:
-		position = position.lerp(base_pos, 20.0 * delta)
-		scale = scale.lerp(base_scale, 20.0 * delta)
+		position = position.lerp(base_pos, 15.0 * delta)
+		scale = scale.lerp(base_scale, 15.0 * delta)
+		modulate = modulate.lerp(Color.WHITE, 10.0 * delta)
+		text = "Polygon Protocol"
 	
-	# 3. Horizontal "Scanline" offset
-	# Just a tiny bit of horizontal swaying to make it feel less static, but keep it tight
-	position.x = base_pos.x + sin(time * 0.5) * 5.0
+	# 3. Floating Motion
+	position.y = base_pos.y + sin(time * 1.5) * 8.0
+	rotation = sin(time * 0.8) * 0.02

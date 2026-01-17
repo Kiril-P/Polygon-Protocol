@@ -33,5 +33,6 @@ collision_mask = 5
 polygon = PackedVector2Array(25, 0, 20, 20, 0, 25, -20, 20, -25, 0, -20, -20, 0, -25, 20, -20)
 
 [node name="Camera2D" type="Camera2D" parent="."]
+zoom = Vector2(1.8, 1.8)
 position_smoothing_enabled = true
 rotation_smoothing_enabled = true

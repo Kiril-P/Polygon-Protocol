@@ -12,8 +12,6 @@ collision_layer = 4
 collision_mask = 3
 script = ExtResource("1_p4l84")
 bullet_scene = ExtResource("2_mneqe")
-xp_gem_scene = ExtResource("2_p4l84")
-
 [node name="Polygon2D" type="Polygon2D" parent="."]
 color = Color(0.6252279, 0.3336818, 2.8878452e-07, 1)
 polygon = PackedVector2Array(15, 15, -15, 15, -15, -15, 15, -15)

@@ -10,7 +10,6 @@ extends CharacterBody2D
 @export var burst_count: int = 3
 @export var burst_delay: float = 0.15
 @export var bullet_scene: PackedScene
-@export var xp_gem_scene: PackedScene
 
 var player: Node2D = null
 var fire_timer: float = 0.0
@@ -128,11 +127,10 @@ func die():
 	if player and player.has_method("add_shake"):
 		player.add_shake(5.0)
 	
-	if xp_gem_scene:
-		var gem = xp_gem_scene.instantiate()
-		gem.global_position = global_position
-		gem.xp_value = xp_value
-		get_tree().current_scene.call_deferred("add_child", gem)
+	# Give XP directly to player
+	if player and player.has_method("add_xp"):
+		player.add_xp(xp_value)
+		
 	queue_free()
 
 func spawn_death_particles():

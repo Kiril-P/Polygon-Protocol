@@ -29,7 +29,6 @@ var level: int = 1
 var xp: float = 0.0
 var xp_to_next_level: float = 100.0
 var next_evolution_level: int = 4
-@export var xp_magnet_range: float = 150.0
 
 # Shooting
 @export var bullet_scene: PackedScene  # Drag bullet.tscn here in inspector
@@ -667,8 +666,6 @@ func apply_upgrade(upgrade_type: String, value: float):
 			fire_rate *= (1.0 - value)
 		"dash_trail":
 			dash_trail_damage = value
-		"magnet":
-			xp_magnet_range *= (1.0 + value)
 		"heal":
 			current_hearts = min(current_hearts + 1, max_hearts)
 			health_changed.emit(current_hearts, max_hearts)

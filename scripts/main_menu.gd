@@ -74,12 +74,21 @@ func spawn_menu_shape():
 	poly.color = colors[randi() % colors.size()]
 	poly.position = Vector2(randf_range(0, 1152), randf_range(0, 648))
 	
-	var tween = create_tween().set_loops()
+	animate_menu_shape(poly)
+
+func animate_menu_shape(poly: Node2D):
+	if not is_instance_valid(poly): return
+	
 	var travel = Vector2(randf_range(-100, 100), randf_range(-100, 100))
 	var duration = randf_range(10, 20)
+	
+	var tween = create_tween().set_parallel(true)
 	tween.tween_property(poly, "position", poly.position + travel, duration).set_trans(Tween.TRANS_SINE)
-	tween.tween_property(poly, "position", poly.position, duration).set_trans(Tween.TRANS_SINE)
-	tween.parallel().tween_property(poly, "rotation", TAU, duration * 2)
+	tween.tween_property(poly, "rotation", poly.rotation + PI, duration)
+	
+	tween.set_parallel(false)
+	tween.tween_interval(1.0) # Small pause
+	tween.tween_callback(func(): animate_menu_shape(poly))
 
 func spawn_menu_enemy():
 	var enemy = Button.new() # Use Button to detect clicks easily
@@ -113,12 +122,7 @@ func spawn_menu_enemy():
 		get_tree().create_timer(2.0).timeout.connect(spawn_menu_enemy)
 	)
 	
-	# Behavior: Patrol and "Shoot"
-	var duration = randf_range(5, 10)
-	var tween = create_tween().set_loops()
-	var target = Vector2(randf_range(0, 1152), randf_range(0, 648))
-	tween.tween_property(enemy, "position", target, duration).set_trans(Tween.TRANS_SINE)
-	tween.parallel().tween_property(poly, "rotation", TAU * 2, duration)
+	animate_menu_enemy(enemy, poly)
 	
 	# Firing logic
 	var fire_timer = Timer.new()
@@ -129,6 +133,19 @@ func spawn_menu_enemy():
 		spawn_menu_bullet(enemy.position + poly.position, poly.rotation, poly.color)
 	)
 	fire_timer.start()
+
+func animate_menu_enemy(enemy: Control, poly: Node2D):
+	if not is_instance_valid(enemy): return
+	
+	var duration = randf_range(5, 10)
+	var target = Vector2(randf_range(0, 1152), randf_range(0, 648))
+	
+	var tween = create_tween().set_parallel(true)
+	tween.tween_property(enemy, "position", target, duration).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(poly, "rotation", poly.rotation + TAU, duration)
+	
+	tween.set_parallel(false)
+	tween.tween_callback(func(): animate_menu_enemy(enemy, poly))
 
 func spawn_menu_death_particles(pos: Vector2, col: Color):
 	var particles = CPUParticles2D.new()
@@ -167,7 +184,6 @@ func spawn_menu_bullet(pos: Vector2, rot: float, col: Color):
 
 func _on_start_button_pressed():
 	# Cool "Warp" Animation
-	var canvas = get_parent() # Assuming MainMenu is top level or in a root
 	
 	# 1. Disable buttons
 	start_button.disabled = true
