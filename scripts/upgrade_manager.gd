@@ -48,13 +48,6 @@ var upgrade_pool = [
 		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_011.png"
 	},
 	{
-		"id": "magnet",
-		"name": "Greed",
-		"description": "+50% Pickup Range",
-		"value": 0.5,
-		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_013.png"
-	},
-	{
 		"id": "bounce",
 		"name": "Rubber Bullets",
 		"description": "Bullets bounce off screen edges",

@@ -10,8 +10,6 @@ var drift_direction: Vector2 = Vector2.ZERO
 var drift_timer: float = 0.0
 var is_dying: bool = false
 
-@export var xp_gem_scene: PackedScene
-
 func _ready():
 	add_to_group("enemies")
 	player = get_tree().get_first_node_in_group("player")
@@ -74,11 +72,11 @@ func die():
 	is_dying = true
 	spawn_death_particles()
 	if player and player.has_method("add_shake"): player.add_shake(3.0)
-	if xp_gem_scene:
-		var gem = xp_gem_scene.instantiate()
-		gem.global_position = global_position
-		gem.xp_value = xp_value
-		get_tree().current_scene.call_deferred("add_child", gem)
+	
+	# Give XP directly to player
+	if player and player.has_method("add_xp"):
+		player.add_xp(xp_value)
+		
 	queue_free()
 
 func spawn_death_particles():

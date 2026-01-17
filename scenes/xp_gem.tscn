@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3 uid="uid://bmk2qcp3sulkl"]
+[gd_scene load_steps=2 format=3 uid="uid://ch1mylofreust"]
 
-[ext_resource type="Script" uid="uid://cf0ipmchkhmo8" path="res://scripts/xp_gem.gd" id="1_2i32e"]
+[ext_resource type="Script" path="res://scripts/xp_gem.gd" id="1_2i32e"]
 
 [node name="XPGem" type="Area2D"]
 script = ExtResource("1_2i32e")

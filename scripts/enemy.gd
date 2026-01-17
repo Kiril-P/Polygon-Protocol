@@ -32,8 +32,6 @@ func _physics_process(delta: float):
 		velocity = direction * speed
 		move_and_slide()
 
-@export var xp_gem_scene: PackedScene # Drag xp_gem.tscn here
-
 func spawn_death_particles():
 	var particles = CPUParticles2D.new()
 	get_tree().current_scene.add_child(particles)
@@ -82,11 +80,8 @@ func die():
 	if player and player.has_method("add_shake"):
 		player.add_shake(5.0)
 	
-	if xp_gem_scene:
-		var gem = xp_gem_scene.instantiate()
-		# Add to scene first, then set position
-		get_tree().current_scene.add_child(gem)
-		gem.global_position = global_position
-		gem.xp_value = xp_value
+	# Give XP directly to player
+	if player and player.has_method("add_xp"):
+		player.add_xp(xp_value)
 		
 	queue_free()
