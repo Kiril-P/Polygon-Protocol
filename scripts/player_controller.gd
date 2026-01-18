@@ -110,10 +110,7 @@ func _ready():
 		overdrive_available = gd.is_upgrade_active("emergency_overdrive")
 		
 		# RECURSIVE EVOLUTION
-		if gd.is_upgrade_active("recursive_evolution"):
-			# Instant level 3
-			for i in range(2):
-				add_xp(xp_to_next_level)
+		# (Removed)
 	
 	# Apply Permanent Stat Boosts
 	apply_upgrade("init_permanent", 0)
@@ -158,6 +155,7 @@ func _ready():
 			env.set("glow_levels/5", 1.0)
 	
 	# DASH TUTORIAL
+	get_tree().paused = false # Ensure game is unpaused at start
 	if has_node("/root/GlobalData") and get_node("/root/GlobalData").show_tutorial:
 		show_full_tutorial()
 	else:
@@ -199,6 +197,12 @@ func show_full_tutorial():
 	
 	is_tutorial_active = true
 	
+	# Start spawner immediately so movement and spawning aren't blocked by tutorial labels
+	var spawner = get_tree().get_first_node_in_group("spawner")
+	if spawner:
+		spawner.tutorial_finished = true
+		spawner.time_passed = 0.0
+	
 	var label = Label.new()
 	var use_mouse = get_node("/root/GlobalData").use_mouse_controls
 	
@@ -209,10 +213,11 @@ func show_full_tutorial():
 	label.add_theme_font_size_override("font_size", 48)
 	label.add_theme_color_override("font_outline_color", Color.BLACK)
 	label.add_theme_constant_override("outline_size", 12)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.add_child(label)
 	
 	var skip_label = Label.new()
-	skip_label.text = "[LMB / SPACE TO SKIP]"
+	skip_label.text = "[SPACE TO SKIP]"
 	skip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	skip_label.add_theme_font_size_override("font_size", 18)
 	skip_label.modulate.a = 0.5
@@ -221,6 +226,7 @@ func show_full_tutorial():
 	skip_label.offset_left = -300
 	skip_label.offset_right = 300
 	skip_label.offset_bottom = -100
+	skip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.add_child(skip_label)
 	
 	var lines = [
@@ -253,9 +259,7 @@ func show_full_tutorial():
 
 func _input(event):
 	if is_tutorial_active:
-		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-			skip_tutorial()
-		elif event is InputEventKey and event.keycode == KEY_SPACE and event.pressed:
+		if event is InputEventKey and event.keycode == KEY_SPACE and event.pressed:
 			skip_tutorial()
 
 func skip_tutorial():
@@ -269,7 +273,7 @@ func finish_tutorial():
 		$TutorialCanvas.queue_free()
 	
 	var spawner = get_tree().get_first_node_in_group("spawner")
-	if spawner:
+	if spawner and not spawner.tutorial_finished:
 		spawner.tutorial_finished = true
 		spawner.time_passed = 0.0 
 		spawner.spawn_timer = 10.0 # Force immediate spawn after safety window

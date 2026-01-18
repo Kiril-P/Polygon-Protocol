@@ -13,8 +13,7 @@ var vault_upgrades = [
 	{"id": "dash_mastery", "name": "DASH MASTERY", "desc": "Reduces Dash energy consumption.", "cost": 200, "icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_011.png"},
 	{"id": "emergency_overdrive", "name": "EMERGENCY OVERDRIVE", "desc": "At 1 heart, gain 5s of extreme speed and fire rate. (Once per run)", "cost": 300, "icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_013.png"},
 	{"id": "shard_multiplier", "name": "RECURSIVE HARVEST", "desc": "Earn 50% more Quantum Shards on every run.", "cost": 400, "icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_017.png"},
-	{"id": "repulsive_armor", "name": "REPULSIVE ARMOR", "desc": "Taking damage releases a shockwave that pushes back nearby enemies.", "cost": 500, "icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_018.png"},
-	{"id": "recursive_evolution", "name": "RECURSIVE EVOLUTION", "desc": "Start every run at Level 3 immediately.", "cost": 1500, "icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_019.png"}
+	{"id": "repulsive_armor", "name": "REPULSIVE ARMOR", "desc": "Taking damage releases a shockwave that pushes back nearby enemies.", "cost": 500, "icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_018.png"}
 ]
 
 func _ready():

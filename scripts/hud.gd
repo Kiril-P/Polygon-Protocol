@@ -5,22 +5,6 @@ extends CanvasLayer
 @onready var dash_bar = $Control/DashBar
 @onready var level_label = $Control/LevelLabel
 
-func setup_heart_pointer():
-	var arrow = Polygon2D.new()
-	arrow.name = "HeartPointer"
-	var pts = PackedVector2Array([
-		Vector2(-8, -12), Vector2(15, 0), Vector2(-8, 12), Vector2(-4, 0)
-	])
-	arrow.polygon = pts
-	arrow.color = Color(1.0, 0.2, 0.6) # Neon Pink
-	arrow.modulate = Color(2.0, 1.5, 2.0) # Glow
-	arrow.visible = false
-	$Control.add_child(arrow)
-	
-	var t = create_tween().set_loops()
-	t.tween_property(arrow, "scale", Vector2(1.2, 1.2), 0.4).set_trans(Tween.TRANS_SINE)
-	t.tween_property(arrow, "scale", Vector2(1.0, 1.0), 0.4).set_trans(Tween.TRANS_SINE)
-
 func show_dash_nerf_warning():
 	var warn = $Control.get_node_or_null("BossWarning")
 	if warn:
@@ -31,13 +15,21 @@ func show_dash_nerf_warning():
 		t.tween_property(warn, "modulate:a", 1.0, 0.3)
 		t.tween_interval(2.0)
 		t.tween_property(warn, "modulate:a", 0.0, 0.3)
+		# Add new label
+		t.tween_callback(func(): 
+			warn.text = "FIND AND DESTROY THE HEART TO KILL THEM"
+			warn.modulate.a = 0
+			warn.visible = true
+		)
+		t.tween_property(warn, "modulate:a", 1.0, 0.3)
+		t.tween_interval(3.0)
+		t.tween_property(warn, "modulate:a", 0.0, 0.3)
 		t.tween_callback(func(): warn.visible = false)
 
 func _ready():
 	add_to_group("hud")
 	# Create nodes first
 	setup_boss_pointer()
-	setup_heart_pointer()
 	setup_combo_ui()
 	setup_boss_bar()
 	setup_bottom_ui() # This initializes heart_container
@@ -283,39 +275,6 @@ func _process(_delta):
 				bar.max_value = boss.max_health
 				bar.value = boss.health
 		
-		# Update Heart Pointer
-		var heart_pointer = $Control.get_node_or_null("HeartPointer")
-		if heart_pointer:
-			var hearts = get_tree().get_nodes_in_group("boss_hearts")
-			var nearest_heart = null
-			var min_dist = INF
-			var player_node = get_tree().get_first_node_in_group("player")
-			
-			if player_node:
-				for heart in hearts:
-					if is_instance_valid(heart):
-						var d = player_node.global_position.distance_to(heart.global_position)
-						if d < min_dist:
-							min_dist = d
-							nearest_heart = heart
-				
-				if nearest_heart:
-					heart_pointer.visible = true
-					var screen_size = get_viewport().get_visible_rect().size
-					var heart_screen_pos = nearest_heart.get_global_transform_with_canvas().get_origin()
-					
-					# Reuse pointer clamping logic
-					var center = screen_size / 2.0
-					var to_heart = (heart_screen_pos - center)
-					var dir = to_heart.normalized()
-					var edge_margin = 60.0
-					var target_pos = center + dir * (min(screen_size.x, screen_size.y) / 2.0 - edge_margin)
-					
-					heart_pointer.position = target_pos
-					heart_pointer.rotation = dir.angle()
-				else:
-					heart_pointer.visible = false
-
 		if pointer:
 			var player = get_tree().get_first_node_in_group("player")
 			if player:

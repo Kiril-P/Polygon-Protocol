@@ -30,6 +30,10 @@ func _ready():
 		$VBoxContainer.add_child(hs_label)
 		$VBoxContainer.move_child(hs_label, 0) # Top of buttons
 	
+	# setup_difficulty_selector()
+	if tutorial_button:
+		tutorial_button.visible = true
+		
 	setup_difficulty_selector()
 	if quit_button:
 		if OS.get_name() == "Web":
