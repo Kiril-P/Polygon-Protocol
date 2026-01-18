@@ -1,6 +1,6 @@
 [gd_scene load_steps=4 format=3 uid="uid://c8y7q2w1x4j5r"]
 
-[ext_resource type="Script" path="res://scripts/loading_screen.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://wgbt2ksmcw0r" path="res://scripts/loading_screen.gd" id="1_script"]
 [ext_resource type="PackedScene" uid="uid://dwdeo41t4c7xe" path="res://scenes/background.tscn" id="2_bg"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_progress"]
