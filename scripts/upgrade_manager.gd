@@ -29,8 +29,8 @@ var upgrade_pool = [
 	{
 		"id": "dash_cooldown",
 		"name": "Quick Reflow",
-		"description": "+10% Energy Recovery",
-		"value": 0.1,
+		"description": "+15% Energy Recovery",
+		"value": 0.15,
 		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_007.png"
 	},
 	{
@@ -58,15 +58,15 @@ var upgrade_pool = [
 	{
 		"id": "bullet_speed",
 		"name": "Aero Rounds",
-		"description": "+20% Bullet Speed",
-		"value": 0.2,
+		"description": "+40% Bullet Speed",
+		"value": 0.4,
 		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_023.png"
 	},
 	{
 		"id": "rotation_speed",
 		"name": "Centrifuge",
-		"description": "+30% Rotation Speed",
-		"value": 0.3,
+		"description": "+50% Rotation Speed",
+		"value": 0.5,
 		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_025.png"
 	},
 	{

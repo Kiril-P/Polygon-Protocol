@@ -41,14 +41,16 @@ func _process(delta: float):
 	# 2. Glitch Effect
 	if randf() < glitch_chance:
 		# Random position "jumps"
-		position = base_pos + Vector2(randf_range(-8, 8), randf_range(-3, 3))
+		position = base_pos + Vector2(randf_range(-15, 15), randf_range(-5, 5))
 		# Random text corruption feel (using scale)
-		scale.x = base_scale.x * randf_range(0.9, 1.2)
+		scale.x = base_scale.x * randf_range(0.8, 1.4)
 		modulate = Color(2, 2, 2, 1) # Flash white
 		
 		# Occasional "split" feel
 		if randf() < 0.5:
 			text = "P0lygon Pr0t0col"
+		else:
+			text = "P_LYGON PROTOC_L"
 	else:
 		position = position.lerp(base_pos, 15.0 * delta)
 		scale = scale.lerp(base_scale, 15.0 * delta)
@@ -58,3 +60,9 @@ func _process(delta: float):
 	# 3. Floating Motion
 	position.y = base_pos.y + sin(time * 1.5) * 8.0
 	rotation = sin(time * 0.8) * 0.02
+	
+	# 4. Multi-layered glow (dynamic shadows)
+	var glow_offset = Vector2(sin(time * 3.0), cos(time * 3.0)) * 6.0
+	add_theme_constant_override("shadow_offset_x", int(glow_offset.x))
+	add_theme_constant_override("shadow_offset_y", int(glow_offset.y))
+	add_theme_color_override("font_shadow_color", magenta.lerp(cyan, pulse).lerp(Color.TRANSPARENT, 0.4))

@@ -9,22 +9,55 @@ func show_dash_nerf_warning():
 	var warn = $Control.get_node_or_null("BossWarning")
 	if warn:
 		warn.visible = true
-		warn.text = "BOSS IS NERFING YOUR DASH"
-		warn.modulate.a = 0
+		warn.text = "DASH CAPABILITIES CRIPPLED"
+		warn.modulate = Color(2.0, 1.0, 0.0, 0.0) # Orange Glow
+		warn.scale = Vector2(1.5, 1.5)
+		
 		var t = create_tween()
+		t.set_parallel(true)
 		t.tween_property(warn, "modulate:a", 1.0, 0.3)
+		t.tween_property(warn, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_SINE)
+		
+		t.set_parallel(false)
 		t.tween_interval(2.0)
 		t.tween_property(warn, "modulate:a", 0.0, 0.3)
-		# Add new label
 		t.tween_callback(func(): 
-			warn.text = "FIND AND DESTROY THE HEART TO KILL THEM"
+			warn.text = "ELIMINATE THE CORE"
 			warn.modulate.a = 0
-			warn.visible = true
 		)
 		t.tween_property(warn, "modulate:a", 1.0, 0.3)
 		t.tween_interval(3.0)
 		t.tween_property(warn, "modulate:a", 0.0, 0.3)
 		t.tween_callback(func(): warn.visible = false)
+
+func show_corruption_warning():
+	var warn = $Control.get_node_or_null("BossWarning")
+	if warn:
+		warn.visible = true
+		warn.text = "CRITICAL: DATA CORRUPTION"
+		warn.modulate = Color(2.5, 0.5, 3.0, 0.0) # Intense Purple/Magenta Glow
+		warn.scale = Vector2(0.2, 2.0) # Stretched start
+		
+		var t = create_tween()
+		t.set_parallel(true)
+		t.tween_property(warn, "modulate:a", 1.0, 0.2)
+		t.tween_property(warn, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+		
+		t.set_parallel(false)
+		t.tween_interval(2.0)
+		t.tween_property(warn, "modulate:a", 0.0, 0.2)
+		t.tween_callback(func(): 
+			warn.text = "GLITCH FIELDS DETECTED"
+			warn.modulate.a = 0
+		)
+		t.tween_property(warn, "modulate:a", 1.0, 0.2)
+		t.tween_interval(3.0)
+		t.tween_property(warn, "modulate:a", 0.0, 0.2)
+		t.tween_callback(func(): 
+			warn.visible = false
+			warn.modulate = Color(1, 1, 1, 1)
+			warn.scale = Vector2(1, 1)
+		)
 
 func _ready():
 	add_to_group("hud")
@@ -115,11 +148,11 @@ func setup_arena_border():
 	$Control.move_child(glow, 0)
 	
 	# Pulse animation
-	var t = create_tween().set_loops()
+	var t = create_tween().set_loops(9999)
 	t.tween_property(border, "border_color:a", 0.6, 1.5).set_trans(Tween.TRANS_SINE)
 	t.tween_property(border, "border_color:a", 0.2, 1.5).set_trans(Tween.TRANS_SINE)
 	
-	var t2 = create_tween().set_loops()
+	var t2 = create_tween().set_loops(9999)
 	t2.tween_property(glow, "border_color:a", 0.3, 2.0).set_trans(Tween.TRANS_SINE)
 	t2.tween_property(glow, "border_color:a", 0.05, 2.0).set_trans(Tween.TRANS_SINE)
 
@@ -169,24 +202,9 @@ func setup_bottom_ui():
 	heart_container.add_theme_constant_override("separation", 10)
 
 func setup_kill_counter():
-	var kills_label = Label.new()
-	kills_label.name = "KillsLabel"
-	kills_label.text = "KILLS: 0"
-	kills_label.add_theme_font_size_override("font_size", 20)
-	kills_label.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	kills_label.offset_left = -150
-	kills_label.offset_top = -60
-	$Control.add_child(kills_label)
-	
-	var timer_label = Label.new()
-	timer_label.name = "TimerLabel"
-	timer_label.text = "00:00"
-	timer_label.add_theme_font_size_override("font_size", 24)
-	timer_label.add_theme_color_override("font_color", Color(0, 1, 1, 0.8)) # Cyan glow
-	timer_label.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	timer_label.offset_left = -150
-	timer_label.offset_top = -100 # Above kills label
-	$Control.add_child(timer_label)
+	# Removed Kills, Score, and Timer labels from HUD as requested.
+	# They are now in the Pause Menu / Options Screen.
+	pass
 
 func setup_boss_bar():
 	var bar = ProgressBar.new()
@@ -221,7 +239,10 @@ func setup_warning_label():
 	var warn = Label.new()
 	warn.name = "BossWarning"
 	warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	warn.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	warn.set_anchors_preset(Control.PRESET_CENTER)
+	warn.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	warn.grow_vertical = Control.GROW_DIRECTION_BOTH
 	warn.add_theme_font_size_override("font_size", 48)
 	warn.add_theme_color_override("font_color", Color.RED)
 	warn.add_theme_constant_override("outline_size", 12)
@@ -232,14 +253,24 @@ func show_boss_warning():
 	var warn = $Control.get_node_or_null("BossWarning")
 	if warn:
 		warn.visible = true
-		warn.text = "BOSS IN 10 SECONDS"
-		warn.modulate.a = 0
+		warn.text = "CORRUPTED PROTOCOL INBOUND"
+		warn.modulate = Color(2.0, 0.2, 0.2, 0.0) # Intense Red Glow
+		warn.scale = Vector2(0.5, 0.5)
 		
-		# Just pop in and out with fade
+		# Menacing Pulse Animation
 		var t = create_tween()
-		t.tween_property(warn, "modulate:a", 1.0, 0.3)
-		t.tween_interval(3.0)
-		t.tween_property(warn, "modulate:a", 0.0, 0.3)
+		t.set_parallel(true)
+		t.tween_property(warn, "modulate:a", 1.0, 0.5)
+		t.tween_property(warn, "scale", Vector2(1.2, 1.2), 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		
+		t.set_parallel(false)
+		# Shake while visible
+		for i in range(6):
+			t.tween_property(warn, "position", warn.position + Vector2(randf_range(-10, 10), randf_range(-10, 10)), 0.05)
+			t.tween_property(warn, "position", warn.position, 0.05)
+		
+		t.tween_interval(2.0)
+		t.tween_property(warn, "modulate:a", 0.0, 0.5)
 		t.tween_callback(func(): warn.visible = false)
 
 func setup_boss_pointer():
@@ -256,7 +287,7 @@ func setup_boss_pointer():
 	$Control.add_child(arrow)
 	
 	# Add a pulse animation
-	var t_boss = create_tween().set_loops()
+	var t_boss = create_tween().set_loops(9999)
 	t_boss.tween_property(arrow, "scale", Vector2(1.2, 1.2), 0.5).set_trans(Tween.TRANS_SINE)
 	t_boss.tween_property(arrow, "scale", Vector2(1.0, 1.0), 0.5).set_trans(Tween.TRANS_SINE)
 
@@ -321,17 +352,6 @@ func _process(_delta):
 		if pointer:
 			pointer.visible = false
 
-	# Update Kill Counter in real-time
-	if has_node("/root/GlobalData") and has_node("Control/KillsLabel"):
-		$Control/KillsLabel.text = "KILLS: " + str(get_node("/root/GlobalData").run_kills)
-	
-	# Update Timer
-	if has_node("Control/TimerLabel"):
-		var spawner = get_tree().get_first_node_in_group("spawner")
-		if spawner:
-			var t = spawner.time_passed
-			$Control/TimerLabel.text = "%02d:%02d" % [int(t / 60), int(t) % 60]
-
 func trigger_intro_fade():
 	var fade = ColorRect.new()
 	add_child(fade)
@@ -372,7 +392,7 @@ func _on_player_health_changed(current_health: int, _max_health: int):
 			heart.modulate = Color(2.5, 0.2, 0.2)
 			
 			# Add a simple pulsing animation
-			var tween = heart.create_tween().set_loops()
+			var tween = heart.create_tween().set_loops(9999)
 			tween.tween_property(heart, "scale", Vector2(1.1, 1.1), 0.6).set_trans(Tween.TRANS_SINE)
 			tween.tween_property(heart, "scale", Vector2(1.0, 1.0), 0.6).set_trans(Tween.TRANS_SINE)
 			heart.pivot_offset = Vector2(16, 16)

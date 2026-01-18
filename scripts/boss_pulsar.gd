@@ -1,7 +1,7 @@
 extends CharacterBody2D
 
-@export var health: float = 12000.0
-@export var max_health: float = 12000.0
+@export var health: float = 30000.0
+@export var max_health: float = 30000.0
 @export var xp_value: int = 1500
 
 var player: Node2D = null
@@ -14,6 +14,12 @@ var lasers_active: bool = true
 
 var arena_barrier: StaticBody2D = null
 var border_radius: float = 1450.0
+
+# Enemy variety
+var spawn_timer: float = 2.0
+var kamikaze_scene = load("res://scenes/enemy_kamikaze.tscn")
+var fairy_scene = load("res://scenes/enemy_fairy.tscn")
+var shooter_scene = load("res://scenes/enemy_shooter.tscn")
 
 @onready var poly = $Polygon2D
 
@@ -100,7 +106,7 @@ func setup_lasers():
 		laser_nodes.append(laser)
 		
 		# Glow
-		var t = create_tween().set_loops()
+		var t = create_tween().set_loops(9999)
 		t.tween_property(laser, "width", 18.0, 0.1)
 		t.tween_property(laser, "width", 12.0, 0.1)
 
@@ -132,6 +138,37 @@ func _physics_process(delta: float):
 			
 	if not has_own_heart and not is_dying:
 		spawn_three_hearts()
+		
+	# Spawn variety enemies
+	spawn_timer -= delta
+	if spawn_timer <= 0 and not is_dying:
+		spawn_variety_enemies()
+		# More frequent spawns for pressure
+		spawn_timer = randf_range(3.0, 5.0)
+
+func spawn_variety_enemies():
+	# More enemies based on phase
+	var count = 3 if phase == 1 else 5
+	for i in range(count):
+		# Ensure they spawn WELL within the arena (border is 1450)
+		var dist = randf_range(400, border_radius - 200)
+		var spawn_pos = global_position + Vector2(dist, 0).rotated(randf() * TAU)
+		
+		var roll = randf()
+		var enemy
+		if roll < 0.3:
+			enemy = kamikaze_scene.instantiate()
+		elif roll < 0.7:
+			enemy = fairy_scene.instantiate()
+		else:
+			enemy = shooter_scene.instantiate()
+			
+		get_parent().add_child(enemy)
+		enemy.global_position = spawn_pos
+		
+		# Low XP to prevent boss-farming level ups
+		if enemy.has_method("set_xp_value"):
+			enemy.set_xp_value(1)
 
 func spawn_three_hearts():
 	var start_angle = randf() * TAU
@@ -203,6 +240,14 @@ func die():
 	
 	if player:
 		player.dash_nerf_active = false
+		if player.has_method("add_xp"):
+			player.add_xp(xp_value)
+	
+	if has_node("/root/GlobalData"):
+		var gd = get_node("/root/GlobalData")
+		gd.total_kills += 1
+		gd.run_kills += 1
+		gd.add_score(xp_value * 10, player.combo_count if player else 0)
 	
 	if is_instance_valid(arena_barrier):
 		arena_barrier.queue_free()

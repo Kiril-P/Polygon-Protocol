@@ -86,6 +86,13 @@ func die():
 		get_node("/root/AudioManager").play_sfx("enemy_death", 0.0, 0.9, 1.1, 0.3)
 	spawn_death_particles()
 	if player and player.has_method("add_xp"): player.add_xp(xp_value)
+	
+	if has_node("/root/GlobalData"):
+		var gd = get_node("/root/GlobalData")
+		gd.total_kills += 1
+		gd.run_kills += 1
+		gd.add_score(xp_value * 10, player.combo_count if player else 0)
+		
 	queue_free()
 
 func spawn_death_particles():

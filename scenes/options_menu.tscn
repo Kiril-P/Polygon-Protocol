@@ -113,6 +113,22 @@ max_value = 1.0
 step = 0.05
 value = 0.7
 
+[node name="DifficultySection" type="VBoxContainer" parent="CenterContainer/PanelContainer/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="CenterContainer/PanelContainer/MarginContainer/VBoxContainer/DifficultySection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "DIFFICULTY"
+horizontal_alignment = 1
+
+[node name="DifficultyButtons" type="HBoxContainer" parent="CenterContainer/PanelContainer/MarginContainer/VBoxContainer/DifficultySection"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 15
+alignment = 1
+
 [node name="Spacer" type="Control" parent="CenterContainer/PanelContainer/MarginContainer/VBoxContainer"]
 custom_minimum_size = Vector2(0, 10)
 layout_mode = 2

@@ -118,6 +118,9 @@ func flash_white():
 	tween.tween_property($Polygon2D, "modulate", Color(5, 5, 5, 1), 0.05)
 	tween.tween_property($Polygon2D, "modulate", Color(1, 1, 1, 1), 0.05)
 
+func set_xp_value(v):
+	xp_value = v
+
 func die():
 	if is_dying:
 		return
@@ -135,6 +138,12 @@ func die():
 	# Give XP directly to player
 	if player and player.has_method("add_xp"):
 		player.add_xp(xp_value)
+		
+	if has_node("/root/GlobalData"):
+		var gd = get_node("/root/GlobalData")
+		gd.total_kills += 1
+		gd.run_kills += 1
+		gd.add_score(xp_value * 10, player.combo_count if player else 0)
 		
 	queue_free()
 

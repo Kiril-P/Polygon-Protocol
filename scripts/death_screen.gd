@@ -12,26 +12,98 @@ func _ready():
 	visible = false
 	control.modulate.a = 0
 	
+	# Add Leaderboard Button
+	var lb_btn = Button.new()
+	lb_btn.text = "LEADERBOARD"
+	lb_btn.name = "LeaderboardButton"
+	
+	# Match other button sizes
+	lb_btn.custom_minimum_size = Vector2(250, 50)
+	lb_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	if restart_btn:
+		lb_btn.add_theme_font_size_override("font_size", restart_btn.get_theme_font_size("font_size"))
+		
+	menu_ui.add_child(lb_btn)
+	# Move between restart and menu
+	menu_ui.move_child(lb_btn, 4)
+	lb_btn.pressed.connect(_on_leaderboard_pressed)
+	
 	var player = get_tree().get_first_node_in_group("player")
 	if player:
 		player.game_over.connect(_show_death_screen)
 	
+	style_all_buttons()
 	setup_button_animations()
 
+func style_all_buttons():
+	var buttons = [restart_btn, menu_btn]
+	var lb_btn = menu_ui.get_node_or_null("LeaderboardButton")
+	if lb_btn: buttons.append(lb_btn)
+	
+	for btn in buttons:
+		if not btn: continue
+		style_menu_button(btn)
+
+func style_menu_button(btn: Button):
+	var normal = StyleBoxFlat.new()
+	normal.bg_color = Color(0.1, 0.1, 0.2, 0.6)
+	normal.border_width_left = 4
+	normal.border_color = Color(0.0, 0.8, 1.0, 0.6)
+	normal.corner_radius_top_left = 2
+	normal.corner_radius_bottom_right = 15
+	normal.content_margin_left = 20
+	
+	var hover = normal.duplicate()
+	hover.bg_color = Color(0.2, 0.2, 0.4, 0.8)
+	hover.border_color = Color(0.0, 1.0, 1.0, 1.0)
+	hover.shadow_color = Color(0.0, 1.0, 1.0, 0.3)
+	hover.shadow_size = 10
+	
+	var pressed = hover.duplicate()
+	pressed.bg_color = Color(0.3, 0.1, 0.4, 0.9)
+	pressed.border_color = Color(1.0, 0.0, 1.0, 1.0)
+	
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	
+	btn.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
+	btn.add_theme_color_override("font_hover_color", Color.WHITE)
+	btn.add_theme_constant_override("outline_size", 4)
+	btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
+
 func setup_button_animations():
-	for btn in [restart_btn, menu_btn]:
+	var buttons = [restart_btn, menu_btn]
+	var lb_btn = menu_ui.get_node_or_null("LeaderboardButton")
+	if lb_btn:
+		buttons.append(lb_btn)
+		
+	for btn in buttons:
 		btn.pivot_offset = btn.custom_minimum_size / 2
 		btn.focus_mode = Control.FOCUS_NONE # Remove selection border
 		
 		btn.mouse_entered.connect(func():
+			if has_node("/root/AudioManager"):
+				get_node("/root/AudioManager").play_sfx("hover")
 			var t = create_tween().set_parallel(true)
-			t.tween_property(btn, "scale", Vector2(1.1, 1.1), 0.1)
-			t.tween_property(btn, "modulate", Color(1.5, 1.2, 1.2), 0.1)
+			t.tween_property(btn, "scale", Vector2(1.1, 1.1), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			t.tween_property(btn, "modulate", Color(1.5, 1.5, 2.0), 0.2)
 		)
 		btn.mouse_exited.connect(func():
 			var t = create_tween().set_parallel(true)
-			t.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.1)
-			t.tween_property(btn, "modulate", Color.WHITE, 0.1)
+			t.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_SINE)
+			t.tween_property(btn, "modulate", Color.WHITE, 0.2)
+		)
+		
+		btn.button_down.connect(func():
+			if has_node("/root/AudioManager"):
+				get_node("/root/AudioManager").play_sfx("click")
+			btn.scale = Vector2(0.95, 0.95)
+		)
+		
+		btn.button_up.connect(func():
+			btn.scale = Vector2(1.1, 1.1)
 		)
 
 func _show_death_screen(stats: Dictionary):
@@ -39,7 +111,9 @@ func _show_death_screen(stats: Dictionary):
 	await get_tree().create_timer(1.0).timeout
 	
 	visible = true
-	stats_label.text = "LEVEL REACHED: " + str(stats["level"]) + "\nSHARDS EARNED: " + str(stats["shards"]) + "\nHIGHEST COMBO: " + str(stats.get("highest_combo", 0))
+	var time_val = stats.get("time", 0.0)
+	var time_str = "%d:%02d" % [int(time_val / 60), int(time_val) % 60]
+	stats_label.text = "LEVEL REACHED: " + str(stats["level"]) + "\nSCORE: " + str(get_node("/root/GlobalData").run_score if has_node("/root/GlobalData") else 0) + "\nTIME SURVIVED: " + time_str + "\nSHARDS EARNED: " + str(stats["shards"]) + "\nHIGHEST COMBO: " + str(stats.get("highest_combo", 0))
 	
 	if has_node("/root/GlobalData"):
 		total_shards_label.text = "TOTAL SHARDS: " + str(get_node("/root/GlobalData").total_shards)
@@ -57,6 +131,12 @@ func _show_death_screen(stats: Dictionary):
 func _on_restart_pressed():
 	get_tree().paused = false
 	get_tree().reload_current_scene()
+
+func _on_leaderboard_pressed():
+	get_tree().paused = false
+	if has_node("/root/GlobalData"):
+		get_node("/root/GlobalData").next_scene_path = "res://scenes/leaderboard.tscn"
+	get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
 
 func _on_main_menu_pressed():
 	get_tree().paused = false

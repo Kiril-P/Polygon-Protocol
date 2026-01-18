@@ -38,7 +38,7 @@ func setup_visuals():
 	t_in.tween_property(self, "scale", Vector2(1.5, 1.5), 0.5).set_trans(Tween.TRANS_BACK)
 	
 	# Constant Pulse animation
-	var t = create_tween().set_loops(0)
+	var t = create_tween().set_loops(9999)
 	t.tween_property(poly, "scale", Vector2(1.2, 1.2), 0.3).set_trans(Tween.TRANS_SINE)
 	t.tween_property(poly, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_SINE)
 
@@ -54,10 +54,8 @@ func die(hit_by_player: bool):
 	
 	if hit_by_player and boss and is_instance_valid(boss):
 		# Boss takes significant damage from heart destruction
-		var damage_percent = 0.1 # Default 10%
-		if "boss_pulsar" in boss.get_script().get_path():
-			damage_percent = 0.334 # ~33% for Pulsar (3 hearts to trigger next phase/kill)
-			
+		var damage_percent = 0.111 # ~11% for Bosses (9 hearts total to kill)
+		
 		boss.take_damage(boss.max_health * damage_percent) 
 		
 		# Feedback sound and screen shake
