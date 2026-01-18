@@ -156,8 +156,8 @@ func update_controls_button_text():
 
 func update_tutorial_button_text():
 	if tutorial_button and has_node("/root/GlobalData"):
-		var show = get_node("/root/GlobalData").show_tutorial
-		tutorial_button.text = "TUTORIAL: ON" if show else "TUTORIAL: OFF"
+		var is_tutorial_enabled = get_node("/root/GlobalData").show_tutorial
+		tutorial_button.text = "TUTORIAL: ON" if is_tutorial_enabled else "TUTORIAL: OFF"
 
 func create_menu_juice():
 	# Background elements: Mix of shapes and "Enemies"
@@ -234,7 +234,7 @@ func spawn_menu_enemy():
 	# Detect Click
 	enemy.pressed.connect(func():
 		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("enemy_death")
+			get_node("/root/AudioManager").play_sfx("enemy_death", 0.0, 0.9, 1.1, 0.3)
 		spawn_menu_death_particles(enemy.position + poly.position, poly.color)
 		enemy.queue_free()
 		# Respawn another after a delay to keep the menu busy

@@ -54,7 +54,6 @@ func _process(_delta):
 		var t = create_tween()
 		t.tween_property(self, "modulate:a", 0.0, 0.3)
 		t.tween_callback(func():
-			var new_scene = ResourceLoader.load_threaded_get_status(target_scene_path) # Should be loaded
 			get_tree().change_scene_to_packed(ResourceLoader.load_threaded_get(target_scene_path))
 		)
 	elif scene_load_status == ResourceLoader.THREAD_LOAD_FAILED:

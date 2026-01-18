@@ -48,6 +48,9 @@ func _show_upgrade_options(options: Array):
 
 func _on_upgrade_selected(upgrade_data: Dictionary):
 	# Selection animation before closing
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("click")
+		
 	var manager = get_node("/root/UpgradeManager")
 	if manager:
 		manager.apply_upgrade(upgrade_data)

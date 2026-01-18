@@ -16,14 +16,20 @@ signal xp_changed(current_xp: float, max_xp: float)
 signal energy_changed(current_energy: float, max_energy: float)
 signal level_up_ready
 signal game_over(stats: Dictionary)
+signal combo_changed(combo: int, time_left: float)
 @export var dash_speed: float = 600.0
 @export var max_energy: float = 100.0
-@export var energy_consumption: float = 50.0 # Per second
-@export var energy_recovery: float = 25.0 # Per second
+@export var energy_consumption: float = 60.0 # Per second
+@export var energy_recovery: float = 22.0 # Per second (Reduced from 25.0)
 var current_energy: float = 100.0
 var regen_delay_timer: float = 0.0 # NEW: Delay after running out
 var is_dashing: bool = false
 var dash_direction: Vector2 = Vector2.ZERO
+
+# Boss Nerf state
+var dash_nerf_active: bool = false
+var base_energy_consumption: float = 60.0
+var base_energy_recovery: float = 22.0
 
 # Shape progression
 var current_shape: int = 0  # 0 = circle, 3 = triangle, 4 = square, etc.
@@ -40,6 +46,11 @@ var next_evolution_level: int = 4
 var fire_timer: float = 0.0
 var rotation_speed: float = 2.0  # Radians per second
 var current_rotation: float = 0.0
+var combo_count: int = 0
+var combo_timer: float = 0.0
+var highest_combo_run: int = 0
+var combo_speed_boost: float = 0.0
+const COMBO_MAX_TIME: float = 1.4 # Reduced from 1.8 to make it even harder
 
 # Upgrades
 var damage_multiplier: float = 1.0
@@ -69,7 +80,6 @@ var is_unpausing: bool = false # NEW: Prevent movement during unpause animation
 # Meta Upgrade Tracking
 var overdrive_available: bool = false
 var is_in_overdrive: bool = false
-var can_reflect: bool = false
 
 # Shield Meta Progression
 var has_shield: bool = false
@@ -98,7 +108,6 @@ func _ready():
 		var gd = get_node("/root/GlobalData")
 		gd.run_kills = 0
 		overdrive_available = gd.is_upgrade_active("emergency_overdrive")
-		can_reflect = gd.is_upgrade_active("kinetic_reflector")
 		
 		# RECURSIVE EVOLUTION
 		if gd.is_upgrade_active("recursive_evolution"):
@@ -129,6 +138,24 @@ func _ready():
 	health_changed.emit(current_hearts, max_hearts)
 	xp_changed.emit(xp, xp_to_next_level)
 	energy_changed.emit(current_energy, max_energy)
+	
+	# WEB-ONLY GLOW BOOST
+	# Browsers need much stronger settings to see the neon effect
+	if OS.get_name() == "Web":
+		var world_env = get_parent().get_node_or_null("WorldEnvironment")
+		if world_env and world_env.environment:
+			# We must DUPLICATE the environment resource, otherwise 
+			# we change the file on disk/globally
+			world_env.environment = world_env.environment.duplicate()
+			var env = world_env.environment
+			env.glow_intensity = 2.0
+			env.glow_bloom = 0.5
+			env.glow_hdr_threshold = 0.5
+			env.set("glow_levels/1", 1.0)
+			env.set("glow_levels/2", 1.0)
+			env.set("glow_levels/3", 1.0)
+			env.set("glow_levels/4", 1.0)
+			env.set("glow_levels/5", 1.0)
 	
 	# DASH TUTORIAL
 	if has_node("/root/GlobalData") and get_node("/root/GlobalData").show_tutorial:
@@ -190,7 +217,10 @@ func show_full_tutorial():
 	skip_label.add_theme_font_size_override("font_size", 18)
 	skip_label.modulate.a = 0.5
 	skip_label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	skip_label.position.y -= 100
+	skip_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	skip_label.offset_left = -300
+	skip_label.offset_right = 300
+	skip_label.offset_bottom = -100
 	canvas.add_child(skip_label)
 	
 	var lines = [
@@ -274,8 +304,14 @@ func _physics_process(delta: float):
 		camera.offset = Vector2.ZERO
 	
 	# Constant contact damage check
-	if iframe_timer <= 0 and not is_dashing:
-		check_contact_damage()
+	if iframe_timer <= 0:
+		var vulnerable = true
+		if is_dashing:
+			# Dashing is permanently invulnerable
+			vulnerable = false
+		
+		if vulnerable:
+			check_contact_damage()
 	
 	# DASH/BOOST INPUT
 	if (Input.is_action_pressed("dash") or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)) and current_energy > 0:
@@ -299,12 +335,15 @@ func _physics_process(delta: float):
 		# Screen rumble for dashing
 		add_shake(2.0)
 		
-		current_energy -= energy_consumption * delta
+		# REDUCED consumption mult from 2.5 to 1.8 for better feel
+		var consumption_mult = 1.8 if dash_nerf_active else 1.0
+		current_energy -= energy_consumption * consumption_mult * delta
+		
 		if current_energy <= 0: 
 			current_energy = 0
 			is_dashing = false
 			modulate = Color(1, 1, 1, 1)
-			regen_delay_timer = 0.5 # Set delay only on full depletion
+			regen_delay_timer = 1.0 if dash_nerf_active else 0.5
 			if has_node("/root/AudioManager"):
 				get_node("/root/AudioManager").stop_persistent_sfx("dash")
 		energy_changed.emit(current_energy, max_energy)
@@ -315,13 +354,24 @@ func _physics_process(delta: float):
 			if has_node("/root/AudioManager"):
 				get_node("/root/AudioManager").stop_persistent_sfx("dash")
 		
-		if current_energy < max_energy:
+	if current_energy < max_energy:
 			if regen_delay_timer > 0:
 				regen_delay_timer -= delta
 			else:
-				current_energy += energy_recovery * delta
+				var current_recovery = energy_recovery
+				if dash_nerf_active:
+					current_recovery *= 0.4 # Recovery is 60% slower
+				current_energy += current_recovery * delta
 				if current_energy > max_energy: current_energy = max_energy
 				energy_changed.emit(current_energy, max_energy)
+
+	# Combo Timer
+	if combo_count > 0:
+		combo_timer -= delta
+		if combo_timer <= 0:
+			reset_combo()
+		else:
+			combo_changed.emit(combo_count, combo_timer / COMBO_MAX_TIME)
 
 	handle_movement(delta)
 	handle_rotation(delta)
@@ -475,8 +525,37 @@ func shoot():
 			if bullet_explosive:
 				bullet.apply_upgrade("explode", explosion_radius)
 
+func reset_combo():
+	if combo_count > 10 and has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("combo_break", -10.0, 0.8, 1.2)
+	combo_count = 0
+	combo_timer = 0
+	speed_multiplier -= combo_speed_boost
+	combo_speed_boost = 0.0
+	combo_changed.emit(0, 0)
+
 func add_xp(amount: float):
 	xp += amount
+	
+	# Reset combo if it expired
+	if combo_timer <= 0:
+		combo_count = 0
+		speed_multiplier -= combo_speed_boost
+		combo_speed_boost = 0.0
+	
+	# Increment Combo
+	combo_count += 1
+	if combo_count > highest_combo_run:
+		highest_combo_run = combo_count
+	combo_timer = COMBO_MAX_TIME
+	
+	# Speed boost based on combo (max 50% boost)
+	speed_multiplier -= combo_speed_boost
+	combo_speed_boost = min(0.5, combo_count * 0.01)
+	speed_multiplier += combo_speed_boost
+	
+	combo_changed.emit(combo_count, 1.0)
+	
 	xp_changed.emit(xp, xp_to_next_level)
 	if xp >= xp_to_next_level:
 		level_up()
@@ -489,16 +568,16 @@ func level_up():
 	
 	# Slowly unzoom camera with exponential decay and a limit
 	if camera:
-		var min_zoom = 0.4
+		var min_zoom = 0.6 # Slightly decreased from 0.7 to allow more zoom-out
 		var current_zoom = camera.zoom.x
-		# Each level-up moves 15% of the way toward min_zoom
-		var new_zoom_val = lerp(current_zoom, min_zoom, 0.15)
+		# Each level-up moves 12% of the way toward min_zoom (slightly faster zoom out)
+		var new_zoom_val = lerp(current_zoom, min_zoom, 0.12)
 		var target_zoom = Vector2(new_zoom_val, new_zoom_val)
 		create_tween().tween_property(camera, "zoom", target_zoom, 1.0).set_trans(Tween.TRANS_SINE)
 	
 	# Shape progression: Update shape based on current level
 	if level >= next_evolution_level:
-		trigger_evolution_visual()
+		await trigger_evolution_visual()
 		if current_shape == 0:
 			current_shape = 3
 		else:
@@ -591,10 +670,14 @@ func trigger_level_up_blast():
 	var enemies = get_tree().get_nodes_in_group("enemies")
 	for enemy in enemies:
 		if enemy is CharacterBody2D:
+			# BOSS IMMUNITY: Don't push back bosses
+			if enemy.is_in_group("bosses"):
+				continue
+				
 			var push_dir = (enemy.global_position - global_position).normalized()
 			var distance = global_position.distance_to(enemy.global_position)
-			# Big pushback
-			var push_strength = 600.0 * (1.0 - clamp(distance / 800.0, 0, 0.8))
+			# Reduced pushback strength from 600 to 350
+			var push_strength = 350.0 * (1.0 - clamp(distance / 800.0, 0, 0.8))
 			var target_pos = enemy.global_position + push_dir * push_strength
 			
 			var push_tween = create_tween()
@@ -858,6 +941,10 @@ func take_damage(_amount: float):
 	if iframe_timer > 0:
 		return
 		
+	# Dashing is permanently invulnerable
+	if is_dashing:
+		return
+		
 	# Check Shield first
 	if has_shield:
 		has_shield = false
@@ -935,6 +1022,10 @@ func trigger_repulsive_pushback():
 	# Push back nearby enemies
 	var enemies = get_tree().get_nodes_in_group("enemies")
 	for enemy in enemies:
+		# Don't push bosses
+		if enemy.is_in_group("bosses"):
+			continue
+			
 		var dist = global_position.distance_to(enemy.global_position)
 		if dist < 250.0:
 			var push_dir = (enemy.global_position - global_position).normalized()
@@ -976,7 +1067,7 @@ func trigger_emergency_overdrive():
 
 func trigger_hit_impact():
 	# 1. Hit-stop: Set time scale to slow
-	# To prevent stacking issues where it stays slow forever, we always reset first
+	if Engine.time_scale < 1.0: return # Prevent overlapping hitstop
 	Engine.time_scale = 0.05
 	
 	# 2. Impact Frame: White flash on HUD
@@ -1040,7 +1131,8 @@ func die():
 	add_shake(100.0) # Screen-shattering death shake
 	emit_signal("game_over", {
 		"level": level,
-		"shards": shards_earned
+		"shards": shards_earned,
+		"highest_combo": highest_combo_run
 	})
 	
 	# Pause the game instead of reloading
@@ -1121,11 +1213,6 @@ func check_contact_damage():
 	var overlapping_areas = $Area2D.get_overlapping_areas()
 	for area in overlapping_areas:
 		if area.is_in_group("enemy_bullets"):
-			# KINETIC REFLECTOR
-			if is_dashing and can_reflect and randf() < 0.25:
-				reflect_bullet(area)
-				continue
-				
 			take_damage(1)
 			area.queue_free()
 			return # Exit after taking damage
@@ -1140,29 +1227,6 @@ func check_contact_damage():
 			
 			take_damage(1)
 			break
-
-func reflect_bullet(bullet):
-	# Play SFX
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("bullet_bounce", 0.0, 1.5, 2.0)
-	
-	# Reverse direction
-	if "direction" in bullet:
-		bullet.direction *= -1
-		bullet.rotation = bullet.direction.angle()
-		
-	# Change group so it can hit enemies
-	bullet.remove_from_group("enemy_bullets")
-	bullet.add_to_group("player_bullets")
-	
-	# Boost speed and damage
-	if "speed" in bullet: bullet.speed *= 1.5
-	if "damage" in bullet: bullet.damage *= 2.0
-	
-	# Visual flash
-	var t = create_tween()
-	bullet.modulate = Color(10, 10, 10, 1)
-	t.tween_property(bullet, "modulate", Color(0, 1, 1, 1), 0.1) # Turn cyan
 
 # Collision with enemies (mostly for Dash now)
 func _on_area_2d_body_entered(body):

@@ -39,7 +39,7 @@ func _show_death_screen(stats: Dictionary):
 	await get_tree().create_timer(1.0).timeout
 	
 	visible = true
-	stats_label.text = "LEVEL REACHED: " + str(stats["level"]) + "\nSHARDS EARNED: " + str(stats["shards"])
+	stats_label.text = "LEVEL REACHED: " + str(stats["level"]) + "\nSHARDS EARNED: " + str(stats["shards"]) + "\nHIGHEST COMBO: " + str(stats.get("highest_combo", 0))
 	
 	if has_node("/root/GlobalData"):
 		total_shards_label.text = "TOTAL SHARDS: " + str(get_node("/root/GlobalData").total_shards)

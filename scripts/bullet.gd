@@ -86,12 +86,13 @@ func spawn_trail_ghost():
 
 func handle_screen_bounce():
 	var camera = get_viewport().get_camera_2d()
+	var pos = global_position
+	var bounced = false
+	
 	if not camera:
 		# Fallback to simple viewport if no camera
 		var screen_rect = get_viewport_rect()
-		var pos = global_position
 		var margin = 10.0
-		var bounced = false
 		if pos.x < margin and direction.x < 0: direction.x *= -1; bounced = true
 		elif pos.x > screen_rect.size.x - margin and direction.x > 0: direction.x *= -1; bounced = true
 		if pos.y < margin and direction.y < 0: direction.y *= -1; bounced = true
@@ -105,21 +106,19 @@ func handle_screen_bounce():
 	var visible_size = viewport_size / zoom
 	var visible_rect = Rect2(camera_center - visible_size / 2, visible_size)
 	
-	var pos = global_position
-	var margin = 15.0
-	var bounced = false
+	var margin_v = 15.0
 	
-	if pos.x < visible_rect.position.x + margin and direction.x < 0:
+	if pos.x < visible_rect.position.x + margin_v and direction.x < 0:
 		direction.x *= -1
 		bounced = true
-	elif pos.x > visible_rect.end.x - margin and direction.x > 0:
+	elif pos.x > visible_rect.end.x - margin_v and direction.x > 0:
 		direction.x *= -1
 		bounced = true
 		
-	if pos.y < visible_rect.position.y + margin and direction.y < 0:
+	if pos.y < visible_rect.position.y + margin_v and direction.y < 0:
 		direction.y *= -1
 		bounced = true
-	elif pos.y > visible_rect.end.y - margin and direction.y > 0:
+	elif pos.y > visible_rect.end.y - margin_v and direction.y > 0:
 		direction.y *= -1
 		bounced = true
 	
@@ -152,6 +151,7 @@ func setup_bullet_shape():
 	
 	# Make sure Area2D can detect bodies (Enemies are CharacterBody2D)
 	collision_layer = 0
+	set_collision_mask_value(2, true) # Layer 2 is Player
 	set_collision_mask_value(3, true) # Layer 3 is Enemies
 
 func find_nearest_enemy():

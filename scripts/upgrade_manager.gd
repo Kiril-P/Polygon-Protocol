@@ -22,15 +22,15 @@ var upgrade_pool = [
 	{
 		"id": "dash_charge",
 		"name": "Energy Battery",
-		"description": "+25% Dash Energy",
-		"value": 0.25,
+		"description": "+10% Dash Energy",
+		"value": 0.1,
 		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_005.png"
 	},
 	{
 		"id": "dash_cooldown",
 		"name": "Quick Reflow",
-		"description": "+30% Energy Recovery",
-		"value": 0.3,
+		"description": "+10% Energy Recovery",
+		"value": 0.1,
 		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_007.png"
 	},
 	{
