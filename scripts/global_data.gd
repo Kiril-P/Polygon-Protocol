@@ -23,7 +23,6 @@ var permanent_upgrades = {
 	"energy_shield": 0,   # Absorbs one shot
 	"shield_regen": 0,    # Regenerates shield
 	"emergency_overdrive": 0,
-	"kinetic_reflector": 0,
 	"shard_multiplier": 0,
 	"recursive_evolution": 0,
 	"repulsive_armor": 0

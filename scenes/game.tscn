@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://f2ddmfkkhhru"]
+[gd_scene load_steps=15 format=3 uid="uid://f2ddmfkkhhru"]
 
 [ext_resource type="PackedScene" uid="uid://dwdeo41t4c7xe" path="res://scenes/background.tscn" id="1_kvpfn"]
 [ext_resource type="PackedScene" uid="uid://b6b5cvp68bng7" path="res://scenes/player.tscn" id="1_uwrxv"]
@@ -11,14 +11,14 @@
 [ext_resource type="PackedScene" uid="uid://bfq122qkhqsi6" path="res://scenes/hud.tscn" id="5_iywne"]
 [ext_resource type="PackedScene" uid="uid://cyspvet765o8i" path="res://scenes/enemy_zigzagger.tscn" id="5_kvpfn"]
 [ext_resource type="PackedScene" uid="uid://di3xivgn03e8r" path="res://scenes/death_screen.tscn" id="6_u5sy4"]
-[ext_resource type="PackedScene" uid="uid://c5xk3p7r8q5u" path="res://scenes/enemy_kamikaze.tscn" id="7_kamikaze"]
 [ext_resource type="PackedScene" uid="uid://5jpyddyo4ed6" path="res://scenes/enemy_tank.tscn" id="6_vtaks"]
+[ext_resource type="PackedScene" uid="uid://c5xk3p7r8q5u" path="res://scenes/enemy_kamikaze.tscn" id="7_kamikaze"]
 
 [sub_resource type="Environment" id="Environment_mwb40"]
 background_mode = 3
 glow_enabled = true
 glow_intensity = 1.2
-glow_bloom = 0.2
+glow_bloom = 0.6
 glow_blend_mode = 0
 
 [node name="GameScene" type="Node2D"]

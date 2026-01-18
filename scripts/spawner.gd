@@ -9,6 +9,11 @@ var time_passed: float = 0.0
 var player: Node2D = null
 var spawn_delay: float = 3.0 # 3 second safety window at start
 var tutorial_finished: bool = false
+var hazard_timer: float = 0.0
+const HAZARD_INTERVAL: float = 12.0
+
+var boss_active: bool = false
+var bosses_spawned: Array[int] = [] # Track which milestones were hit
 
 func _ready():
 	add_to_group("spawner")
@@ -22,7 +27,22 @@ func _process(delta: float):
 	if not tutorial_finished:
 		return
 		
-	time_passed += delta
+	# BOSS MILESTONES: Pause timer at 60s and 120s
+	var milestone_times = [60, 120]
+	for m in milestone_times:
+		# Show warning 10 seconds before (Trigger only once)
+		if int(time_passed) == m - 10 and not bosses_spawned.has(m):
+			var hud = get_tree().get_first_node_in_group("hud")
+			if hud and hud.has_method("show_boss_warning"):
+				hud.show_boss_warning()
+		
+		if int(time_passed) == m and not bosses_spawned.has(m):
+			spawn_major_boss(m)
+			bosses_spawned.append(m)
+			boss_active = true
+			
+	if not boss_active:
+		time_passed += delta
 	
 	# Reduced safety window after tutorial/start
 	var current_delay = spawn_delay
@@ -39,9 +59,9 @@ func _process(delta: float):
 	var scaling = 1.0 + (time_factor * 0.5) # Base scaling
 	
 	if time_passed > 60.0:
-		# Add exponential component after 60s
+		# Add exponential component after 60s (Slightly nerfed scaling)
 		var post_60_time = (time_passed - 60.0) / 60.0
-		scaling += pow(post_60_time, 1.5) * 1.5 
+		scaling += pow(post_60_time, 1.4) * 1.2 
 		
 	var difficulty_mult = 1.0
 	if has_node("/root/GlobalData"):
@@ -52,10 +72,55 @@ func _process(delta: float):
 		
 	var current_spawn_rate = spawn_rate * difficulty_mult * scaling
 	
-	spawn_timer += delta
-	if spawn_timer >= 1.0 / current_spawn_rate:
-		spawn_enemy()
-		spawn_timer = 0.0
+	if not boss_active:
+		spawn_timer += delta
+		if spawn_timer >= 1.0 / current_spawn_rate:
+			spawn_enemy()
+			spawn_timer = 0.0
+
+	if not boss_active:
+		# Hazard Spawning
+		hazard_timer += delta
+		if hazard_timer >= HAZARD_INTERVAL:
+			spawn_hazard()
+			hazard_timer = 0.0
+
+func spawn_hazard():
+	if not player: return
+	
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("glitch", 5.0, 0.5, 0.8) # Increased volume from -5.0 to 5.0
+	
+	# Spawn hazard somewhere nearby but not right on top of player
+	var angle = randf() * TAU
+	var dist = randf_range(200, 500)
+	var pos = player.global_position + Vector2(dist, 0).rotated(angle)
+	
+	var hazard = Area2D.new()
+	hazard.script = load("res://scripts/data_corruption.gd")
+	
+	# Add components needed by script BEFORE add_child so _ready works
+	var poly = Polygon2D.new()
+	poly.name = "Polygon2D"
+	hazard.add_child(poly)
+	
+	var collision = CollisionShape2D.new()
+	collision.name = "CollisionShape2D"
+	var shape = CircleShape2D.new()
+	shape.radius = 1.0 
+	collision.shape = shape
+	hazard.add_child(collision)
+	
+	hazard.global_position = pos
+	get_parent().add_child(hazard)
+	
+	# Set collision mask to detect player, enemies, AND bullets
+	hazard.collision_layer = 0
+	hazard.collision_mask = 0
+	hazard.set_collision_mask_value(2, true) # Player
+	hazard.set_collision_mask_value(3, true) # Enemies
+	hazard.monitorable = true
+	hazard.monitoring = true
 
 func spawn_enemy():
 	if enemy_types.is_empty():
@@ -70,27 +135,27 @@ func spawn_enemy():
 	
 	# 0: Chaser, 1: Fairy, 2: Shooter, 3: Spinner, 4: Tank, 5: Zigzagger, 6: Kamikaze
 	if time_passed < 50: # Phase 1: Early Game Stagger (Extended to 50s)
-		available_indices.append(0) # Chasers
-		if time_passed >= 15:
-			available_indices.append(1) # Fairies at 15s (was 10s)
-		if time_passed >= 30:
-			available_indices.append(6) # Kamikazes at 30s
+		available_indices.append_array([0, 0, 0, 1, 1, 6]) # Triple weight for chasers
 		if time_passed >= 40:
 			available_indices.append(5) # Zigzaggers at 40s
 			
-	elif time_passed < 100: # Phase 2: Mid Game Stagger (Extended to 100s)
-		available_indices.append_array([0, 1, 5, 6])
+	elif time_passed < 130: # Phase 2: Mid Game Stagger (Extended to 130s)
+		# Fodder base
+		available_indices.append_array([0, 0, 0, 0, 1, 1, 1, 6, 6, 6]) 
+		available_indices.append(5) # Zigzaggers
 		
-		# Introduce mid/late enemies one by one with lower initial weights
+		# Heavies (Much rarer)
 		if time_passed >= 55:
-			available_indices.append(2) # Spinners at 55s (was 42s)
+			available_indices.append(2) # Spinners
 		if time_passed >= 75:
-			available_indices.append(4) # Tanks at 75s (was 55s)
+			# Reduced tanks further
+			pass 
 		if time_passed >= 90:
-			available_indices.append(3) # Shooters at 90s (was 65s)
-	else: # Phase 3: Total Chaos (Now starts at 100s instead of 80s)
-		# Full weighted mix
-		available_indices = [0, 0, 1, 1, 5, 5, 6, 6, 2, 3, 4]
+			available_indices.append(3) # Shooters
+	else: # Phase 3: Total Chaos (130s+)
+		# Heavy weight on fodder to prevent tank overcrowding
+		# 0: Chaser(x5), 1: Fairy(x4), 6: Kamikaze(x4), 5: Zigzagger(x2), 2: Shooter(x1), 3: Spinner(x1), 4: Tank(x0.5)
+		available_indices = [0, 0, 0, 0, 0, 1, 1, 1, 1, 6, 6, 6, 6, 5, 5, 2, 3, 4]
 	
 	var index = available_indices[randi() % available_indices.size()]
 	
@@ -107,8 +172,23 @@ func spawn_enemy():
 	var enemy_scene = enemy_types[index]
 	if not enemy_scene: return
 
+	# Calculate dynamic spawn radius based on camera zoom
+	var current_radius = spawn_radius
+	if player and player.has_node("Camera2D"):
+		var zoom = player.get_node("Camera2D").zoom.x
+		# If zoom is 1.0, radius is 700. If zoom is 0.5 (zoomed out), radius is 1400.
+		# Add a small buffer to ensure they always spawn off-screen
+		current_radius = (spawn_radius / zoom) + 100.0
+	
 	var angle = randf() * TAU
-	var spawn_pos = player.global_position + Vector2(spawn_radius, 0).rotated(angle)
+	
+	# ANTI-KITING: 30% chance to spawn specifically in front of the player's movement
+	if player.velocity.length() > 10.0 and randf() < 0.3:
+		var move_dir = player.velocity.normalized()
+		# Cone of 90 degrees in front
+		angle = move_dir.angle() + randf_range(-PI/4, PI/4)
+	
+	var spawn_pos = player.global_position + Vector2(current_radius, 0).rotated(angle)
 	
 	var enemy = enemy_scene.instantiate()
 	# SET POSITION BEFORE ADD_CHILD
@@ -127,3 +207,56 @@ func spawn_enemy():
 		enemy.set_xp_value(int(scaled_xp))
 		
 	get_parent().add_child(enemy)
+
+func spawn_major_boss(milestone: int):
+	# KILL ALL ENEMIES ON BOSS SPAWN
+	var existing_enemies = get_tree().get_nodes_in_group("enemies")
+	for enemy in existing_enemies:
+		if is_instance_valid(enemy):
+			# If they have a die() method, use it for visual impact, else queue_free
+			if enemy.has_method("die"):
+				enemy.die()
+			else:
+				enemy.queue_free()
+
+	var boss = CharacterBody2D.new()
+	# Connect death signal to resume timer
+	boss.tree_exited.connect(func(): 
+		boss_active = false
+		if has_node("/root/AudioManager"):
+			get_node("/root/AudioManager").set_boss_music_mode(false)
+	)
+	
+	if milestone == 120:
+		boss.set_script(load("res://scripts/boss_pulsar.gd"))
+	else:
+		boss.set_script(load("res://scripts/boss_fortress.gd"))
+	
+	# Add Components
+	var poly = Polygon2D.new()
+	poly.name = "Polygon2D"
+	boss.add_child(poly)
+	
+	var shields = Node2D.new()
+	shields.name = "Shields"
+	boss.add_child(shields)
+	
+	var coll = CollisionShape2D.new()
+	coll.name = "CollisionShape2D"
+	var shape = CircleShape2D.new()
+	shape.radius = 80.0 # LARGE hit box for multi-directional shooting
+	coll.shape = shape
+	boss.add_child(coll)
+	
+	# Position and Grouping
+	var angle = randf() * TAU
+	boss.global_position = player.global_position + Vector2(spawn_radius * 1.2, 0).rotated(angle)
+	boss.set_collision_layer_value(3, true) # Enemy layer
+	boss.set_collision_mask_value(1, true) # World
+	boss.set_collision_mask_value(2, true) # Player (to avoid overlapping too much if desired)
+	
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("boss_spawn", 10.0) 
+		get_node("/root/AudioManager").set_boss_music_mode(true)
+		
+	get_parent().add_child(boss)

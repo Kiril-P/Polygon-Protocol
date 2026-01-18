@@ -94,7 +94,7 @@ func die():
 	
 	# Play SFX
 	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("enemy_death")
+		get_node("/root/AudioManager").play_sfx("enemy_death", 0.0, 0.9, 1.1, 0.3) # Cut off after 0.3s
 	
 	spawn_death_particles()
 	
@@ -104,7 +104,7 @@ func die():
 	# Give XP directly to player
 	if player and player.has_method("add_xp"):
 		player.add_xp(xp_value)
-	
+		
 	if has_node("/root/GlobalData"):
 		var gd = get_node("/root/GlobalData")
 		gd.total_kills += 1

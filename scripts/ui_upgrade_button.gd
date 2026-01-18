@@ -46,6 +46,9 @@ func setup(upgrade_data: Dictionary):
 	mouse_exited.connect(_on_mouse_exited)
 
 func _on_mouse_entered():
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("hover")
+		
 	if has_node("BG/Border"):
 		$BG/Border.border_color = Color(1, 1, 1, 1) # Flash white border
 		$BG/Border.border_width = 5.0

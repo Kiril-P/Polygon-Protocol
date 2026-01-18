@@ -70,6 +70,11 @@ func flash_white():
 func die():
 	if is_dying: return
 	is_dying = true
+	
+	# Play SFX
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("enemy_death", 0.0, 0.9, 1.1, 0.3)
+	
 	spawn_death_particles()
 	if player and player.has_method("add_shake"): player.add_shake(3.0)
 	
