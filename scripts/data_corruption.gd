@@ -14,7 +14,7 @@ var particles: CPUParticles2D
 func _ready():
 	# Randomized glitchy shape
 	var points = PackedVector2Array()
-	var sides = 8
+	var sides = 6 # Hexagon as requested
 	for i in range(sides):
 		var angle = (TAU / sides) * i
 		var r = 1.0 + randf_range(-0.3, 0.3)
@@ -51,7 +51,7 @@ func _ready():
 	tween.tween_property(poly, "color:a", 0.4, 1.0)
 	
 	# Pulsing
-	var pulse = create_tween().set_loops()
+	var pulse = create_tween().set_loops(9999)
 	pulse.tween_property(poly, "modulate", Color(1.5, 1.2, 1.2, 1.0), 0.5)
 	pulse.tween_property(poly, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.5)
 	

@@ -14,6 +14,7 @@ const HAZARD_INTERVAL: float = 12.0
 
 var boss_active: bool = false
 var bosses_spawned: Array[int] = [] # Track which milestones were hit
+var corruption_warning_shown: bool = false
 
 func _ready():
 	add_to_group("spawner")
@@ -88,6 +89,14 @@ func _process(delta: float):
 func spawn_hazard():
 	if not player: return
 	
+	# Show warning on first hazard if tutorial is on
+	if not corruption_warning_shown:
+		if has_node("/root/GlobalData") and get_node("/root/GlobalData").show_tutorial:
+			var hud = get_tree().get_first_node_in_group("hud")
+			if hud and hud.has_method("show_corruption_warning"):
+				hud.show_corruption_warning()
+		corruption_warning_shown = true
+
 	if has_node("/root/AudioManager"):
 		get_node("/root/AudioManager").play_sfx("glitch", 5.0, 0.5, 0.8) # Increased volume from -5.0 to 5.0
 	
@@ -209,20 +218,37 @@ func spawn_enemy():
 	get_parent().add_child(enemy)
 
 func spawn_major_boss(milestone: int):
-	# KILL ALL ENEMIES ON BOSS SPAWN
+	# KILL ALL ENEMIES ON BOSS SPAWN (Staggered for visual impact, but quieter)
 	var existing_enemies = get_tree().get_nodes_in_group("enemies")
-	for enemy in existing_enemies:
+	
+	# Play a single "Sweep" sound if we had a lot of enemies
+	if existing_enemies.size() > 5 and has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("glitch", -5.0, 0.8, 1.2)
+
+	for i in range(existing_enemies.size()):
+		var enemy = existing_enemies[i]
 		if is_instance_valid(enemy):
-			# If they have a die() method, use it for visual impact, else queue_free
-			if enemy.has_method("die"):
-				enemy.die()
-			else:
-				enemy.queue_free()
+			# Stagger the deaths slightly for a "wave" effect
+			var delay = randf_range(0.0, 0.5)
+			get_tree().create_timer(delay).timeout.connect(func():
+				if is_instance_valid(enemy):
+					# Create death particles but NO SOUND for mass-kill
+					if enemy.has_method("spawn_death_particles"):
+						enemy.spawn_death_particles()
+					
+					# Manually handle XP/Score so they don't lose it
+					if player and player.has_method("add_xp"):
+						player.add_xp(enemy.xp_value if "xp_value" in enemy else 10)
+					
+					enemy.queue_free()
+			)
 
 	var boss = CharacterBody2D.new()
 	# Connect death signal to resume timer
 	boss.tree_exited.connect(func(): 
 		boss_active = false
+		if player:
+			player.dash_nerf_active = false
 		if has_node("/root/AudioManager"):
 			get_node("/root/AudioManager").set_boss_music_mode(false)
 	)

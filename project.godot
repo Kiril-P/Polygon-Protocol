@@ -11,14 +11,19 @@ config_version=5
 [application]
 
 config/name="Mini Jam 202 - Power Up"
-run/main_scene="uid://fu0f367iflkj"
+run/main_scene="uid://c8y7q2w1x4j5r"
 config/features=PackedStringArray("4.5", "Forward Plus", "Mobile")
+boot_splash/show_image=false
+boot_splash/fullsize=false
+boot_splash/use_filter=false
+boot_splash/bg_color=Color(0.0509804, 0.0509804, 0.0509804, 1)
 
 [autoload]
 
 UpgradeManager="*res://scripts/upgrade_manager.gd"
 GlobalData="*res://scripts/global_data.gd"
 AudioManager="*res://scripts/audio_manager.gd"
+SilentWolf="*res://addons/silent_wolf/SilentWolf.gd"
 
 [display]
 
@@ -26,6 +31,10 @@ window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/size/mode=3
 window/stretch/mode="canvas_items"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/silent_wolf/plugin.cfg")
 
 [input]
 

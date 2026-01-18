@@ -19,7 +19,7 @@ signal game_over(stats: Dictionary)
 signal combo_changed(combo: int, time_left: float)
 @export var dash_speed: float = 600.0
 @export var max_energy: float = 100.0
-@export var energy_consumption: float = 60.0 # Per second
+@export var energy_consumption: float = 75.0 # Per second
 @export var energy_recovery: float = 22.0 # Per second (Reduced from 25.0)
 var current_energy: float = 100.0
 var regen_delay_timer: float = 0.0 # NEW: Delay after running out
@@ -105,9 +105,12 @@ func _ready():
 	
 	# Reset Run Stats
 	if has_node("/root/GlobalData"):
-		var gd = get_node("/root/GlobalData")
-		gd.run_kills = 0
-		overdrive_available = gd.is_upgrade_active("emergency_overdrive")
+		var _gd = get_node("/root/GlobalData")
+		_gd.run_kills = 0
+		_gd.run_score = 0
+		_gd.run_level = 1
+		_gd.run_time = 0.0
+		overdrive_available = _gd.is_upgrade_active("emergency_overdrive")
 		
 		# RECURSIVE EVOLUTION
 		# (Removed)
@@ -249,10 +252,10 @@ func show_full_tutorial():
 		tutorial_tween.tween_property(label, "modulate:a", 1.0, 0.3)
 		tutorial_tween.parallel().tween_property(label, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_BACK)
 		
-		tutorial_tween.tween_interval(1.5) # Reduced from 2.0
+		tutorial_tween.tween_interval(2.5) # Increased from 1.5 for better readability
 		
 		# Out animation
-		tutorial_tween.tween_property(label, "modulate:a", 0.0, 0.2) # Faster fade
+		tutorial_tween.tween_property(label, "modulate:a", 0.0, 0.4) # Slower fade
 		tutorial_tween.parallel().tween_property(label, "scale", Vector2(1.2, 1.2), 0.2)
 		
 	tutorial_tween.tween_callback(finish_tutorial)
@@ -281,7 +284,8 @@ func finish_tutorial():
 func _physics_process(delta: float):
 	# Pause Input (Always check this first)
 	if Input.is_action_just_pressed("ui_cancel"):
-		toggle_pause()
+		if not is_unpausing:
+			toggle_pause()
 		return # Stop processing this frame to avoid double-triggers
 	
 	if get_tree().paused or is_unpausing:
@@ -328,9 +332,11 @@ func _physics_process(delta: float):
 			if hud and hud.has_method("trigger_dash_effect"):
 				hud.trigger_dash_effect(0.2)
 			
-			# Camera kick
-			create_tween().tween_property(camera, "zoom", camera.zoom * 0.95, 0.1).set_trans(Tween.TRANS_BACK)
-			create_tween().tween_property(camera, "zoom", camera.zoom, 0.2).set_delay(0.1)
+			# Camera kick (Zoom IN slightly for impact)
+			var base_zoom = camera.zoom
+			var kick_tween = create_tween()
+			kick_tween.tween_property(camera, "zoom", base_zoom * 1.05, 0.1).set_trans(Tween.TRANS_BACK)
+			kick_tween.tween_property(camera, "zoom", base_zoom, 0.2).set_delay(0.1)
 			
 			if has_node("/root/AudioManager"):
 				# Lower volume (-10db) and start persistent loop
@@ -421,11 +427,11 @@ func spawn_shield():
 	visual.color = Color(0.2, 0.6, 1.0, 0.3)
 	
 	# Rotating animation
-	var tween = create_tween().set_loops()
+	var tween = create_tween().set_loops(9999)
 	tween.tween_property(shield_node, "rotation", TAU, 2.0).as_relative()
 	
 	# Pulse effect
-	var pulse = create_tween().set_loops()
+	var pulse = create_tween().set_loops(9999)
 	pulse.tween_property(visual, "modulate:a", 0.6, 0.5)
 	pulse.tween_property(visual, "modulate:a", 0.2, 0.5)
 
@@ -449,7 +455,7 @@ func spawn_ghost():
 	tween.tween_callback(ghost.queue_free)
 
 func handle_movement(delta: float):
-	var speed = dash_speed if is_dashing else (base_speed * speed_multiplier)
+	var speed = (dash_speed if is_dashing else base_speed) * speed_multiplier
 	var input_dir = Vector2.ZERO
 	
 	var use_mouse = false
@@ -566,6 +572,8 @@ func add_xp(amount: float):
 
 func level_up():
 	level += 1
+	if has_node("/root/GlobalData"):
+		get_node("/root/GlobalData").run_level = level
 	xp -= xp_to_next_level
 	xp_to_next_level *= 1.15  # Scaling XP requirement
 	xp_changed.emit(xp, xp_to_next_level)
@@ -745,12 +753,16 @@ func toggle_pause():
 				
 				# 2. Keep the shards visible for 2 more frames while fading
 				# This masks the transition from the static screenshot back to live game
-				var final_fade = create_tween()
-				final_fade.tween_property(canvas, "modulate:a", 0.0, 0.1)
-				final_fade.tween_callback(func():
-					is_unpausing = false # Finally re-enable movement/input
+				if bg:
+					var final_fade = create_tween()
+					final_fade.tween_property(bg, "modulate:a", 0.0, 0.1)
+					final_fade.tween_callback(func():
+						is_unpausing = false # Finally re-enable movement/input
+						canvas.queue_free()
+					)
+				else:
+					is_unpausing = false
 					canvas.queue_free()
-				)
 			)
 		else:
 			get_tree().paused = false
@@ -800,6 +812,43 @@ func pause_game_fractured():
 	menu_ui.add_theme_constant_override("separation", 20)
 	canvas.add_child(menu_ui)
 	
+	# Run Stats (New addition)
+	var gd = get_node("/root/GlobalData") if has_node("/root/GlobalData") else null
+	if gd:
+		var stats_box = VBoxContainer.new()
+		stats_box.alignment = BoxContainer.ALIGNMENT_CENTER
+		menu_ui.add_child(stats_box)
+		
+		var score_label = Label.new()
+		score_label.text = "SCORE: " + str(gd.run_score)
+		score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		score_label.add_theme_font_size_override("font_size", 32)
+		score_label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2)) # Gold
+		score_label.modulate = Color(2.0, 2.0, 1.5) # Strong Glow
+		stats_box.add_child(score_label)
+		
+		var kills_label = Label.new()
+		kills_label.text = "KILLS: " + str(gd.run_kills)
+		kills_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		kills_label.add_theme_font_size_override("font_size", 28)
+		kills_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.4)) # Neon Pink
+		kills_label.modulate = Color(2.0, 1.2, 1.5) # Strong Glow
+		stats_box.add_child(kills_label)
+		
+		var time_label = Label.new()
+		var spawner = get_tree().get_first_node_in_group("spawner")
+		var t = spawner.time_passed if spawner else 0.0
+		time_label.text = "TIME: %02d:%02d" % [int(t / 60), int(t) % 60]
+		time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		time_label.add_theme_font_size_override("font_size", 28)
+		time_label.add_theme_color_override("font_color", Color(0, 1, 1)) # Cyan
+		time_label.modulate = Color(1.5, 2.0, 2.0) # Strong Glow
+		stats_box.add_child(time_label)
+		
+		var spacer = Control.new()
+		spacer.custom_minimum_size = Vector2(0, 20)
+		menu_ui.add_child(spacer)
+	
 	# Title
 	var label = Label.new()
 	label.text = "PAUSED"
@@ -810,23 +859,58 @@ func pause_game_fractured():
 	menu_ui.add_child(label)
 	
 	# Create Buttons helper function for animations
+	var style_btn = func(btn: Button):
+		var normal = StyleBoxFlat.new()
+		normal.bg_color = Color(0.1, 0.1, 0.2, 0.6)
+		normal.border_width_left = 4
+		normal.border_color = Color(0.0, 0.8, 1.0, 0.6)
+		normal.corner_radius_top_left = 2
+		normal.corner_radius_bottom_right = 15
+		normal.content_margin_left = 20
+		normal.content_margin_right = 20
+		
+		var hover = normal.duplicate()
+		hover.bg_color = Color(0.2, 0.2, 0.4, 0.8)
+		hover.border_color = Color(0.0, 1.0, 1.0, 1.0)
+		hover.shadow_color = Color(0.0, 1.0, 1.0, 0.3)
+		hover.shadow_size = 10
+		
+		var pressed = hover.duplicate()
+		pressed.bg_color = Color(0.3, 0.1, 0.4, 0.9)
+		pressed.border_color = Color(1.0, 0.0, 1.0, 1.0)
+		
+		btn.add_theme_stylebox_override("normal", normal)
+		btn.add_theme_stylebox_override("hover", hover)
+		btn.add_theme_stylebox_override("pressed", pressed)
+		btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+		
+		btn.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
+		btn.add_theme_color_override("font_hover_color", Color.WHITE)
+		btn.add_theme_constant_override("outline_size", 4)
+		btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
+
 	var setup_btn = func(btn: Button, size: int):
+		style_btn.call(btn)
 		btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		btn.add_theme_font_size_override("font_size", size)
-		btn.pivot_offset = Vector2(100, 25) # Approximate, will adjust after frame
-		btn.focus_mode = Control.FOCUS_NONE # Remove the white selection border
+		btn.pivot_offset = Vector2(100, 25) # Approximate
+		btn.focus_mode = Control.FOCUS_NONE
 		
 		btn.mouse_entered.connect(func():
+			if has_node("/root/AudioManager"):
+				get_node("/root/AudioManager").play_sfx("hover")
 			var t = canvas.create_tween()
-			t.tween_property(btn, "scale", Vector2(1.1, 1.1), 0.1).set_trans(Tween.TRANS_BACK)
-			t.parallel().tween_property(btn, "modulate", Color(1.2, 1.2, 1.5), 0.1)
+			t.tween_property(btn, "scale", Vector2(1.1, 1.1), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			t.parallel().tween_property(btn, "modulate", Color(1.5, 1.5, 2.0), 0.2)
 		)
 		btn.mouse_exited.connect(func():
 			var t = canvas.create_tween()
-			t.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.1)
-			t.parallel().tween_property(btn, "modulate", Color.WHITE, 0.1)
+			t.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_SINE)
+			t.parallel().tween_property(btn, "modulate", Color.WHITE, 0.2)
 		)
 		btn.button_down.connect(func():
+			if has_node("/root/AudioManager"):
+				get_node("/root/AudioManager").play_sfx("click")
 			btn.scale = Vector2(0.9, 0.9)
 		)
 		btn.button_up.connect(func():
@@ -835,14 +919,14 @@ func pause_game_fractured():
 	
 	# Resume Button
 	var resume_btn = Button.new()
-	resume_btn.text = " RESUME "
+	resume_btn.text = "RESUME"
 	setup_btn.call(resume_btn, 32)
 	resume_btn.pressed.connect(toggle_pause)
 	menu_ui.add_child(resume_btn)
 	
 	# Main Menu Button
 	var main_menu_btn = Button.new()
-	main_menu_btn.text = " BACK TO MAIN MENU "
+	main_menu_btn.text = "BACK TO MAIN MENU"
 	setup_btn.call(main_menu_btn, 24)
 	main_menu_btn.pressed.connect(func():
 		get_tree().paused = false
@@ -1119,11 +1203,15 @@ func die():
 	
 	if has_node("/root/GlobalData"):
 		var gd = get_node("/root/GlobalData")
+		gd.run_time = spawner.time_passed if spawner else 0.0
 		if gd.has_upgrade("shard_multiplier"):
 			shards_earned = int(shards_earned * 1.5)
 			
 		gd.add_shards(shards_earned)
-		if time_survived > gd.high_score:
+		if gd.run_score > gd.high_score_points:
+			gd.high_score_points = gd.run_score
+			gd.best_kills = gd.run_kills
+			gd.best_level = gd.run_level
 			gd.high_score = time_survived
 		gd.save_game()
 	
@@ -1136,7 +1224,8 @@ func die():
 	emit_signal("game_over", {
 		"level": level,
 		"shards": shards_earned,
-		"highest_combo": highest_combo_run
+		"highest_combo": highest_combo_run,
+		"time": spawner.time_passed if spawner else 0.0
 	})
 	
 	# Pause the game instead of reloading

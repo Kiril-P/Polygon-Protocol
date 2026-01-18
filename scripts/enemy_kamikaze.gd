@@ -22,8 +22,8 @@ func _ready():
 	scale = Vector2(0.8, 0.8)
 	
 	if has_node("Polygon2D"):
-		sprite.color = Color(1.0, 0.8, 0.0) # Yellow initially
-		sprite.modulate = Color(2.0, 1.5, 0.0, 1.0) # Bright glow
+		sprite.color = Color(1.0, 0.4, 0.0) # Vibrant Orange (More distinct from Yellow Fairy)
+		sprite.modulate = Color(2.5, 1.2, 0.0, 1.0) # Bright glow
 	
 	# Difficulty scaling
 	if has_node("/root/GlobalData"):
@@ -51,7 +51,7 @@ func _physics_process(delta: float):
 		
 		# Pulsate red
 		var pulse = (sin(Time.get_ticks_msec() * 0.02) + 1.0) * 0.5
-		sprite.color = Color(1.0, 0.8, 0.0).lerp(Color(1.0, 0.0, 0.0), pulse)
+		sprite.color = Color(1.0, 0.4, 0.0).lerp(Color(1.0, 0.0, 0.0), pulse)
 		sprite.modulate = Color(2.0, 1.0, 1.0).lerp(Color(5.0, 1.0, 1.0), pulse)
 	else:
 		# Normal chase
@@ -148,6 +148,7 @@ func die():
 		var gd = get_node("/root/GlobalData")
 		gd.total_kills += 1
 		gd.run_kills += 1
+		gd.add_score(xp_value * 10, player.combo_count if player else 0)
 		
 	queue_free()
 

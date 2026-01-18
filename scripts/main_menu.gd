@@ -3,13 +3,10 @@ extends Control
 @onready var start_button = $VBoxContainer/StartButton
 @onready var upgrade_button = $VBoxContainer/UpgradeButton
 @onready var options_button = $VBoxContainer/OptionsButton
+@onready var quit_button = $QuitButton 
+@onready var splash_label = %SplashLabel
 
-@onready var options_menu = $OptionsMenu
-@onready var controls_button = $OptionsMenu/VBoxContainer/ControlsButton
-@onready var tutorial_button = $OptionsMenu/VBoxContainer/TutorialButton # You might need to add this in editor
-@onready var quit_button = $QuitButton # You might need to add this in editor
-@onready var close_options_button = $OptionsMenu/VBoxContainer/CloseOptionsButton
-var difficulty_buttons: Array[Button] = []
+var options_scene = preload("res://scenes/options_menu.tscn")
 
 func _ready():
 	# Set music to menu mode
@@ -17,36 +14,83 @@ func _ready():
 		get_node("/root/AudioManager").set_music_menu_mode(true)
 		get_node("/root/AudioManager").set_muffled(false)
 		
-	options_menu.visible = false
+	# Leaderboard Button
+	var lb_button = Button.new()
+	lb_button.text = "LEADERBOARD"
+	lb_button.name = "LeaderboardButton"
+	lb_button.custom_minimum_size = Vector2(350, 70)
+	lb_button.add_theme_font_size_override("font_size", 30)
+	$VBoxContainer.add_child(lb_button)
+	# Position it below options or upgrades
+	$VBoxContainer.move_child(lb_button, 2)
+	lb_button.pressed.connect(_on_leaderboard_pressed)
 	
-	# Display High Score on Main Menu
-	var gd = get_node("/root/GlobalData")
-	if gd and gd.high_score > 0:
-		var hs_label = Label.new()
-		hs_label.text = "BEST TIME: %d:%02d" % [int(gd.high_score / 60), int(gd.high_score) % 60]
-		hs_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		hs_label.add_theme_font_size_override("font_size", 18)
-		hs_label.modulate = Color(0.0, 0.8, 1.0, 0.6) # Cyan glow
-		$VBoxContainer.add_child(hs_label)
-		$VBoxContainer.move_child(hs_label, 0) # Top of buttons
-	
-	# setup_difficulty_selector()
-	if tutorial_button:
-		tutorial_button.visible = true
-		
-	setup_difficulty_selector()
 	if quit_button:
 		if OS.get_name() == "Web":
 			quit_button.text = "FULLSCREEN"
 		else:
 			quit_button.text = "QUIT"
-	update_controls_button_text()
-	update_tutorial_button_text()
+			
 	create_menu_juice()
 	setup_button_animations()
+	style_all_buttons()
+	animate_splash_text()
+
+func animate_splash_text():
+	if not splash_label: return
+	
+	var t = create_tween().set_loops()
+	t.tween_property(splash_label, "scale", Vector2(1.2, 1.2), 0.5).set_trans(Tween.TRANS_SINE)
+	t.tween_property(splash_label, "scale", Vector2(1.0, 1.0), 0.5).set_trans(Tween.TRANS_SINE)
+
+func style_all_buttons():
+	var buttons = [start_button, upgrade_button, options_button, quit_button]
+	var lb_btn = $VBoxContainer.get_node_or_null("LeaderboardButton")
+	if lb_btn: buttons.append(lb_btn)
+	
+	for btn in buttons:
+		if not btn: continue
+		style_menu_button(btn)
+
+func style_menu_button(btn: Button):
+	# Normal Style
+	var normal = StyleBoxFlat.new()
+	normal.bg_color = Color(0.1, 0.1, 0.2, 0.4)
+	normal.border_width_left = 4
+	normal.border_color = Color(0.0, 0.8, 1.0, 0.6) # Cyan edge
+	normal.corner_radius_top_left = 2
+	normal.corner_radius_bottom_right = 15
+	normal.content_margin_left = 20
+	
+	# Hover Style
+	var hover = normal.duplicate()
+	hover.bg_color = Color(0.2, 0.2, 0.4, 0.6)
+	hover.border_color = Color(0.0, 1.0, 1.0, 1.0) # Bright Cyan
+	hover.shadow_color = Color(0.0, 1.0, 1.0, 0.3)
+	hover.shadow_size = 10
+	
+	# Pressed Style
+	var pressed = hover.duplicate()
+	pressed.bg_color = Color(0.3, 0.1, 0.4, 0.8)
+	pressed.border_color = Color(1.0, 0.0, 1.0, 1.0) # Magenta flash
+	
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	
+	# Text styling
+	btn.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
+	btn.add_theme_color_override("font_hover_color", Color.WHITE)
+	btn.add_theme_constant_override("outline_size", 4)
+	btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
 
 func setup_button_animations():
-	var buttons = [start_button, upgrade_button, options_button, controls_button, tutorial_button, quit_button, close_options_button]
+	var buttons = [start_button, upgrade_button, options_button, quit_button]
+	var lb_btn = $VBoxContainer.get_node_or_null("LeaderboardButton")
+	if lb_btn:
+		buttons.append(lb_btn)
+		
 	for btn in buttons:
 		if not btn: continue
 		
@@ -78,104 +122,19 @@ func setup_button_animations():
 			btn.scale = Vector2(1.1, 1.1)
 		)
 
-func setup_difficulty_selector():
-	var container = $OptionsMenu/VBoxContainer
-	if not container: return
-	
-	var label = Label.new()
-	label.text = "DIFFICULTY"
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 20)
-	container.add_child(label)
-	# Move above close button
-	container.move_child(label, container.get_child_count() - 2)
-	
-	var hbox = HBoxContainer.new()
-	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	hbox.add_theme_constant_override("separation", 15)
-	container.add_child(hbox)
-	container.move_child(hbox, container.get_child_count() - 2)
-	
-	var gd = get_node("/root/GlobalData")
-	var current_diff = gd.difficulty_level if gd else 2
-	
-	for i in range(1, 6):
-		var btn = Button.new()
-		btn.text = str(i)
-		btn.custom_minimum_size = Vector2(40, 40)
-		btn.toggle_mode = true
-		btn.focus_mode = Control.FOCUS_NONE
-		
-		if i == 2:
-			btn.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2)) # Gold-ish for Normal
-			btn.tooltip_text = "NORMAL"
-		
-		btn.pressed.connect(func(): _on_difficulty_selected(i))
-		hbox.add_child(btn)
-		difficulty_buttons.append(btn)
-		
-		# Simple hover effect for difficulty buttons
-		btn.mouse_entered.connect(func():
-			create_tween().tween_property(btn, "scale", Vector2(1.2, 1.2), 0.1)
-		)
-		btn.mouse_exited.connect(func():
-			var base_scale = Vector2(1.1, 1.1) if btn.button_pressed else Vector2(1.0, 1.0)
-			create_tween().tween_property(btn, "scale", base_scale, 0.1)
-		)
-	
-	update_difficulty_buttons(current_diff)
-
-func _on_difficulty_selected(level: int):
-	if has_node("/root/GlobalData"):
-		var gd = get_node("/root/GlobalData")
-		gd.difficulty_level = level
-		gd.save_game()
-		update_difficulty_buttons(level)
-
-func update_difficulty_buttons(selected_level: int):
-	for i in range(difficulty_buttons.size()):
-		var btn = difficulty_buttons[i]
-		var level = i + 1
-		btn.button_pressed = (level == selected_level)
-		
-		# Visual feedback for selection
-		if level == selected_level:
-			btn.modulate = Color(1.5, 1.5, 2.0) # Glowing selected
-			btn.scale = Vector2(1.1, 1.1)
-		else:
-			btn.modulate = Color.WHITE
-			btn.scale = Vector2(1.0, 1.0)
-		
-		# Highlight Normal (2) even when not selected, but more when selected
-		if level == 2:
-			if level == selected_level:
-				btn.add_theme_color_override("font_color", Color(1.0, 1.0, 0.0))
-			else:
-				btn.add_theme_color_override("font_color", Color(0.8, 0.8, 0.0))
-
-func update_controls_button_text():
-	if controls_button and has_node("/root/GlobalData"):
-		var use_mouse = get_node("/root/GlobalData").use_mouse_controls
-		controls_button.text = "INPUT: MOUSE" if use_mouse else "INPUT: WASD"
-
-func update_tutorial_button_text():
-	if tutorial_button and has_node("/root/GlobalData"):
-		var is_tutorial_enabled = get_node("/root/GlobalData").show_tutorial
-		tutorial_button.text = "TUTORIAL: ON" if is_tutorial_enabled else "TUTORIAL: OFF"
-
 func create_menu_juice():
 	# Background elements: Mix of shapes and "Enemies"
-	for i in range(12):
+	for i in range(20): # Increased from 12
 		spawn_menu_shape()
 	
 	# Spawn a few "Preview Enemies"
-	for i in range(8): # Increased count
+	for i in range(15): # Increased count for more hectic feel
 		spawn_menu_enemy()
 
 func spawn_menu_shape():
 	var poly = Polygon2D.new()
 	add_child(poly)
-	move_child(poly, 1)
+	move_child(poly, 1) # Just above Background
 	
 	var pts = PackedVector2Array()
 	var sides = randi_range(3, 8)
@@ -190,19 +149,21 @@ func spawn_menu_shape():
 	# Add Glow to background shapes
 	poly.modulate = Color(1.5, 1.5, 1.5, 1.0)
 	
-	poly.position = Vector2(randf_range(0, 1152), randf_range(0, 648))
+	var screen_size = get_viewport_rect().size
+	poly.position = Vector2(randf_range(0, screen_size.x), randf_range(0, screen_size.y))
 	
 	animate_menu_shape(poly)
 
 func animate_menu_shape(poly: Node2D):
 	if not is_instance_valid(poly): return
 	
-	var travel = Vector2(randf_range(-100, 100), randf_range(-100, 100))
-	var duration = randf_range(10, 20)
+	var screen_size = get_viewport_rect().size
+	var target = Vector2(randf_range(0, screen_size.x), randf_range(0, screen_size.y))
+	var duration = randf_range(15, 25)
 	
 	var tween = create_tween().set_parallel(true)
-	tween.tween_property(poly, "position", poly.position + travel, duration).set_trans(Tween.TRANS_SINE)
-	tween.tween_property(poly, "rotation", poly.rotation + PI, duration)
+	tween.tween_property(poly, "position", target, duration).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(poly, "rotation", poly.rotation + PI * 2.0, duration)
 	
 	tween.set_parallel(false)
 	tween.tween_interval(1.0) # Small pause
@@ -213,7 +174,7 @@ func spawn_menu_enemy():
 	enemy.flat = true # Hide the default button look
 	enemy.focus_mode = Control.FOCUS_NONE # Remove white selection border
 	add_child(enemy)
-	move_child(enemy, 2)
+	move_child(enemy, 1) # Just above Background
 	
 	var poly = Polygon2D.new()
 	enemy.add_child(poly)
@@ -231,7 +192,8 @@ func spawn_menu_enemy():
 	# Add Glow to menu enemies
 	poly.modulate = Color(2.0, 1.5, 1.5, 1.0) if not is_tank else Color(1.5, 2.0, 1.5, 1.0)
 	
-	enemy.position = Vector2(randf_range(0, 1152), randf_range(0, 648))
+	var screen_size = get_viewport_rect().size
+	enemy.position = Vector2(randf_range(0, screen_size.x), randf_range(0, screen_size.y))
 	enemy.custom_minimum_size = Vector2(e_size * 2, e_size * 2)
 	poly.position = Vector2(e_size, e_size) # Center poly in button
 	
@@ -242,7 +204,7 @@ func spawn_menu_enemy():
 		spawn_menu_death_particles(enemy.position + poly.position, poly.color)
 		enemy.queue_free()
 		# Respawn another after a delay to keep the menu busy
-		get_tree().create_timer(2.0).timeout.connect(spawn_menu_enemy)
+		get_tree().create_timer(0.5).timeout.connect(spawn_menu_enemy)
 	)
 	
 	animate_menu_enemy(enemy, poly)
@@ -250,7 +212,7 @@ func spawn_menu_enemy():
 	# Firing logic
 	var fire_timer = Timer.new()
 	enemy.add_child(fire_timer) # Child of enemy so it dies with it
-	fire_timer.wait_time = randf_range(1.5, 3.0)
+	fire_timer.wait_time = randf_range(0.5, 1.5)
 	fire_timer.timeout.connect(func(): 
 		if not is_instance_valid(enemy): return
 		spawn_menu_bullet(enemy.position + poly.position, poly.rotation, poly.color)
@@ -261,11 +223,12 @@ func animate_menu_enemy(enemy: Control, poly: Node2D):
 	if not is_instance_valid(enemy): return
 	
 	var duration = randf_range(5, 10)
-	var target = Vector2(randf_range(0, 1152), randf_range(0, 648))
+	var screen_size = get_viewport_rect().size
+	var target = Vector2(randf_range(0, screen_size.x), randf_range(0, screen_size.y))
 	
 	var tween = create_tween().set_parallel(true)
 	tween.tween_property(enemy, "position", target, duration).set_trans(Tween.TRANS_SINE)
-	tween.tween_property(poly, "rotation", poly.rotation + TAU, duration)
+	tween.tween_property(poly, "rotation", poly.rotation + TAU * 3.0, duration) # Faster rotation
 	
 	tween.set_parallel(false)
 	tween.tween_callback(func(): animate_menu_enemy(enemy, poly))
@@ -274,18 +237,21 @@ func spawn_menu_death_particles(pos: Vector2, col: Color):
 	var particles = CPUParticles2D.new()
 	add_child(particles)
 	particles.global_position = pos
-	particles.amount = 15
+	particles.amount = 60 # Even more particles
 	particles.one_shot = true
 	particles.explosiveness = 1.0
 	particles.spread = 180.0
 	particles.gravity = Vector2.ZERO
-	particles.initial_velocity_min = 100.0
-	particles.initial_velocity_max = 200.0
-	particles.scale_amount_min = 3.0
-	particles.scale_amount_max = 5.0
+	particles.initial_velocity_min = 200.0 # Even faster
+	particles.initial_velocity_max = 400.0 # Even faster
+	particles.scale_amount_min = 4.0
+	particles.scale_amount_max = 10.0 # Larger max scale
+	particles.hue_variation_min = -0.1
+	particles.hue_variation_max = 0.1
+	# Add some color variation to particles
 	particles.color = col
 	particles.emitting = true
-	get_tree().create_timer(1.0).timeout.connect(particles.queue_free)
+	get_tree().create_timer(1.5).timeout.connect(particles.queue_free)
 
 func spawn_menu_bullet(pos: Vector2, rot: float, col: Color):
 	var bullet = Polygon2D.new()
@@ -372,29 +338,73 @@ func _on_upgrade_button_pressed():
 		get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
 	)
 
+func _on_leaderboard_pressed():
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("click")
+	
+	# Cool "Warp" Animation like Evolution Vault
+	start_button.disabled = true
+	upgrade_button.disabled = true
+	options_button.disabled = true
+	var lb_btn = $VBoxContainer.get_node_or_null("LeaderboardButton")
+	if lb_btn: lb_btn.disabled = true
+	
+	var duration = 0.5
+	var tween = create_tween().set_parallel(true)
+	
+	# Buttons fly off
+	tween.tween_property($VBoxContainer, "position:y", 1000, duration).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	
+	# Title zooms into camera
+	var title = get_node_or_null("Title")
+	if title:
+		tween.tween_property(title, "scale", Vector2(10, 10), duration + 0.1).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_IN)
+		tween.tween_property(title, "modulate:a", 0.0, duration + 0.1)
+	
+	# White flash or Warp effect
+	var flash = ColorRect.new()
+	add_child(flash)
+	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	flash.color = Color.WHITE
+	flash.modulate.a = 0
+	tween.tween_property(flash, "modulate:a", 1.0, duration).set_delay(duration * 0.4)
+	
+	tween.set_parallel(false)
+	tween.tween_callback(func():
+		if has_node("/root/GlobalData"):
+			get_node("/root/GlobalData").next_scene_path = "res://scenes/leaderboard.tscn"
+		get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
+	)
+
 func _on_options_button_pressed():
 	if has_node("/root/AudioManager"):
 		get_node("/root/AudioManager").play_sfx("click")
-	get_tree().change_scene_to_file("res://scenes/options_menu.tscn")
-
-func _on_close_options_button_pressed():
-	var tween = create_tween()
-	tween.tween_property(options_menu, "modulate:a", 0.0, 0.2)
-	tween.tween_callback(func(): options_menu.visible = false)
-
-func _on_controls_button_pressed():
-	if has_node("/root/GlobalData"):
-		var gd = get_node("/root/GlobalData")
-		gd.use_mouse_controls = !gd.use_mouse_controls
-		gd.save_game()
-		update_controls_button_text()
-
-func _on_tutorial_button_pressed():
-	if has_node("/root/GlobalData"):
-		var gd = get_node("/root/GlobalData")
-		gd.show_tutorial = !gd.show_tutorial
-		gd.save_game()
-		update_tutorial_button_text()
+	
+	var options = options_scene.instantiate()
+	add_child(options)
+	
+	# Hide background if overlaying
+	if options.has_node("Background"):
+		options.get_node("Background").visible = false
+	
+	# Entry animation
+	options.modulate.a = 0
+	options.scale = Vector2(0.8, 0.8)
+	options.pivot_offset = get_viewport_rect().size / 2
+	
+	var tween = create_tween().set_parallel(true)
+	tween.tween_property(options, "modulate:a", 1.0, 0.3).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(options, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	
+	# Handle closing without scene change
+	if options.has_method("setup_as_overlay"):
+		options.setup_as_overlay(func():
+			var t = create_tween().set_parallel(true)
+			t.tween_property(options, "modulate:a", 0.0, 0.2).set_trans(Tween.TRANS_SINE)
+			t.tween_property(options, "scale", Vector2(1.2, 1.2), 0.2).set_trans(Tween.TRANS_SINE)
+			t.set_parallel(false)
+			t.tween_callback(options.queue_free)
+		)
 
 func _on_quit_button_pressed():
 	if OS.get_name() == "Web":

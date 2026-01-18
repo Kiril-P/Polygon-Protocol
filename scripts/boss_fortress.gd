@@ -1,8 +1,8 @@
 extends CharacterBody2D
 
 @export var speed: float = 60.0
-@export var health: float = 4000.0
-@export var max_health: float = 4000.0
+@export var health: float = 12000.0
+@export var max_health: float = 12000.0
 @export var damage: float = 20.0
 @export var xp_value: int = 500
 
@@ -14,8 +14,13 @@ var pillar_spawn_timer: float = 5.0 # Increased initial delay
 var border_radius: float = 1200.0
 var arena_barrier: StaticBody2D = null
 
+# Enemy variety
+var spawn_timer: float = 2.0
+var kamikaze_scene = load("res://scenes/enemy_kamikaze.tscn")
+var chaser_scene = load("res://scenes/enemy.tscn")
+var shooter_scene = load("res://scenes/enemy_shooter.tscn")
+
 @onready var poly = $Polygon2D
-@onready var core_sprite = $Core
 @onready var shield_container = $Shields
 
 func _ready():
@@ -76,7 +81,7 @@ func setup_arena_border():
 		static_body.add_child(coll)
 	
 	# Glow effect
-	var t = create_tween().set_loops(0)
+	var t = create_tween().set_loops(9999)
 	t.tween_property(border, "default_color:a", 1.0, 0.5)
 	t.tween_property(border, "default_color:a", 0.4, 0.5)
 
@@ -136,6 +141,34 @@ func _physics_process(delta: float):
 		if pillar_spawn_timer <= 0:
 			spawn_pillar()
 			pillar_spawn_timer = 2.0 # Short delay before next wave spawns
+			
+	# Spawn variety enemies for pressure
+	spawn_timer -= delta
+	if spawn_timer <= 0 and not is_dying:
+		spawn_variety_enemies()
+		spawn_timer = randf_range(3.5, 5.5)
+
+func spawn_variety_enemies():
+	var count = 3 if phase == 1 else 6
+	for i in range(count):
+		# Border is 1200
+		var dist = randf_range(300, border_radius - 150)
+		var spawn_pos = global_position + Vector2(dist, 0).rotated(randf() * TAU)
+		
+		var roll = randf()
+		var enemy
+		if roll < 0.4:
+			enemy = kamikaze_scene.instantiate()
+		elif roll < 0.7:
+			enemy = chaser_scene.instantiate()
+		else:
+			enemy = shooter_scene.instantiate()
+			
+		get_parent().add_child(enemy)
+		enemy.global_position = spawn_pos
+		
+		if enemy.has_method("set_xp_value"):
+			enemy.set_xp_value(1)
 
 func spawn_pillar():
 	# Spawn 3 hearts
@@ -219,7 +252,7 @@ func take_damage(amount: float):
 	
 	health -= amount
 	
-	if health < max_health * 0.5 and phase == 1:
+	if health < max_health * 0.67 and phase == 1:
 		phase = 2
 		# Drastic visual change for Phase 2
 		poly.color = Color(0.3, 0.0, 0.0) # Blood Red Core
@@ -252,6 +285,12 @@ func die():
 	# Massive XP
 	if player and player.has_method("add_xp"):
 		player.add_xp(xp_value)
+		
+	if has_node("/root/GlobalData"):
+		var gd = get_node("/root/GlobalData")
+		gd.total_kills += 1
+		gd.run_kills += 1
+		gd.add_score(xp_value * 10, player.combo_count if player else 0)
 		
 	# REMOVE ARENA BARRIER AND HEARTS
 	if is_instance_valid(arena_barrier):

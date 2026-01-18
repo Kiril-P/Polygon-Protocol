@@ -109,6 +109,7 @@ func die():
 		var gd = get_node("/root/GlobalData")
 		gd.total_kills += 1
 		gd.run_kills += 1
+		gd.add_score(xp_value * 10, player.combo_count if player else 0)
 		
 	queue_free()
 

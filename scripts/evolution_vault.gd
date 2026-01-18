@@ -24,6 +24,69 @@ func _ready():
 	# Entry Animation
 	modulate.a = 0
 	create_tween().tween_property(self, "modulate:a", 1.0, 0.5)
+	style_back_button()
+
+func style_back_button():
+	var back_btn = $UI/TopBar/BackButton # Assuming this is the path
+	if not back_btn: return
+	style_menu_button(back_btn)
+	setup_button_animations(back_btn)
+
+func style_menu_button(btn: Button):
+	var normal = StyleBoxFlat.new()
+	normal.bg_color = Color(0.1, 0.1, 0.2, 0.6)
+	normal.border_width_left = 4
+	normal.border_color = Color(0.0, 0.8, 1.0, 0.6)
+	normal.corner_radius_top_left = 2
+	normal.corner_radius_bottom_right = 15
+	normal.content_margin_left = 20
+	
+	var hover = normal.duplicate()
+	hover.bg_color = Color(0.2, 0.2, 0.4, 0.8)
+	hover.border_color = Color(0.0, 1.0, 1.0, 1.0)
+	hover.shadow_color = Color(0.0, 1.0, 1.0, 0.3)
+	hover.shadow_size = 10
+	
+	var pressed = hover.duplicate()
+	pressed.bg_color = Color(0.3, 0.1, 0.4, 0.9)
+	pressed.border_color = Color(1.0, 0.0, 1.0, 1.0)
+	
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	
+	btn.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
+	btn.add_theme_color_override("font_hover_color", Color.WHITE)
+	btn.add_theme_constant_override("outline_size", 4)
+	btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
+
+func setup_button_animations(btn: Button):
+	btn.pivot_offset = btn.size / 2
+	btn.focus_mode = Control.FOCUS_NONE
+	
+	btn.mouse_entered.connect(func():
+		if has_node("/root/AudioManager"):
+			get_node("/root/AudioManager").play_sfx("hover")
+		var t = create_tween().set_parallel(true)
+		t.tween_property(btn, "scale", Vector2(1.1, 1.1), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		t.tween_property(btn, "modulate", Color(1.5, 1.5, 2.0), 0.2)
+	)
+	btn.mouse_exited.connect(func():
+		var t = create_tween().set_parallel(true)
+		t.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_SINE)
+		t.tween_property(btn, "modulate", Color.WHITE, 0.2)
+	)
+	
+	btn.button_down.connect(func():
+		if has_node("/root/AudioManager"):
+			get_node("/root/AudioManager").play_sfx("click")
+		btn.scale = Vector2(0.95, 0.95)
+	)
+	
+	btn.button_up.connect(func():
+		btn.scale = Vector2(1.1, 1.1)
+	)
 
 func setup_background():
 	# Create a techy/grid background
@@ -32,15 +95,17 @@ func setup_background():
 	bg_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	background.add_child(bg_rect)
 	
+	var screen_size = get_viewport_rect().size
+	
 	# Add some "floating" particles for vibe
 	var particles = CPUParticles2D.new()
 	background.add_child(particles)
-	particles.position = Vector2(576, 324)
+	particles.position = screen_size / 2
 	particles.amount = 50
 	particles.lifetime = 10.0
 	particles.preprocess = 5.0
 	particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	particles.emission_rect_extents = Vector2(600, 400)
+	particles.emission_rect_extents = screen_size / 2
 	particles.gravity = Vector2.ZERO
 	particles.initial_velocity_min = 5.0
 	particles.initial_velocity_max = 15.0
@@ -132,6 +197,9 @@ func create_card(data, gd):
 		btn.text = str(data["cost"]) + " SHARDS"
 		btn.disabled = not can_afford
 	
+	style_menu_button(btn)
+	setup_button_animations(btn)
+	
 	btn.pressed.connect(func():
 		if owned:
 			gd.toggle_upgrade(data["id"])
@@ -172,8 +240,13 @@ func create_card(data, gd):
 	return panel
 
 func _on_back_pressed():
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("click")
+	
 	var t = create_tween()
 	t.tween_property(self, "modulate:a", 0.0, 0.3)
 	t.tween_callback(func():
-		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+		if has_node("/root/GlobalData"):
+			get_node("/root/GlobalData").next_scene_path = "res://scenes/main_menu.tscn"
+		get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
 	)

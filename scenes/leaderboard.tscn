@@ -1,0 +1,175 @@
+[gd_scene load_steps=4 format=3 uid="uid://c6l2k2r5p7x6"]
+
+[ext_resource type="Script" path="res://scripts/leaderboard.gd" id="1_leader"]
+[ext_resource type="Script" path="res://scripts/background_scroller.gd" id="2_scroller"]
+
+[sub_resource type="Shader" id="Shader_grid"]
+code = "shader_type canvas_item;
+
+uniform vec2 grid_size = vec2(100.0, 100.0);
+uniform vec4 line_color : source_color = vec4(0.0, 0.5, 1.0, 0.1);
+uniform float line_thickness : hint_range(0.0, 10.0) = 1.0;
+uniform vec2 offset = vec2(0.0, 0.0);
+
+void fragment() {
+    vec2 uv = FRAGCOORD.xy + offset;
+    vec2 grid = mod(uv, grid_size);
+    
+    float line_x = step(grid.x, line_thickness);
+    float line_y = step(grid.y, line_thickness);
+    
+    float mask = max(line_x, line_y);
+    COLOR = line_color * mask;
+}"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_grid"]
+shader = SubResource("Shader_grid")
+shader_parameter/grid_size = Vector2(100, 100)
+shader_parameter/line_color = Color(0, 0.5, 1, 0.05)
+shader_parameter/line_thickness = 1.0
+shader_parameter/offset = Vector2(0, 0)
+
+[node name="Leaderboard" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_leader")
+
+[node name="Background" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="BaseColor" type="ColorRect" parent="Background"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0156863, 0.0156863, 0.0588235, 1)
+
+[node name="Grid" type="ColorRect" parent="Background"]
+material = SubResource("ShaderMaterial_grid")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2_scroller")
+auto_scroll = Vector2(20, 10)
+
+[node name="UI" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Title" type="Label" parent="UI"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -300.0
+offset_top = 40.0
+offset_right = 300.0
+offset_bottom = 140.0
+grow_horizontal = 2
+theme_override_colors/font_outline_color = Color(0, 1, 1, 1)
+theme_override_constants/outline_size = 12
+theme_override_font_sizes/font_size = 64
+text = "QUANTUM RANKINGS"
+horizontal_alignment = 1
+
+[node name="TopBar" type="Control" parent="UI"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 100.0
+grow_horizontal = 2
+
+[node name="BackButton" type="Button" parent="UI/TopBar"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 40.0
+offset_right = 240.0
+offset_bottom = 100.0
+theme_override_font_sizes/font_size = 24
+text = "RETURN TO CORE"
+
+[node name="StatsPanel" type="PanelContainer" parent="UI"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -450.0
+offset_top = -180.0
+offset_right = 450.0
+offset_bottom = -80.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="NameEntry" type="HBoxContainer" parent="UI"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -400.0
+offset_top = -60.0
+offset_right = 400.0
+offset_bottom = 10.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="Label" type="Label" parent="UI/NameEntry"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "IDENTITY: "
+
+[node name="LineEdit" type="LineEdit" parent="UI/NameEntry"]
+custom_minimum_size = Vector2(300, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+placeholder_text = "Enter Designation..."
+max_length = 12
+
+[node name="SaveButton" type="Button" parent="UI/NameEntry"]
+custom_minimum_size = Vector2(200, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "UPLOAD DATA"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="UI"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -450.0
+offset_top = 30.0
+offset_right = 450.0
+offset_bottom = 300.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LeaderboardList" type="VBoxContainer" parent="UI/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 15
