@@ -26,6 +26,7 @@ func setup_initial_values():
 		if master_slider: master_slider.value = gd.audio_settings.master
 		if music_slider: music_slider.value = gd.audio_settings.music
 		if sfx_slider: sfx_slider.value = gd.audio_settings.sfx
+		if tutorial_btn: tutorial_btn.visible = true
 		update_button_texts()
 
 func _on_master_volume_changed(value: float):
