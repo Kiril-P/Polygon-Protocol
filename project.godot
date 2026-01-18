@@ -13,10 +13,10 @@ config_version=5
 config/name="Mini Jam 202 - Power Up"
 run/main_scene="uid://c8y7q2w1x4j5r"
 config/features=PackedStringArray("4.5", "Forward Plus", "Mobile")
+boot_splash/bg_color=Color(0.0509804, 0.0509804, 0.0509804, 1)
 boot_splash/show_image=false
 boot_splash/fullsize=false
 boot_splash/use_filter=false
-boot_splash/bg_color=Color(0.0509804, 0.0509804, 0.0509804, 1)
 
 [autoload]
 
