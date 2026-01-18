@@ -4,12 +4,9 @@ extends CanvasLayer
 @onready var xp_bar = $Control/XPBar
 @onready var dash_bar = $Control/DashBar
 @onready var level_label = $Control/LevelLabel
-var vignette: TextureRect
 
 func _ready():
-	# Create true Vignette texture
-	setup_vignette()
-	
+	add_to_group("hud")
 	# Wait a frame to ensure all nodes are in groups
 	await get_tree().process_frame
 	
@@ -25,9 +22,11 @@ func _ready():
 		_on_player_energy_changed(player.current_energy, player.max_energy)
 		level_label.text = "Level " + str(player.level)
 	
-	# Hide heart container as requested
-	if heart_container:
-		heart_container.visible = false
+	# Create heart container or reposition it
+	setup_heart_container()
+	
+	# Kill Counter UI
+	setup_kill_counter()
 	
 	# Initial Styling
 	if xp_bar:
@@ -35,36 +34,116 @@ func _ready():
 	if dash_bar:
 		dash_bar.modulate = Color(0.0, 0.8, 1.0) # Neon Cyan
 		
+	# Setup Arena Border
+	setup_arena_border()
+	
+	# Setup Dash Blur Overlay
+	setup_dash_overlay()
+
 	# INTRO ANIMATION: "Reverse Warp"
 	trigger_intro_fade()
 
-func setup_vignette():
-	vignette = TextureRect.new()
-	vignette.name = "VignetteNode"
-	$Control.add_child(vignette)
-	vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
-	vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vignette.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	vignette.stretch_mode = TextureRect.STRETCH_SCALE
+func setup_dash_overlay():
+	var overlay = ColorRect.new()
+	overlay.name = "DashBlur"
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.visible = false
 	
-	# Create a Radial Gradient for the vignette
-	var gradient = Gradient.new()
-	gradient.offsets = [0.0, 0.7, 1.0] # More pervasive red
-	gradient.colors = [Color(0.8, 0, 0, 0), Color(0.9, 0, 0, 0.4), Color(1.0, 0, 0, 1.0)] 
+	var shader = load("res://assets/shaders/dash_blur.gdshader")
+	if shader:
+		var mat = ShaderMaterial.new()
+		mat.shader = shader
+		overlay.material = mat
+		
+	$Control.add_child(overlay)
+
+func trigger_dash_effect(duration: float):
+	var overlay = $Control.get_node_or_null("DashBlur")
+	if not overlay: return
 	
-	var tex = GradientTexture2D.new()
-	tex.gradient = gradient
-	tex.fill = GradientTexture2D.FILL_RADIAL
-	tex.fill_from = Vector2(0.5, 0.5)
-	tex.fill_to = Vector2(1.0, 1.0)
-	tex.width = 512
-	tex.height = 512
+	overlay.visible = true
+	var mat = overlay.material as ShaderMaterial
+	if mat:
+		var t = create_tween()
+		t.tween_method(func(v): mat.set_shader_parameter("strength", v), 0.08, 0.0, duration)
+		t.tween_callback(func(): overlay.visible = false)
+
+func setup_arena_border():
+	var border = ReferenceRect.new()
+	border.name = "ArenaBorder"
+	border.set_anchors_preset(Control.PRESET_FULL_RECT)
+	border.editor_only = false
+	border.border_color = Color(0.0, 1.0, 1.0, 0.3) # Cyan faint
+	border.border_width = 4.0
+	$Control.add_child(border)
+	$Control.move_child(border, 0) # Behind other HUD elements
 	
-	vignette.texture = tex
-	vignette.modulate.a = 0 # Start invisible
+	# Add a second thicker border for glow
+	var glow = ReferenceRect.new()
+	glow.name = "ArenaGlow"
+	glow.set_anchors_preset(Control.PRESET_FULL_RECT)
+	glow.editor_only = false
+	glow.border_color = Color(0.0, 1.0, 1.0, 0.1)
+	glow.border_width = 12.0
+	$Control.add_child(glow)
+	$Control.move_child(glow, 0)
 	
-	# Move to front
-	vignette.z_index = 10 
+	# Pulse animation
+	var t = create_tween().set_loops()
+	t.tween_property(border, "border_color:a", 0.6, 1.5).set_trans(Tween.TRANS_SINE)
+	t.tween_property(border, "border_color:a", 0.2, 1.5).set_trans(Tween.TRANS_SINE)
+	
+	var t2 = create_tween().set_loops()
+	t2.tween_property(glow, "border_color:a", 0.3, 2.0).set_trans(Tween.TRANS_SINE)
+	t2.tween_property(glow, "border_color:a", 0.05, 2.0).set_trans(Tween.TRANS_SINE)
+
+func setup_heart_container():
+	if has_node("Control/HeartContainer"):
+		heart_container = $Control/HeartContainer
+	else:
+		heart_container = HBoxContainer.new()
+		heart_container.name = "HeartContainer"
+		$Control.add_child(heart_container)
+	
+	heart_container.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	heart_container.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	heart_container.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	heart_container.offset_bottom = -20 # Almost at the bottom
+	heart_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	heart_container.add_theme_constant_override("separation", 10)
+
+func setup_kill_counter():
+	var kills_label = Label.new()
+	kills_label.name = "KillsLabel"
+	kills_label.text = "KILLS: 0"
+	kills_label.add_theme_font_size_override("font_size", 20)
+	kills_label.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	kills_label.offset_left = -150
+	kills_label.offset_top = -60
+	$Control.add_child(kills_label)
+	
+	var timer_label = Label.new()
+	timer_label.name = "TimerLabel"
+	timer_label.text = "00:00"
+	timer_label.add_theme_font_size_override("font_size", 24)
+	timer_label.add_theme_color_override("font_color", Color(0, 1, 1, 0.8)) # Cyan glow
+	timer_label.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	timer_label.offset_left = -150
+	timer_label.offset_top = -100 # Above kills label
+	$Control.add_child(timer_label)
+
+func _process(_delta):
+	# Update Kill Counter in real-time
+	if has_node("/root/GlobalData") and has_node("Control/KillsLabel"):
+		$Control/KillsLabel.text = "KILLS: " + str(get_node("/root/GlobalData").run_kills)
+	
+	# Update Timer
+	if has_node("Control/TimerLabel"):
+		var spawner = get_tree().get_first_node_in_group("spawner")
+		if spawner:
+			var t = spawner.time_passed
+			$Control/TimerLabel.text = "%02d:%02d" % [int(t / 60), int(t) % 60]
 
 func trigger_intro_fade():
 	var fade = ColorRect.new()
@@ -87,30 +166,30 @@ func trigger_intro_fade():
 		create_tween().tween_property(cam, "zoom", original_zoom, 1.0).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
 
 func _on_player_health_changed(new_health: int, max_health: int):
-	# Update vignette alpha based on health - MUCH more aggressive
-	if vignette:
-		var health_percent = float(new_health) / float(max_health)
+	# Update hearts
+	if heart_container:
+		# Clear existing hearts
+		for child in heart_container.get_children():
+			child.queue_free()
 		
-		# Start appearing immediately and ramp up fast
-		var target_alpha = (1.0 - health_percent) * 1.5 
-		target_alpha = clamp(target_alpha, 0.0, 1.0) # Full coverage at low HP
-		
-		# Ensure it's visible and on top
-		vignette.visible = target_alpha > 0.01
-		vignette.z_index = 10
-		
-		var tween = create_tween().set_parallel(true)
-		tween.tween_property(vignette, "modulate:a", target_alpha, 0.2).set_trans(Tween.TRANS_SINE)
-		
-		# "Closing in" scale effect on hit
-		vignette.scale = Vector2(1.2, 1.2)
-		vignette.pivot_offset = get_viewport().get_visible_rect().size / 2.0
-		tween.tween_property(vignette, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_BACK)
-		
-		# Extra bright red hit flash pulse on the vignette itself
-		var pulse_tween = create_tween()
-		vignette.modulate = Color(5.0, 1.0, 1.0, target_alpha) 
-		pulse_tween.tween_property(vignette, "modulate", Color(1, 1, 1, target_alpha), 0.3)
+		# Add new hearts
+		for i in range(new_health):
+			var heart = Label.new()
+			heart.text = "♥"
+			heart.add_theme_font_size_override("font_size", 32)
+			
+			# Neon Red Glow
+			heart.modulate = Color(2.5, 0.2, 0.2) # Overdriven Red for glow
+			heart.add_theme_color_override("font_outline_color", Color.WHITE)
+			heart.add_theme_constant_override("outline_size", 2)
+			
+			# Add a simple pulsing animation to each heart
+			var tween = heart.create_tween().set_loops()
+			tween.tween_property(heart, "scale", Vector2(1.1, 1.1), 0.6).set_trans(Tween.TRANS_SINE)
+			tween.tween_property(heart, "scale", Vector2(1.0, 1.0), 0.6).set_trans(Tween.TRANS_SINE)
+			heart.pivot_offset = Vector2(16, 16) # Center of heart approx
+			
+			heart_container.add_child(heart)
 
 func _on_player_xp_changed(current_xp: float, max_xp: float):
 	if xp_bar:

@@ -15,6 +15,7 @@ signal health_changed(new_health: int, max_health: int)
 signal xp_changed(current_xp: float, max_xp: float)
 signal energy_changed(current_energy: float, max_energy: float)
 signal level_up_ready
+signal game_over(stats: Dictionary)
 @export var dash_speed: float = 600.0
 @export var max_energy: float = 100.0
 @export var energy_consumption: float = 50.0 # Per second
@@ -35,7 +36,7 @@ var next_evolution_level: int = 4
 @export var bullet_scene: PackedScene  # Drag bullet.tscn here in inspector
 @export var bullet_damage: float = 10.0
 @export var bullet_speed: float = 400.0
-@export var fire_rate: float = 0.15  # Time between shots
+@export var fire_rate: float = 0.4  # Time between shots (Slightly faster start)
 var fire_timer: float = 0.0
 var rotation_speed: float = 2.0  # Radians per second
 var current_rotation: float = 0.0
@@ -59,8 +60,22 @@ var explosion_radius: float = 50.0
 var ghost_timer: float = 0.0
 @export var ghost_delay: float = 0.05
 
+var tutorial_tween: Tween = null
+var is_tutorial_active: bool = false
+
 var shake_intensity: float = 0.0
 var is_unpausing: bool = false # NEW: Prevent movement during unpause animation
+
+# Meta Upgrade Tracking
+var overdrive_available: bool = false
+var is_in_overdrive: bool = false
+var can_reflect: bool = false
+
+# Shield Meta Progression
+var has_shield: bool = false
+var shield_node: Node2D = null
+var shield_regen_timer: float = 0.0
+const SHIELD_REGEN_TIME: float = 15.0
 
 func _ready():
 	add_to_group("player")
@@ -69,11 +84,39 @@ func _ready():
 	current_energy = max_energy
 	update_shape_visuals()
 	
+	# Initial Meta-Upgrades
+	if has_node("/root/GlobalData"):
+		var gd = get_node("/root/GlobalData")
+		if gd.is_upgrade_active("energy_shield"):
+			spawn_shield()
+	
 	# Set Player Palette
 	sprite.color = Color(0.0, 0.8, 1.0) # Neon Cyan
 	
+	# Reset Run Stats
+	if has_node("/root/GlobalData"):
+		var gd = get_node("/root/GlobalData")
+		gd.run_kills = 0
+		overdrive_available = gd.is_upgrade_active("emergency_overdrive")
+		can_reflect = gd.is_upgrade_active("kinetic_reflector")
+		
+		# RECURSIVE EVOLUTION
+		if gd.is_upgrade_active("recursive_evolution"):
+			# Instant level 3
+			for i in range(2):
+				add_xp(xp_to_next_level)
+	
+	# Apply Permanent Stat Boosts
+	apply_upgrade("init_permanent", 0)
+	
+	# Apply Dash Mastery
+	if has_node("/root/GlobalData") and get_node("/root/GlobalData").is_upgrade_active("dash_mastery"):
+		energy_consumption *= 0.75 # 25% reduction
+	
 	# Intro Particle Burst
 	spawn_intro_particles()
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("player_spawn")
 	
 	# PHYSICS SETUP (Fixes sticking)
 	# Player is Layer 2. Mask 1 (World). NO Mask 3 (Enemies).
@@ -89,7 +132,12 @@ func _ready():
 	
 	# DASH TUTORIAL
 	if has_node("/root/GlobalData") and get_node("/root/GlobalData").show_tutorial:
-		show_dash_tutorial()
+		show_full_tutorial()
+	else:
+		# If no tutorial, tell spawner it's okay to start
+		var spawner = get_tree().get_first_node_in_group("spawner")
+		if spawner:
+			spawner.tutorial_finished = true
 	
 	# Spawn Protection
 	iframe_timer = 2.0 
@@ -117,29 +165,84 @@ func spawn_intro_particles():
 	particles.emitting = true
 	get_tree().create_timer(1.5).timeout.connect(particles.queue_free)
 
-func show_dash_tutorial():
+func show_full_tutorial():
 	var canvas = CanvasLayer.new()
+	canvas.name = "TutorialCanvas"
 	add_child(canvas)
+	
+	is_tutorial_active = true
 	
 	var label = Label.new()
 	var use_mouse = get_node("/root/GlobalData").use_mouse_controls
-	label.text = "SPACE or LEFT CLICK to DASH" if use_mouse else "SPACE to DASH"
-	label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	label.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	label.position.y -= 100
+	
+	label.set_anchors_preset(Control.PRESET_CENTER)
+	label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	label.grow_vertical = Control.GROW_DIRECTION_BOTH
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 32)
+	label.add_theme_font_size_override("font_size", 48)
 	label.add_theme_color_override("font_outline_color", Color.BLACK)
-	label.add_theme_constant_override("outline_size", 8)
+	label.add_theme_constant_override("outline_size", 12)
 	canvas.add_child(label)
 	
-	# Fade in and out
-	label.modulate.a = 0
-	var tween = create_tween()
-	tween.tween_property(label, "modulate:a", 1.0, 0.5)
-	tween.tween_interval(4.0)
-	tween.tween_property(label, "modulate:a", 0.0, 0.5)
-	tween.tween_callback(canvas.queue_free)
+	var skip_label = Label.new()
+	skip_label.text = "[LMB / SPACE TO SKIP]"
+	skip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	skip_label.add_theme_font_size_override("font_size", 18)
+	skip_label.modulate.a = 0.5
+	skip_label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	skip_label.position.y -= 100
+	canvas.add_child(skip_label)
+	
+	var lines = [
+		"USE MOUSE TO MOVE" if use_mouse else "USE WASD TO MOVE",
+		"DASH INTO ENEMIES TO KILL",
+		"EVOLVE BEFORE YOU ARE OVERWHELMED"
+	]
+	
+	tutorial_tween = create_tween()
+	for i in range(lines.size()):
+		var line = lines[i]
+		tutorial_tween.tween_callback(func(): 
+			label.text = line
+			label.modulate = Color(2.0, 2.0, 2.5, 0.0) # Bright neon glow
+			label.scale = Vector2(0.5, 0.5)
+			# Need to wait for label to size itself
+			label.pivot_offset = label.size / 2
+		)
+		# Pop animation
+		tutorial_tween.tween_property(label, "modulate:a", 1.0, 0.3)
+		tutorial_tween.parallel().tween_property(label, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_BACK)
+		
+		tutorial_tween.tween_interval(1.5) # Reduced from 2.0
+		
+		# Out animation
+		tutorial_tween.tween_property(label, "modulate:a", 0.0, 0.2) # Faster fade
+		tutorial_tween.parallel().tween_property(label, "scale", Vector2(1.2, 1.2), 0.2)
+		
+	tutorial_tween.tween_callback(finish_tutorial)
+
+func _input(event):
+	if is_tutorial_active:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			skip_tutorial()
+		elif event is InputEventKey and event.keycode == KEY_SPACE and event.pressed:
+			skip_tutorial()
+
+func skip_tutorial():
+	if tutorial_tween:
+		tutorial_tween.kill()
+	finish_tutorial()
+
+func finish_tutorial():
+	is_tutorial_active = false
+	if has_node("TutorialCanvas"):
+		$TutorialCanvas.queue_free()
+	
+	var spawner = get_tree().get_first_node_in_group("spawner")
+	if spawner:
+		spawner.tutorial_finished = true
+		spawner.time_passed = 0.0 
+		spawner.spawn_timer = 10.0 # Force immediate spawn after safety window
 
 func _physics_process(delta: float):
 	# Pause Input (Always check this first)
@@ -179,6 +282,19 @@ func _physics_process(delta: float):
 		if not is_dashing:
 			is_dashing = true
 			modulate = Color(1.2, 1.8, 2.0, 1.0) # Cyber Cyan
+			
+			# DASH IMPACT POLISH
+			var hud = get_tree().get_first_node_in_group("hud")
+			if hud and hud.has_method("trigger_dash_effect"):
+				hud.trigger_dash_effect(0.2)
+			
+			# Camera kick
+			create_tween().tween_property(camera, "zoom", camera.zoom * 0.95, 0.1).set_trans(Tween.TRANS_BACK)
+			create_tween().tween_property(camera, "zoom", camera.zoom, 0.2).set_delay(0.1)
+			
+			if has_node("/root/AudioManager"):
+				# Lower volume (-10db) and start persistent loop
+				get_node("/root/AudioManager").start_persistent_sfx("player_dash", "dash", -10.0)
 		
 		# Screen rumble for dashing
 		add_shake(2.0)
@@ -189,11 +305,15 @@ func _physics_process(delta: float):
 			is_dashing = false
 			modulate = Color(1, 1, 1, 1)
 			regen_delay_timer = 0.5 # Set delay only on full depletion
+			if has_node("/root/AudioManager"):
+				get_node("/root/AudioManager").stop_persistent_sfx("dash")
 		energy_changed.emit(current_energy, max_energy)
 	else:
 		if is_dashing:
 			is_dashing = false
 			modulate = Color(1, 1, 1, 1)
+			if has_node("/root/AudioManager"):
+				get_node("/root/AudioManager").stop_persistent_sfx("dash")
 		
 		if current_energy < max_energy:
 			if regen_delay_timer > 0:
@@ -219,6 +339,41 @@ func _physics_process(delta: float):
 		if ghost_timer <= 0:
 			spawn_ghost()
 			ghost_timer = ghost_delay
+
+	# Shield Regeneration logic
+	if not has_shield and has_node("/root/GlobalData") and get_node("/root/GlobalData").is_upgrade_active("shield_regen"):
+		shield_regen_timer += delta
+		if shield_regen_timer >= SHIELD_REGEN_TIME:
+			spawn_shield()
+			if has_node("/root/AudioManager"):
+				get_node("/root/AudioManager").play_sfx("shield_regen")
+
+func spawn_shield():
+	has_shield = true
+	shield_regen_timer = 0.0
+	
+	shield_node = Node2D.new()
+	add_child(shield_node)
+	
+	# Visual for shield (a rotating ring or circle)
+	var visual = Polygon2D.new()
+	shield_node.add_child(visual)
+	
+	var points = PackedVector2Array()
+	for i in range(32):
+		var angle = (TAU / 32) * i
+		points.append(Vector2(45, 0).rotated(angle))
+	visual.polygon = points
+	visual.color = Color(0.2, 0.6, 1.0, 0.3)
+	
+	# Rotating animation
+	var tween = create_tween().set_loops()
+	tween.tween_property(shield_node, "rotation", TAU, 2.0).as_relative()
+	
+	# Pulse effect
+	var pulse = create_tween().set_loops()
+	pulse.tween_property(visual, "modulate:a", 0.6, 0.5)
+	pulse.tween_property(visual, "modulate:a", 0.2, 0.5)
 
 func spawn_ghost():
 	var ghost = Polygon2D.new()
@@ -290,6 +445,10 @@ func shoot():
 	if not bullet_scene:
 		return
 	
+	# Play SFX
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("player_fire")
+	
 	# Fire bullets from each edge
 	var angle_step = TAU / current_shape
 	for i in range(current_shape):
@@ -328,9 +487,13 @@ func level_up():
 	xp_to_next_level *= 1.15  # Scaling XP requirement
 	xp_changed.emit(xp, xp_to_next_level)
 	
-	# Slowly unzoom camera
+	# Slowly unzoom camera with exponential decay and a limit
 	if camera:
-		var target_zoom = camera.zoom * 0.95
+		var min_zoom = 0.4
+		var current_zoom = camera.zoom.x
+		# Each level-up moves 15% of the way toward min_zoom
+		var new_zoom_val = lerp(current_zoom, min_zoom, 0.15)
+		var target_zoom = Vector2(new_zoom_val, new_zoom_val)
 		create_tween().tween_property(camera, "zoom", target_zoom, 1.0).set_trans(Tween.TRANS_SINE)
 	
 	# Shape progression: Update shape based on current level
@@ -350,6 +513,10 @@ func level_up():
 	# LEVEL UP BLAST: Visual and physical impact
 	trigger_level_up_blast()
 	
+	# Play SFX
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("level_up")
+	
 	# Open Upgrade UI via Autoload
 	if has_node("/root/UpgradeManager"):
 		get_node("/root/UpgradeManager")._on_player_level_up()
@@ -358,9 +525,10 @@ func level_up():
 
 func trigger_evolution_visual():
 	# 1. Freeze game briefly
-	Engine.time_scale = 0.0
-	await get_tree().create_timer(0.3).timeout
-	Engine.time_scale = 1.0
+	var old_pause = get_tree().paused
+	get_tree().paused = true
+	await get_tree().create_timer(0.3, true, false, true).timeout
+	get_tree().paused = old_pause
 	
 	# 2. Flash/Shine
 	var shine = Polygon2D.new()
@@ -380,13 +548,31 @@ func trigger_evolution_visual():
 func trigger_level_up_blast():
 	# 1. Hit Stop & Flash
 	Engine.time_scale = 0.05
-	var timer = get_tree().create_timer(0.15 * Engine.time_scale)
+	# Force reset after real-time delay
+	var timer = get_tree().create_timer(0.15, true, false, true)
 	timer.timeout.connect(func(): Engine.time_scale = 1.0)
 	
 	# 2. Visual Shockwave (Scale pop)
 	var blast_visual = Polygon2D.new()
 	get_parent().add_child(blast_visual)
 	blast_visual.global_position = global_position
+	
+	# Dust Explosion Particles
+	var dust = CPUParticles2D.new()
+	get_parent().add_child(dust)
+	dust.global_position = global_position
+	dust.amount = 40
+	dust.one_shot = true
+	dust.explosiveness = 0.9
+	dust.spread = 180.0
+	dust.gravity = Vector2.ZERO
+	dust.initial_velocity_min = 300.0
+	dust.initial_velocity_max = 600.0
+	dust.scale_amount_min = 2.0
+	dust.scale_amount_max = 5.0
+	dust.color = Color(1, 1, 1, 0.6)
+	dust.emitting = true
+	get_tree().create_timer(1.0).timeout.connect(dust.queue_free)
 	
 	# Create circle points
 	var points = PackedVector2Array()
@@ -402,6 +588,26 @@ func trigger_level_up_blast():
 	tween.tween_callback(blast_visual.queue_free)
 	
 	# 3. Push back enemies
+	var enemies = get_tree().get_nodes_in_group("enemies")
+	for enemy in enemies:
+		if enemy is CharacterBody2D:
+			var push_dir = (enemy.global_position - global_position).normalized()
+			var distance = global_position.distance_to(enemy.global_position)
+			# Big pushback
+			var push_strength = 600.0 * (1.0 - clamp(distance / 800.0, 0, 0.8))
+			var target_pos = enemy.global_position + push_dir * push_strength
+			
+			var push_tween = create_tween()
+			push_tween.tween_property(enemy, "global_position", target_pos, 0.5).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	
+	# Blast Cleaning: Delete bullets if upgrade is purchased
+	if has_node("/root/GlobalData") and get_node("/root/GlobalData").is_upgrade_active("blast_cleaning"):
+		var bullets = get_tree().get_nodes_in_group("enemy_bullets")
+		for b in bullets:
+			# Visual effect for bullet deletion
+			var b_tween = create_tween()
+			b_tween.tween_property(b, "scale", Vector2.ZERO, 0.2)
+			b_tween.tween_callback(b.queue_free)
 
 func add_shake(intensity: float):
 	shake_intensity = intensity
@@ -415,6 +621,11 @@ func toggle_pause():
 	if get_tree().paused:
 		# Unpausing: Animate fragments back together
 		is_unpausing = true # Prevent movement during animation
+		
+		# Clear muffled effect
+		if has_node("/root/AudioManager"):
+			get_node("/root/AudioManager").set_muffled(false)
+			
 		if has_node("PauseCanvas"):
 			var canvas = $PauseCanvas
 			var menu_ui = canvas.get_node_or_null("PauseMenuUI")
@@ -440,16 +651,19 @@ func toggle_pause():
 			
 			unpause_tween.set_parallel(false)
 			# Brief delay to let the eye register the "snap" before resuming
-			unpause_tween.tween_interval(0.1) 
+			unpause_tween.tween_interval(0.05) 
 			unpause_tween.tween_callback(func():
+				# 1. Unpause the game engine first
 				get_tree().paused = false
-				is_unpausing = false # Re-enable movement
 				
-				# Prevent camera "catch-up" sweep
-				if camera:
-					camera.reset_smoothing()
-					
-				canvas.queue_free()
+				# 2. Keep the shards visible for 2 more frames while fading
+				# This masks the transition from the static screenshot back to live game
+				var final_fade = create_tween()
+				final_fade.tween_property(canvas, "modulate:a", 0.0, 0.1)
+				final_fade.tween_callback(func():
+					is_unpausing = false # Finally re-enable movement/input
+					canvas.queue_free()
+				)
 			)
 		else:
 			get_tree().paused = false
@@ -458,9 +672,20 @@ func toggle_pause():
 		pause_game_fractured()
 
 func pause_game_fractured():
-	# Capture screen
+	# Capture screen EXACTLY as it is (including camera smoothing lag)
 	var image = get_viewport().get_texture().get_image()
 	var texture = ImageTexture.create_from_image(image)
+	
+	# Get player's position on screen to make them the center of the fracture
+	var screen_pos = get_global_transform_with_canvas().get_origin()
+	
+	# Zero out velocity to prevent "teleporting" on unpause
+	velocity = Vector2.ZERO
+	
+	# Play SFX
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("pause")
+		get_node("/root/AudioManager").set_muffled(true)
 	
 	get_tree().paused = true
 	
@@ -550,7 +775,6 @@ func pause_game_fractured():
 	var rows = 6
 	var screen_size = get_viewport().get_visible_rect().size
 	var piece_size = screen_size / Vector2(cols, rows)
-	var center = screen_size / 2.0
 	
 	for y in range(rows):
 		for x in range(cols):
@@ -561,14 +785,14 @@ func pause_game_fractured():
 			piece.region_rect = Rect2(Vector2(x, y) * piece_size, piece_size)
 			piece.position = Vector2(x, y) * piece_size + piece_size / 2.0
 			
-			# Direction away from center
-			var dir_from_center = (piece.position - center).normalized()
-			if piece.position.distance_to(center) < 10:
-				dir_from_center = Vector2(randf_range(-1, 1), randf_range(-1, 1)).normalized()
+			# Direction away from player's screen position
+			var dir_from_player = (piece.position - screen_pos).normalized()
+			if piece.position.distance_to(screen_pos) < 10:
+				dir_from_player = Vector2(randf_range(-1, 1), randf_range(-1, 1)).normalized()
 			
 			# Animate out to open the middle
 			var tween = canvas.create_tween()
-			var target_pos = piece.position + dir_from_center * 500.0
+			var target_pos = piece.position + dir_from_player * 500.0
 			var target_rot = randf_range(-0.5, 0.5)
 			tween.tween_property(piece, "position", target_pos, 0.7).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
 			tween.parallel().tween_property(piece, "rotation", target_rot, 0.7)
@@ -634,8 +858,35 @@ func take_damage(_amount: float):
 	if iframe_timer > 0:
 		return
 		
+	# Check Shield first
+	if has_shield:
+		has_shield = false
+		shield_regen_timer = 0.0
+		if has_node("/root/AudioManager"):
+			get_node("/root/AudioManager").play_sfx("shield_break")
+		if is_instance_valid(shield_node):
+			# Shatter effect
+			var shatter_tween = create_tween()
+			shatter_tween.tween_property(shield_node, "scale", Vector2(1.5, 1.5), 0.1)
+			shatter_tween.parallel().tween_property(shield_node, "modulate:a", 0.0, 0.1)
+			shatter_tween.tween_callback(shield_node.queue_free)
+		
+		# Give full iframes for the shield break
+		iframe_timer = iframe_duration
+		add_shake(20.0)
+		
+		# REPULSIVE ARMOR (Also triggers on shield break)
+		if has_node("/root/GlobalData") and get_node("/root/GlobalData").is_upgrade_active("repulsive_armor"):
+			trigger_repulsive_pushback()
+			
+		return
+
 	current_hearts -= 1
 	health_changed.emit(current_hearts, max_hearts)
+	
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("player_hit", 5.0) # Boosted volume
+		
 	add_shake(60.0) # Massive hit impact
 	
 	# Dim glow based on health
@@ -644,13 +895,109 @@ func take_damage(_amount: float):
 	# Set iframes here so it applies to ALL damage sources
 	iframe_timer = iframe_duration
 	
+	# HITSTOP & IMPACT FRAMES
+	trigger_hit_impact()
+
 	# Extreme Overdriven Red flash effect
 	var tween = create_tween()
 	tween.tween_property(self, "modulate", Color(10, 0, 0, 1), 0.1) 
 	tween.tween_property(self, "modulate", Color.WHITE, 0.1)
 	
+	# EMERGENCY OVERDRIVE
+	if current_hearts == 1 and overdrive_available and not is_in_overdrive:
+		trigger_emergency_overdrive()
+	
+	# REPULSIVE ARMOR
+	if has_node("/root/GlobalData") and get_node("/root/GlobalData").is_upgrade_active("repulsive_armor"):
+		trigger_repulsive_pushback()
+	
 	if current_hearts <= 0:
 		die()
+
+func trigger_repulsive_pushback():
+	# Visual Shockwave
+	var blast = Polygon2D.new()
+	get_parent().add_child(blast)
+	blast.global_position = global_position
+	
+	var points = PackedVector2Array()
+	for i in range(32):
+		var angle = (TAU / 32) * i
+		points.append(Vector2(10, 0).rotated(angle))
+	blast.polygon = points
+	blast.color = Color(1.0, 0.2, 0.4, 0.6) # Reddish shockwave
+	
+	var tween = create_tween()
+	tween.tween_property(blast, "scale", Vector2(25, 25), 0.4).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(blast, "modulate:a", 0.0, 0.4)
+	tween.tween_callback(blast.queue_free)
+	
+	# Push back nearby enemies
+	var enemies = get_tree().get_nodes_in_group("enemies")
+	for enemy in enemies:
+		var dist = global_position.distance_to(enemy.global_position)
+		if dist < 250.0:
+			var push_dir = (enemy.global_position - global_position).normalized()
+			var push_strength = 300.0 * (1.0 - (dist / 250.0))
+			var target_pos = enemy.global_position + push_dir * push_strength
+			
+			var push_tween = create_tween()
+			push_tween.tween_property(enemy, "global_position", target_pos, 0.4).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+
+func trigger_emergency_overdrive():
+	overdrive_available = false
+	is_in_overdrive = true
+	
+	# Visual/Sound
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("level_up", 5.0, 1.5, 2.0)
+	
+	# Boost stats
+	var original_speed = speed_multiplier
+	var original_rate = fire_rate
+	
+	speed_multiplier += 0.5
+	fire_rate *= 0.5
+	
+	# Glow effect
+	var t = create_tween().set_parallel(true)
+	t.tween_property(sprite, "modulate", Color(5, 2, 5, 1), 0.5) # Neon Purple/Pink glow
+	
+	# Duration
+	await get_tree().create_timer(5.0).timeout
+	
+	# Restore stats
+	speed_multiplier = original_speed
+	fire_rate = original_rate
+	is_in_overdrive = false
+	
+	var t2 = create_tween()
+	t2.tween_property(sprite, "modulate", Color(1, 1, 1, 1), 0.5)
+
+func trigger_hit_impact():
+	# 1. Hit-stop: Set time scale to slow
+	# To prevent stacking issues where it stays slow forever, we always reset first
+	Engine.time_scale = 0.05
+	
+	# 2. Impact Frame: White flash on HUD
+	var flash = ColorRect.new()
+	flash.color = Color.WHITE
+	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Add to HUD or a global layer
+	var hud = get_tree().get_first_node_in_group("hud")
+	if hud:
+		hud.add_child(flash)
+	else:
+		get_parent().add_child(flash)
+		
+	# Delay to restore time and remove flash
+	# Using true for ignore_time_scale ensures this ALWAYS finishes in 0.08s real time
+	var timer = get_tree().create_timer(0.08, true, false, true)
+	timer.timeout.connect(func():
+		Engine.time_scale = 1.0 # Force back to normal
+		if is_instance_valid(flash):
+			flash.queue_free()
+	)
 
 func update_health_visuals():
 	var health_percent = float(current_hearts) / float(max_hearts)
@@ -663,16 +1010,34 @@ func update_health_visuals():
 		sprite.modulate.a = 1.0
 
 func die():
+	# Reset time scale in case we died during hitstop
+	Engine.time_scale = 1.0
+	
 	# Calculate shards earned this run (e.g., 10 per level)
 	var shards_earned = level * 10
 	
-	add_shake(100.0) # Screen-shattering death shake
-	spawn_player_death_particles()
+	# Update High Score
+	var time_survived = 0.0
+	var spawner = get_tree().get_first_node_in_group("spawner")
+	if spawner:
+		time_survived = spawner.time_passed
 	
 	if has_node("/root/GlobalData"):
-		get_node("/root/GlobalData").add_shards(shards_earned)
+		var gd = get_node("/root/GlobalData")
+		if gd.has_upgrade("shard_multiplier"):
+			shards_earned = int(shards_earned * 1.5)
+			
+		gd.add_shards(shards_earned)
+		if time_survived > gd.high_score:
+			gd.high_score = time_survived
+		gd.save_game()
 	
-	# Signal game over (HUD will show death screen)
+	# Play SFX
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("game_over")
+		get_node("/root/AudioManager").set_muffled(true) # Muffle on death screen too
+	
+	add_shake(100.0) # Screen-shattering death shake
 	emit_signal("game_over", {
 		"level": level,
 		"shards": shards_earned
@@ -680,8 +1045,6 @@ func die():
 	
 	# Pause the game instead of reloading
 	get_tree().paused = true
-
-signal game_over(stats: Dictionary)
 
 func apply_upgrade(upgrade_type: String, value: float):
 	print("Applying Upgrade: ", upgrade_type, " with value ", value)
@@ -709,7 +1072,9 @@ func apply_upgrade(upgrade_type: String, value: float):
 		"dash_trail":
 			dash_trail_damage = value
 		"heal":
-			current_hearts = min(current_hearts + 1, max_hearts)
+			current_hearts += 1
+			if current_hearts > max_hearts:
+				max_hearts = current_hearts
 			health_changed.emit(current_hearts, max_hearts)
 			update_health_visuals()
 		"bounce":
@@ -728,6 +1093,26 @@ func apply_upgrade(upgrade_type: String, value: float):
 		"explosive":
 			bullet_explosive = true
 			explosion_radius = value
+		"init_permanent":
+			if has_node("/root/GlobalData"):
+				var gd = get_node("/root/GlobalData")
+				
+				var extra_hearts = 0
+				if gd.is_upgrade_active("starting_hearts"):
+					extra_hearts = gd.get_upgrade_level("starting_hearts")
+					
+				if extra_hearts > 0:
+					max_hearts += extra_hearts
+					current_hearts = max_hearts
+					health_changed.emit(current_hearts, max_hearts)
+					update_health_visuals()
+				
+				var bonus_damage = 0
+				if gd.is_upgrade_active("sharp_edges"):
+					bonus_damage = gd.get_upgrade_level("sharp_edges")
+					
+				if bonus_damage > 0:
+					damage_multiplier += 0.2 # 20% base boost
 
 func check_contact_damage():
 	if not has_node("Area2D") or iframe_timer > 0: return
@@ -736,7 +1121,11 @@ func check_contact_damage():
 	var overlapping_areas = $Area2D.get_overlapping_areas()
 	for area in overlapping_areas:
 		if area.is_in_group("enemy_bullets"):
-			print("Hit by bullet!")
+			# KINETIC REFLECTOR
+			if is_dashing and can_reflect and randf() < 0.25:
+				reflect_bullet(area)
+				continue
+				
 			take_damage(1)
 			area.queue_free()
 			return # Exit after taking damage
@@ -749,9 +1138,31 @@ func check_contact_damage():
 			if "is_dying" in body and body.is_dying:
 				continue
 			
-			print("Hit by enemy: ", body.name)
 			take_damage(1)
 			break
+
+func reflect_bullet(bullet):
+	# Play SFX
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("bullet_bounce", 0.0, 1.5, 2.0)
+	
+	# Reverse direction
+	if "direction" in bullet:
+		bullet.direction *= -1
+		bullet.rotation = bullet.direction.angle()
+		
+	# Change group so it can hit enemies
+	bullet.remove_from_group("enemy_bullets")
+	bullet.add_to_group("player_bullets")
+	
+	# Boost speed and damage
+	if "speed" in bullet: bullet.speed *= 1.5
+	if "damage" in bullet: bullet.damage *= 2.0
+	
+	# Visual flash
+	var t = create_tween()
+	bullet.modulate = Color(10, 10, 10, 1)
+	t.tween_property(bullet, "modulate", Color(0, 1, 1, 1), 0.1) # Turn cyan
 
 # Collision with enemies (mostly for Dash now)
 func _on_area_2d_body_entered(body):
@@ -769,6 +1180,3 @@ func _on_area_2d_body_entered(body):
 			var tween = create_tween()
 			tween.tween_property(self, "scale", Vector2(1.2, 0.8), 0.05)
 			tween.tween_property(self, "scale", Vector2(1.0, 1.0), 0.05)
-			
-			if current_shape == 0:  # Circle specific logic if needed
-				pass 

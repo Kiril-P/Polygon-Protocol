@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://cqw1o1wp2cr18"
+path="res://.godot/imported/tokyo-music-walker-sunset-drive-chosic.com_.mp3-7df10eaaa96531f6c27623c7fae59ea0.mp3str"
+
+[deps]
+
+source_file="res://assets/music for game/tokyo-music-walker-sunset-drive-chosic.com_.mp3"
+dest_files=["res://.godot/imported/tokyo-music-walker-sunset-drive-chosic.com_.mp3-7df10eaaa96531f6c27623c7fae59ea0.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

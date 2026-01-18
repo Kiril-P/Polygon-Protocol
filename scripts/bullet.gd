@@ -17,6 +17,8 @@ var chain_lightning: bool = false
 var chain_range: float = 100.0
 
 # Internal
+var trail_timer: float = 0.0
+const TRAIL_DELAY: float = 0.05
 var hit_enemies: Array[RID] = [] # NEW: Avoid hitting same enemy multiple times
 var hits_remaining: int
 var time_alive: float = 0.0
@@ -30,6 +32,9 @@ func _ready():
 	hits_remaining = pierce + 1
 	body_entered.connect(_on_body_entered)
 	setup_bullet_shape()
+	
+	if has_node("VisibleOnScreenNotifier2D"):
+		$VisibleOnScreenNotifier2D.screen_exited.connect(_on_screen_exited)
 
 func _physics_process(delta: float):
 	time_alive += delta
@@ -51,25 +56,85 @@ func _physics_process(delta: float):
 	
 	global_position += direction * speed * delta
 	rotation = direction.angle()
+	
+	# Spawn Trail particles
+	trail_timer += delta
+	if trail_timer >= TRAIL_DELAY:
+		spawn_trail_ghost()
+		trail_timer = 0.0
+
+func spawn_trail_ghost():
+	var ghost = Polygon2D.new()
+	# Add to parent to ensure trail stays even if bullet is deleted
+	var parent = get_parent()
+	if not parent: return
+	
+	parent.add_child(ghost)
+	ghost.polygon = sprite.polygon
+	ghost.global_position = global_position
+	ghost.rotation = rotation
+	ghost.scale = scale * 0.8
+	ghost.color = sprite.color
+	ghost.modulate.a = 0.4
+	
+	# Use ghost's own tween or tree tween to ensure it finishes even if bullet dies
+	var t = ghost.create_tween().set_parallel(true)
+	t.tween_property(ghost, "modulate:a", 0.0, 0.2)
+	t.tween_property(ghost, "scale", Vector2.ZERO, 0.2)
+	t.set_parallel(false)
+	t.tween_callback(ghost.queue_free)
 
 func handle_screen_bounce():
-	var screen_rect = get_viewport_rect()
-	var pos = global_position
+	var camera = get_viewport().get_camera_2d()
+	if not camera:
+		# Fallback to simple viewport if no camera
+		var screen_rect = get_viewport_rect()
+		var pos = global_position
+		var margin = 10.0
+		var bounced = false
+		if pos.x < margin and direction.x < 0: direction.x *= -1; bounced = true
+		elif pos.x > screen_rect.size.x - margin and direction.x > 0: direction.x *= -1; bounced = true
+		if pos.y < margin and direction.y < 0: direction.y *= -1; bounced = true
+		elif pos.y > screen_rect.size.y - margin and direction.y > 0: direction.y *= -1; bounced = true
+		if bounced: _on_bounced()
+		return
+
+	var viewport_size = get_viewport_rect().size
+	var camera_center = camera.get_screen_center_position()
+	var zoom = camera.zoom
+	var visible_size = viewport_size / zoom
+	var visible_rect = Rect2(camera_center - visible_size / 2, visible_size)
 	
-	var margin = 10.0
-	if pos.x < margin and direction.x < 0:
+	var pos = global_position
+	var margin = 15.0
+	var bounced = false
+	
+	if pos.x < visible_rect.position.x + margin and direction.x < 0:
 		direction.x *= -1
-		bounces -= 1
-	elif pos.x > screen_rect.size.x - margin and direction.x > 0:
+		bounced = true
+	elif pos.x > visible_rect.end.x - margin and direction.x > 0:
 		direction.x *= -1
-		bounces -= 1
+		bounced = true
 		
-	if pos.y < margin and direction.y < 0:
+	if pos.y < visible_rect.position.y + margin and direction.y < 0:
 		direction.y *= -1
-		bounces -= 1
-	elif pos.y > screen_rect.size.y - margin and direction.y > 0:
+		bounced = true
+	elif pos.y > visible_rect.end.y - margin and direction.y > 0:
 		direction.y *= -1
-		bounces -= 1
+		bounced = true
+	
+	if bounced:
+		_on_bounced()
+
+func _on_bounced():
+	bounces -= 1
+	rotation = direction.angle()
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("bullet_bounce", -5.0)
+	
+	var tween = create_tween()
+	sprite.modulate = Color(5, 5, 5, 1)
+	tween.tween_property(sprite, "modulate", Color(1, 1, 1, 1), 0.1)
 
 func setup_bullet_shape():
 	# Simple diamond/arrow shape - Made 50% bigger
@@ -84,6 +149,10 @@ func setup_bullet_shape():
 	
 	# Set a bright color
 	sprite.color = Color(0.0, 0.9, 1.0) # Neon Cyan
+	
+	# Make sure Area2D can detect bodies (Enemies are CharacterBody2D)
+	collision_layer = 0
+	set_collision_mask_value(3, true) # Layer 3 is Enemies
 
 func find_nearest_enemy():
 	nearest_enemy = null
@@ -101,9 +170,7 @@ func find_nearest_enemy():
 func _on_body_entered(body: Node):
 	if body.is_in_group("enemies"):
 		if not fired_by_enemy:
-			if not hit_enemies.has(body.get_rid()):
-				hit_enemies.append(body.get_rid())
-				hit_enemy(body)
+			hit_enemy(body)
 	elif body.is_in_group("player"):
 		if fired_by_enemy:
 			hit_player(body)
@@ -129,8 +196,17 @@ func hit_enemy(enemy: Node):
 	hits_remaining -= 1
 	if hits_remaining <= 0:
 		queue_free()
+	else:
+		# Visual feedback for piercing (flicker)
+		var tween = create_tween()
+		sprite.modulate.a = 0.3
+		tween.tween_property(sprite, "modulate:a", 1.0, 0.1)
 
 func create_explosion():
+	# Play SFX - Reduced volume as requested
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("bullet_explosion", -8.0)
+		
 	var enemies = get_tree().get_nodes_in_group("enemies")
 	for enemy in enemies:
 		if not is_instance_valid(enemy):
@@ -143,21 +219,20 @@ func create_explosion():
 	spawn_explosion_visual()
 
 func spawn_explosion_visual():
-	# Use a list to track all created effects for safety
-	var effects = []
-
+	# Parent to main scene so it survives if bullet/parent is deleted
+	var main = get_tree().current_scene
+	
 	# 1. THE CORE FLASH (Cyan/White)
 	var flash = Polygon2D.new()
-	get_tree().current_scene.add_child(flash) # Parent to scene, not parent (which might be deleted)
+	main.add_child(flash)
 	flash.global_position = global_position
 	flash.color = Color(1, 1, 1, 1)
 	var points = PackedVector2Array()
 	for i in range(16):
 		points.append(Vector2(5, 0).rotated(TAU/16 * i))
 	flash.polygon = points
-	effects.append(flash)
 	
-	# Use scene tree tween so it survives bullet deletion
+	# Use scene tree tween for guaranteed cleanup
 	var flash_tween = get_tree().create_tween().set_parallel(true)
 	flash_tween.tween_property(flash, "scale", Vector2(explosion_radius/4.0, explosion_radius/4.0), 0.1)
 	flash_tween.tween_property(flash, "modulate", Color(0, 0.8, 1, 0), 0.2).set_delay(0.05)
@@ -166,7 +241,7 @@ func spawn_explosion_visual():
 	
 	# 2. INNER SPARKS (Orange/Yellow)
 	var sparks = CPUParticles2D.new()
-	get_tree().current_scene.add_child(sparks)
+	main.add_child(sparks)
 	sparks.global_position = global_position
 	sparks.amount = 25
 	sparks.one_shot = true
@@ -179,11 +254,10 @@ func spawn_explosion_visual():
 	sparks.scale_amount_max = 5.0
 	sparks.color = Color(1.0, 0.5, 0.0) # Bright Orange
 	sparks.emitting = true
-	effects.append(sparks)
 	
 	# 3. OUTER SHOCKWAVE (Purple/Magenta)
 	var wave = CPUParticles2D.new()
-	get_tree().current_scene.add_child(wave)
+	main.add_child(wave)
 	wave.global_position = global_position
 	wave.amount = 15
 	wave.one_shot = true
@@ -196,11 +270,12 @@ func spawn_explosion_visual():
 	wave.scale_amount_max = 6.0
 	wave.color = Color(0.8, 0.0, 1.0) # Neon Purple
 	wave.emitting = true
-	effects.append(wave)
 
-	# Safety cleanup for particles
-	get_tree().create_timer(1.0).timeout.connect(sparks.queue_free)
-	get_tree().create_timer(1.0).timeout.connect(wave.queue_free)
+	# Guaranteed cleanup
+	get_tree().create_timer(1.0).timeout.connect(func():
+		if is_instance_valid(sparks): sparks.queue_free()
+		if is_instance_valid(wave): wave.queue_free()
+	)
 	
 	# Screen shake
 	var player = get_tree().get_first_node_in_group("player")
@@ -257,7 +332,8 @@ func split_bullet():
 		new_bullet.splits_on_hit = false
 
 func _on_screen_exited():
-	queue_free()
+	if bounces <= 0:
+		queue_free()
 
 # Helper function to apply upgrades from player
 func apply_upgrade(upgrade_name: String, value):

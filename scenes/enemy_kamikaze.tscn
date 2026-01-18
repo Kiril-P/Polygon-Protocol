@@ -1,0 +1,15 @@
+[gd_scene load_steps=2 format=3 uid="uid://c5xk3p7r8q5u"]
+
+[ext_resource type="Script" uid="uid://cyadjhygx1s5e" path="res://scripts/enemy_kamikaze.gd" id="1_script"]
+
+[node name="EnemyKamikaze" type="CharacterBody2D" groups=["enemies"]]
+collision_layer = 4
+collision_mask = 3
+script = ExtResource("1_script")
+
+[node name="Polygon2D" type="Polygon2D" parent="."]
+color = Color(1, 0.8, 0, 1)
+polygon = PackedVector2Array(20, 0, -10, 12, -10, -12)
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="."]
+polygon = PackedVector2Array(20, 0, -10, 12, -10, -12)

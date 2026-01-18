@@ -11,6 +11,7 @@
 [ext_resource type="PackedScene" uid="uid://bfq122qkhqsi6" path="res://scenes/hud.tscn" id="5_iywne"]
 [ext_resource type="PackedScene" uid="uid://cyspvet765o8i" path="res://scenes/enemy_zigzagger.tscn" id="5_kvpfn"]
 [ext_resource type="PackedScene" uid="uid://di3xivgn03e8r" path="res://scenes/death_screen.tscn" id="6_u5sy4"]
+[ext_resource type="PackedScene" uid="uid://c5xk3p7r8q5u" path="res://scenes/enemy_kamikaze.tscn" id="7_kamikaze"]
 [ext_resource type="PackedScene" uid="uid://5jpyddyo4ed6" path="res://scenes/enemy_tank.tscn" id="6_vtaks"]
 
 [sub_resource type="Environment" id="Environment_mwb40"]
@@ -32,7 +33,7 @@ iframe_duration = 1.0
 
 [node name="Spawner" type="Node2D" parent="."]
 script = ExtResource("2_lnu2h")
-enemy_types = Array[PackedScene]([ExtResource("2_yqjtg"), ExtResource("5_gee14"), ExtResource("4_p57ef"), ExtResource("5_0tnpc"), ExtResource("6_vtaks"), ExtResource("5_kvpfn")])
+enemy_types = Array[PackedScene]([ExtResource("2_yqjtg"), ExtResource("5_gee14"), ExtResource("4_p57ef"), ExtResource("5_0tnpc"), ExtResource("6_vtaks"), ExtResource("5_kvpfn"), ExtResource("7_kamikaze")])
 
 [node name="HUD" parent="." instance=ExtResource("5_iywne")]
 

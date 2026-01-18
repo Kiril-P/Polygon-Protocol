@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" uid="uid://bq80x25tmyl7w" path="res://scripts/enemy_shooter.gd" id="1_p4l84"]
 [ext_resource type="PackedScene" uid="uid://bjumygplv6k07" path="res://scenes/bullet.tscn" id="2_mneqe"]
-[ext_resource type="PackedScene" uid="uid://bmk2qcp3sulkl" path="res://scenes/xp_gem.tscn" id="2_p4l84"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_7p1mj"]
 size = Vector2(30, 30)

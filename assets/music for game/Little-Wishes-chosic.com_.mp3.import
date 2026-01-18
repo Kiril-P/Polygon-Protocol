@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://efw8wha20lf3"
+path="res://.godot/imported/Little-Wishes-chosic.com_.mp3-8f579bb558f2e774cf9dca9d0e17189a.mp3str"
+
+[deps]
+
+source_file="res://assets/music for game/Little-Wishes-chosic.com_.mp3"
+dest_files=["res://.godot/imported/Little-Wishes-chosic.com_.mp3-8f579bb558f2e774cf9dca9d0e17189a.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4
