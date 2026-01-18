@@ -15,8 +15,8 @@ var upgrade_pool = [
 	{
 		"id": "damage",
 		"name": "Sharp Edges",
-		"description": "+50% Bullet Damage",
-		"value": 0.5,
+		"description": "+25% Bullet Damage",
+		"value": 0.25,
 		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_003.png"
 	},
 	{
@@ -34,25 +34,19 @@ var upgrade_pool = [
 		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_007.png"
 	},
 	{
-		"id": "pierce",
-		"name": "Drilling Rounds",
-		"description": "Bullets pierce +1 enemy",
-		"value": 1.0,
-		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_009.png"
-	},
-	{
 		"id": "fire_rate",
 		"name": "Rapid Fire",
-		"description": "+30% Fire Rate",
-		"value": 0.3,
+		"description": "+10% Fire Rate",
+		"value": 0.1,
 		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_011.png"
 	},
 	{
 		"id": "bounce",
-		"name": "Rubber Bullets",
-		"description": "Bullets bounce off screen edges",
+		"name": "RECOIL MATRIX",
+		"description": "CRITICAL: Bullets bounce off screen edges",
 		"value": 1.0,
-		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_015.png"
+		"icon": "res://assets/kenney_rune-pack/PNG/Black/Tile (outline)/runeBlack_tileOutline_015.png",
+		"is_special": true
 	},
 	{
 		"id": "max_hearts",
@@ -77,12 +71,15 @@ var upgrade_pool = [
 	},
 	{
 		"id": "explosive",
-		"name": "Volatile Core",
-		"description": "Every bullet explodes on hit",
+		"name": "VOLATILE SINGULARITY",
+		"description": "ULTRA: Every bullet explodes on contact",
 		"value": 50.0,
-		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_027.png"
+		"icon": "res://assets/kenney_rune-pack/PNG/Black/Tile (outline)/runeBlack_tileOutline_027.png",
+		"is_special": true
 	}
 ]
+
+var applied_special_upgrades = []
 
 func get_random_upgrades(count: int = 3) -> Array:
 	var player = get_tree().get_first_node_in_group("player")
@@ -90,10 +87,20 @@ func get_random_upgrades(count: int = 3) -> Array:
 	
 	var pool = []
 	for upgrade in upgrade_pool:
+		# Check if already applied (only for special ones)
+		if upgrade.get("is_special", false) and upgrade["id"] in applied_special_upgrades:
+			continue
+			
 		if is_circle:
-			# Added 'explosive', 'bullet_speed', and 'rotation_speed' to the forbidden list
-			if upgrade["id"] in ["damage", "pierce", "fire_rate", "homing", "bounce", "explosive", "bullet_speed", "rotation_speed"]:
+			# Removed 'pierce' from the forbidden list as the upgrade itself is removed
+			if upgrade["id"] in ["damage", "fire_rate", "homing", "bounce", "explosive", "bullet_speed", "rotation_speed"]:
 				continue
+		
+		# Rarity check for special upgrades (e.g. 10% chance to even be in the pool this time)
+		if upgrade.get("is_special", false):
+			if randf() > 0.1: # 90% chance to skip a special upgrade from the available pool
+				continue
+				
 		pool.append(upgrade)
 	
 	pool.shuffle()
@@ -114,6 +121,10 @@ func apply_upgrade(upgrade_data: Dictionary):
 	var player = get_tree().get_first_node_in_group("player")
 	if player:
 		player.apply_upgrade(upgrade_data["id"], upgrade_data["value"])
+		
+		# Track if this was a special upgrade to prevent repeat appearances
+		if upgrade_data.get("is_special", false):
+			applied_special_upgrades.append(upgrade_data["id"])
 	
 	# Resume the game
 	get_tree().paused = false

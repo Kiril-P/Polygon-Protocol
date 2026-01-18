@@ -203,7 +203,7 @@ Each level grants choice of 3 random upgrades from pool:
   - Player: Cyan/White (evolves with upgrades)
   - Enemies: Red/Orange spectrum
   - Bullets: Bright cyan/yellow
-  - XP: Green gems
+  - XP: Gained directly upon enemy destruction
   - Background: Dark purple/blue gradient
 
 ### Particle Effects

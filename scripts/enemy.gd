@@ -23,6 +23,17 @@ func _ready():
 	# But keep collision with world (Layer 1)
 	set_collision_mask_value(2, false)
 	set_collision_layer_value(3, true)
+	
+	# Apply difficulty multiplier to speed
+	if has_node("/root/GlobalData"):
+		var level = get_node("/root/GlobalData").difficulty_level
+		# 1: 0.8x, 2: 1.0x, 3: 1.1x, 4: 1.2x, 5: 1.3x
+		var speed_mults = [0.0, 0.8, 1.0, 1.1, 1.2, 1.3]
+		speed *= speed_mults[level]
+		
+		# 1: 0.7x, 2: 1.0x, 3: 1.3x, 4: 1.7x, 5: 2.2x
+		var health_mults = [0.0, 0.7, 1.0, 1.3, 1.7, 2.2]
+		health *= health_mults[level]
 
 func _physics_process(delta: float):
 	# Rotate for visual interest
@@ -61,6 +72,10 @@ func take_damage(amount: float):
 		return
 	health -= amount
 	
+	# Play SFX
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("enemy_hit")
+	
 	# Hit flash
 	flash_white()
 	
@@ -77,6 +92,10 @@ func die():
 		return
 	is_dying = true
 	
+	# Play SFX
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("enemy_death")
+	
 	spawn_death_particles()
 	
 	if player and player.has_method("add_shake"):
@@ -85,5 +104,13 @@ func die():
 	# Give XP directly to player
 	if player and player.has_method("add_xp"):
 		player.add_xp(xp_value)
+	
+	if has_node("/root/GlobalData"):
+		var gd = get_node("/root/GlobalData")
+		gd.total_kills += 1
+		gd.run_kills += 1
 		
 	queue_free()
+
+func set_xp_value(new_value: int):
+	xp_value = new_value

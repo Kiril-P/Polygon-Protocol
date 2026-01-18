@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, user-scalable=no" />
+	<title>$GODOT_PROJECT_NAME</title>
+	<style type="text/css">
+		body {
+			touch-action: none;
+			margin: 0;
+			border: 0 none;
+			padding: 0;
+			text-align: center;
+			background-color: #05050a; /* Deep space blue */
+			font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+		}
+
+		#canvas {
+			display: block;
+			margin: 0 auto;
+			color: white;
+		}
+
+		#canvas:focus {
+			outline: none;
+		}
+
+		#status {
+			position: absolute;
+			left: 0;
+			top: 0;
+			right: 0;
+			bottom: 0;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			align-items: center;
+			visibility: visible;
+		}
+
+		#status-progress {
+			width: 300px;
+			height: 4px;
+			background-color: rgba(0, 204, 255, 0.1);
+			border: 1px solid rgba(0, 204, 255, 0.3);
+			padding: 1px;
+			border-radius: 10px;
+			margin-top: 20px;
+			overflow: hidden;
+		}
+
+		#status-progress-inner {
+			height: 100%;
+			width: 0;
+			background: linear-gradient(90deg, #00ccff, #00ffcc); /* Neon Cyan to Green */
+			box-shadow: 0 0 15px #00ccff;
+			transition: width 0.2s;
+		}
+
+		#status-indeterminate {
+			visibility: hidden;
+			width: 300px;
+			height: 4px;
+			position: relative;
+			overflow: hidden;
+			background-color: rgba(0, 204, 255, 0.1);
+			margin-top: 20px;
+			border-radius: 10px;
+		}
+
+		#status-indeterminate div {
+			position: absolute;
+			width: 100px;
+			height: 100%;
+			background: linear-gradient(90deg, #00ccff, #00ffcc);
+			box-shadow: 0 0 15px #00ccff;
+			animation: indeterminate 2s infinite ease-in-out;
+		}
+
+		@keyframes indeterminate {
+			from { left: -100px; }
+			to { left: 300px; }
+		}
+
+		#status-notice {
+			margin-top: 20px;
+			color: #00ccff;
+			font-weight: bold;
+			text-transform: uppercase;
+			letter-spacing: 2px;
+			text-shadow: 0 0 10px #00ccff;
+		}
+
+		/* Game Logo Visual */
+		.logo {
+			width: 100px;
+			height: 100px;
+			border: 4px solid #00ccff;
+			transform: rotate(45deg);
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			box-shadow: 0 0 30px #00ccff;
+			animation: pulse 2s infinite alternate ease-in-out;
+		}
+
+		.logo-inner {
+			width: 50px;
+			height: 50px;
+			background-color: #00ccff;
+			box-shadow: 0 0 20px #00ccff;
+		}
+
+		@keyframes pulse {
+			from { transform: rotate(45deg) scale(1); opacity: 0.8; }
+			to { transform: rotate(225deg) scale(1.1); opacity: 1; }
+		}
+	</style>
+$GODOT_HEAD_INCLUDE
+</head>
+<body>
+	<canvas id="canvas">
+		HTML5 canvas appearance is not supported by your browser.
+		Please use a recent browser to play this game.
+	</canvas>
+	<div id="status">
+		<div class="logo"><div class="logo-inner"></div></div>
+		<div id="status-notice">INITIALIZING POLYGON PROTOCOL...</div>
+		<div id="status-progress"><div id="status-progress-inner"></div></div>
+		<div id="status-indeterminate"><div></div></div>
+	</div>
+
+	<script type="text/javascript" src="$GODOT_URL"></script>
+	<script type="text/javascript">//<![CDATA[
+		const GODOT_CONFIG = $GODOT_CONFIG;
+		const engine = new Engine(GODOT_CONFIG);
+
+		(function () {
+			const statusNotice = document.getElementById('status-notice');
+			const statusProgress = document.getElementById('status-progress');
+			const statusProgressInner = document.getElementById('status-progress-inner');
+			const statusIndeterminate = document.getElementById('status-indeterminate');
+
+			function setStatusMode(mode) {
+				if (mode === 'hidden') {
+					document.getElementById('status').style.visibility = 'hidden';
+					return;
+				}
+				statusProgress.style.visibility = mode === 'progress' ? 'visible' : 'hidden';
+				statusIndeterminate.style.visibility = mode === 'indeterminate' ? 'visible' : 'hidden';
+			}
+
+			function setStatusNotice(text) {
+				statusNotice.textContent = text;
+			}
+
+			engine.instantiate({
+				onProgress: function (current, total) {
+					if (total > 0) {
+						statusProgressInner.style.width = (current / total * 100) + '%';
+						setStatusMode('progress');
+						if (current === total) {
+							// Wait for final steps
+							setTimeout(() => {
+								if (statusNotice.textContent === 'INITIALIZING POLYGON PROTOCOL...') {
+									setStatusNotice('DECRYPTING SHAPES...');
+								}
+							}, 500);
+						}
+					} else {
+						setStatusMode('indeterminate');
+					}
+				}
+			}).then(() => {
+				setStatusMode('hidden');
+			}, (err) => {
+				console.error(err);
+				setStatusNotice('BOOT SEQUENCE FAILED');
+				setStatusMode('indeterminate');
+			});
+		}());
+	//]]></script>
+</body>
+</html>

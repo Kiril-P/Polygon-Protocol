@@ -69,6 +69,8 @@ func fire_aimed_shot():
 func take_damage(amount: float):
 	if is_dying: return
 	health -= amount
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("enemy_hit")
 	flash_white()
 	if health <= 0: die()
 
@@ -80,6 +82,8 @@ func flash_white():
 func die():
 	if is_dying: return
 	is_dying = true
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("enemy_death")
 	spawn_death_particles()
 	if player and player.has_method("add_xp"): player.add_xp(xp_value)
 	queue_free()
