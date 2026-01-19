@@ -114,28 +114,43 @@ func set_music_menu_mode(is_menu: bool):
 
 func load_music_tracks():
 	music_tracks.clear()
-	var dir = DirAccess.open("res://assets/music for game/")
+	var dir_path = "res://assets/music for game/"
+	var dir = DirAccess.open(dir_path)
 	if dir:
 		dir.list_dir_begin()
 		var file_name = dir.get_next()
 		while file_name != "":
-			if not dir.current_is_dir() and (file_name.ends_with(".mp3") or file_name.ends_with(".ogg")):
-				var track_path = "res://assets/music for game/" + file_name
-				var track = load(track_path)
-				if track:
-					music_tracks.append(track)
+			if not dir.current_is_dir():
+				# In exported builds, .mp3 files are remapped to .mp3.import or similar
+				# Godot 4 load() handles the remapping automatically if we use the original path
+				if file_name.ends_with(".mp3") or file_name.ends_with(".ogg"):
+					var track_path = dir_path + file_name
+					var track = load(track_path)
+					if track:
+						music_tracks.append(track)
+				elif file_name.ends_with(".mp3.import") or file_name.ends_with(".ogg.import"):
+					# Handle remapped files explicitly if needed, but load() usually preferred original name
+					var original_name = file_name.replace(".import", "")
+					var track_path = dir_path + original_name
+					var track = load(track_path)
+					if track and not music_tracks.has(track):
+						music_tracks.append(track)
+						
 			file_name = dir.get_next()
 	
 	# Fallback if DirAccess fails or folder is empty
 	if music_tracks.is_empty():
 		var fallback_tracks = [
 			"res://assets/music for game/Little-Wishes-chosic.com_.mp3",
-			"res://assets/music for game/tokyo-music-walker-sunset-drive-chosic.com_.mp3"
+			"res://assets/music for game/tokyo-music-walker-sunset-drive-chosic.com_.mp3",
+			"res://assets/music for game/echoes-in-blue-by-tokyo-music-walker-chosic.com_.mp3",
+			"res://assets/music for game/Memories-of-Spring(chosic.com).mp3"
 		]
 		for path in fallback_tracks:
-			var track = load(path)
-			if track:
-				music_tracks.append(track)
+			if ResourceLoader.exists(path):
+				var track = load(path)
+				if track:
+					music_tracks.append(track)
 	
 	# Shuffle once at game start as requested
 	music_tracks.shuffle()
@@ -154,7 +169,11 @@ func set_boss_music_mode(enabled: bool, phase: int):
 	
 	var tween = create_tween().set_parallel(true)
 	tween.tween_property(music_player, "pitch_scale", target_pitch, 1.5).set_trans(Tween.TRANS_SINE)
-	tween.tween_property(music_player, "volume_db", target_volume, 1.5).set_trans(Tween.TRANS_SINE)
+	
+	# Safety check for Music bus
+	var bus_idx = AudioServer.get_bus_index("Music")
+	if bus_idx != -1:
+		tween.tween_property(music_player, "volume_db", target_volume, 1.5).set_trans(Tween.TRANS_SINE)
 	
 	# If boss starts, maybe disable muffled effect if it was on
 	if enabled:
@@ -210,7 +229,13 @@ func play_sfx(sfx_name: String, volume_db: float = 0.0, pitch_min: float = 0.9, 
 	player.stream = sfx_pool[sfx_name]
 	player.volume_db = volume_db
 	player.pitch_scale = randf_range(pitch_min, pitch_max)
-	player.bus = "SFX"
+	
+	var bus_idx = AudioServer.get_bus_index("SFX")
+	if bus_idx != -1:
+		player.bus = "SFX"
+	else:
+		player.bus = "Master"
+		
 	player.play()
 	
 	if max_duration > 0.0:

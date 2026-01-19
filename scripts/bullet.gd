@@ -35,6 +35,18 @@ func _ready():
 	
 	if has_node("VisibleOnScreenNotifier2D"):
 		$VisibleOnScreenNotifier2D.screen_exited.connect(_on_screen_exited)
+		
+	# Check for initial overlap (if spawned inside a platform)
+	# Immediate check is better using a call_deferred or similar
+	call_deferred("_check_initial_collision")
+
+func _check_initial_collision():
+	if is_instance_valid(self):
+		var bodies = get_overlapping_bodies()
+		for body in bodies:
+			if body.collision_layer & 1: # Hits Layer 1
+				_on_body_entered(body)
+				break
 
 func _physics_process(delta: float):
 	time_alive += delta
@@ -151,6 +163,7 @@ func setup_bullet_shape():
 	
 	# Make sure Area2D can detect bodies (Enemies are CharacterBody2D)
 	collision_layer = 0
+	set_collision_mask_value(1, true) # Layer 1 is World/Platforms
 	set_collision_mask_value(2, true) # Layer 2 is Player
 	set_collision_mask_value(3, true) # Layer 3 is Enemies
 
@@ -174,6 +187,11 @@ func _on_body_entered(body: Node):
 	elif body.is_in_group("player"):
 		if fired_by_enemy:
 			hit_player(body)
+	elif body.collision_layer & 1: # Hits Layer 1 (World/Platforms)
+		# No more bouncing off platforms - just die to keep screen clear
+		if has_node("/root/AudioManager"):
+			get_node("/root/AudioManager").play_sfx("bullet_bounce", -15.0)
+		queue_free()
 
 func hit_player(player_node: Node):
 	if player_node.has_method("take_damage"):

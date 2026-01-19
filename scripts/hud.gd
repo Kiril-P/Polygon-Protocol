@@ -148,13 +148,13 @@ func setup_arena_border():
 	$Control.move_child(glow, 0)
 	
 	# Pulse animation
-	var t = create_tween().set_loops(9999)
-	t.tween_property(border, "border_color:a", 0.6, 1.5).set_trans(Tween.TRANS_SINE)
-	t.tween_property(border, "border_color:a", 0.2, 1.5).set_trans(Tween.TRANS_SINE)
+	var t_border = create_tween().set_loops().bind_node(border)
+	t_border.tween_property(border, "border_color:a", 0.6, 1.5).set_trans(Tween.TRANS_SINE)
+	t_border.tween_property(border, "border_color:a", 0.2, 1.5).set_trans(Tween.TRANS_SINE)
 	
-	var t2 = create_tween().set_loops(9999)
-	t2.tween_property(glow, "border_color:a", 0.3, 2.0).set_trans(Tween.TRANS_SINE)
-	t2.tween_property(glow, "border_color:a", 0.05, 2.0).set_trans(Tween.TRANS_SINE)
+	var t_glow = create_tween().set_loops().bind_node(glow)
+	t_glow.tween_property(glow, "border_color:a", 0.3, 2.0).set_trans(Tween.TRANS_SINE)
+	t_glow.tween_property(glow, "border_color:a", 0.05, 2.0).set_trans(Tween.TRANS_SINE)
 
 func setup_bottom_ui():
 	var bottom_container = VBoxContainer.new()
@@ -207,31 +207,14 @@ func setup_kill_counter():
 	pass
 
 func setup_boss_bar():
-	var bar = ProgressBar.new()
-	bar.name = "BossBar"
-	bar.show_percentage = false
-	bar.custom_minimum_size = Vector2(600, 20)
-	bar.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	bar.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	bar.offset_left = -300
-	bar.offset_right = 300
-	bar.offset_top = 140 # Moved further down to avoid Level/Dash overlap
-	bar.visible = false
-	style_neon_bar(bar, Color.RED)
-	$Control.add_child(bar)
-	
-	var label = Label.new()
-	label.name = "BossLabel"
-	label.text = "CORRUPTED PROTOCOL DETECTED"
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	label.offset_left = -300
-	label.offset_right = 300
-	label.offset_top = 110 # Moved down
-	label.add_theme_font_size_override("font_size", 18)
-	label.visible = false
-	$Control.add_child(label)
+	var boss_container = VBoxContainer.new()
+	boss_container.name = "BossBarsContainer"
+	boss_container.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	boss_container.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	boss_container.offset_top = 110 # Adjusted position
+	boss_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	boss_container.add_theme_constant_override("separation", 5)
+	$Control.add_child(boss_container)
 	
 	setup_warning_label()
 
@@ -290,28 +273,89 @@ func setup_boss_pointer():
 	$Control.add_child(arrow)
 	
 	# Add a pulse animation
-	var t_boss = create_tween().set_loops(9999)
-	t_boss.tween_property(arrow, "scale", Vector2(1.2, 1.2), 0.5).set_trans(Tween.TRANS_SINE)
-	t_boss.tween_property(arrow, "scale", Vector2(1.0, 1.0), 0.5).set_trans(Tween.TRANS_SINE)
+	var t_boss_pointer = create_tween().set_loops().bind_node(arrow)
+	t_boss_pointer.tween_property(arrow, "scale", Vector2(1.2, 1.2), 0.5).set_trans(Tween.TRANS_SINE)
+	t_boss_pointer.tween_property(arrow, "scale", Vector2(1.0, 1.0), 0.5).set_trans(Tween.TRANS_SINE)
 
 func _process(_delta):
-	# Update Boss Bar
-	var boss = get_tree().get_first_node_in_group("bosses")
-	var bar = $Control.get_node_or_null("BossBar")
-	var label = $Control.get_node_or_null("BossLabel")
+	# Update Boss Bars
+	var bosses = get_tree().get_nodes_in_group("bosses")
+	var container = $Control.get_node_or_null("BossBarsContainer")
 	var pointer = $Control.get_node_or_null("BossPointer")
 	
-	if boss and is_instance_valid(boss):
-		if bar and label:
-			bar.visible = true
-			label.visible = true
-			if "health" in boss and "max_health" in boss:
-				bar.max_value = boss.max_health
-				bar.value = boss.health
+	if container:
+		# Update or create bars for each boss
+		var existing_bars = container.get_children()
 		
-		if pointer:
-			var player = get_tree().get_first_node_in_group("player")
-			if player:
+		# Hide all first, then show active ones
+		for child in existing_bars:
+			child.visible = false
+			
+		for i in range(bosses.size()):
+			var boss_node_ref = bosses[i]
+			if not is_instance_valid(boss_node_ref) or ("is_dying" in boss_node_ref and boss_node_ref.is_dying):
+				continue
+				
+			var bar_name = "BossBar_" + str(boss_node_ref.get_instance_id())
+			var bar_node = container.get_node_or_null(bar_name)
+			
+			if not bar_node:
+				# Create a new bar for this boss
+				var boss_ui = VBoxContainer.new()
+				boss_ui.name = bar_name
+				boss_ui.alignment = BoxContainer.ALIGNMENT_CENTER
+				container.add_child(boss_ui)
+				
+				var new_label = Label.new()
+				new_label.name = "Label"
+				new_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				new_label.add_theme_font_size_override("font_size", 14)
+				boss_ui.add_child(new_label)
+				
+				var new_bar = ProgressBar.new()
+				new_bar.name = "Bar"
+				new_bar.show_percentage = false
+				new_bar.custom_minimum_size = Vector2(500, 12)
+				boss_ui.add_child(new_bar)
+				
+				# Style based on boss type
+				var color = Color.RED
+				if "heart_color" in boss_node_ref:
+					color = boss_node_ref.heart_color
+				style_neon_bar(new_bar, color)
+				
+				bar_node = boss_ui
+			
+			bar_node.visible = true
+			var active_bar = bar_node.get_node("Bar")
+			var active_label = bar_node.get_node("Label")
+			
+			if "health" in boss_node_ref and "max_health" in boss_node_ref:
+				active_bar.max_value = boss_node_ref.max_health
+				active_bar.value = boss_node_ref.health
+				
+				var boss_display_name = "CORRUPTED PROTOCOL"
+				if boss_node_ref.get_script().resource_path.contains("boss_fortress"):
+					boss_display_name = "FORTRESS PROTOCOL"
+				elif boss_node_ref.get_script().resource_path.contains("boss_pulsar"):
+					boss_display_name = "PULSAR PROTOCOL"
+				
+				active_label.text = boss_display_name
+		
+		# Cleanup bars for bosses that are gone
+		for child in existing_bars:
+			var boss_id = child.name.replace("BossBar_", "")
+			var found = false
+			for b in bosses:
+				if str(b.get_instance_id()) == boss_id:
+					found = true
+					break
+			if not found:
+				child.queue_free()
+
+	if bosses.size() > 0:
+		var boss = bosses[0] # Point to the first boss for simplicity
+		if pointer and is_instance_valid(boss):
 				var screen_size = get_viewport().get_visible_rect().size
 				var boss_screen_pos = boss.get_global_transform_with_canvas().get_origin()
 				
@@ -349,9 +393,6 @@ func _process(_delta):
 				else:
 					pointer.visible = false
 	else:
-		if bar and label:
-			bar.visible = false
-			label.visible = false
 		if pointer:
 			pointer.visible = false
 
@@ -395,9 +436,9 @@ func _on_player_health_changed(current_health: int, _max_health: int):
 			heart.modulate = Color(2.5, 0.2, 0.2)
 			
 			# Add a simple pulsing animation
-			var tween = heart.create_tween().set_loops(9999)
-			tween.tween_property(heart, "scale", Vector2(1.1, 1.1), 0.6).set_trans(Tween.TRANS_SINE)
-			tween.tween_property(heart, "scale", Vector2(1.0, 1.0), 0.6).set_trans(Tween.TRANS_SINE)
+			var t_heart_pulse = heart.create_tween().set_loops().bind_node(heart)
+			t_heart_pulse.tween_property(heart, "scale", Vector2(1.1, 1.1), 0.6).set_trans(Tween.TRANS_SINE)
+			t_heart_pulse.tween_property(heart, "scale", Vector2(1.0, 1.0), 0.6).set_trans(Tween.TRANS_SINE)
 			heart.pivot_offset = Vector2(16, 16)
 			
 			heart_container.add_child(heart)

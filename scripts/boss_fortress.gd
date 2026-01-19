@@ -12,7 +12,7 @@ var is_dying: bool = false
 var phase: int = 1
 var fire_timer: float = 0.0
 var pillar_spawn_timer: float = 5.0 # Increased initial delay
-var border_radius: float = 1200.0
+var border_radius: float = 1450.0 # Standardized for boss fights
 var arena_barrier: StaticBody2D = null
 var heart_color: Color = Color(1.0, 0.2, 0.4) # Fortress hearts: Pink/Red
 
@@ -45,8 +45,14 @@ func _ready():
 	spawn_variety_enemies(5 if bosses.size() > 1 else 10)
 
 func setup_arena_border():
+	# If another boss already has an arena, don't create a second one
+	var existing_borders = get_tree().get_nodes_in_group("boss_arena")
+	if existing_borders.size() > 0:
+		return
+		
 	var border = Line2D.new()
 	border.name = "ArenaBorder"
+	border.add_to_group("boss_arena")
 	var pts = PackedVector2Array()
 	var collision_pts = PackedVector2Array()
 	
@@ -87,9 +93,9 @@ func setup_arena_border():
 		static_body.add_child(coll)
 	
 	# Glow effect
-	var t = create_tween().set_loops(9999)
-	t.tween_property(border, "default_color:a", 1.0, 0.5)
-	t.tween_property(border, "default_color:a", 0.4, 0.5)
+	var t_glow = create_tween().set_loops().bind_node(border)
+	t_glow.tween_property(border, "default_color:a", 1.0, 0.5)
+	t_glow.tween_property(border, "default_color:a", 0.4, 0.5)
 
 func setup_boss_visuals():
 	# Revert to normal scale
@@ -142,7 +148,13 @@ func _physics_process(delta: float):
 			
 	# Pillar Spawning (Hearts)
 	var active_hearts = get_tree().get_nodes_in_group("boss_hearts")
-	if active_hearts.size() == 0:
+	var has_own_heart = false
+	for h in active_hearts:
+		if h.get("boss") == self:
+			has_own_heart = true
+			break
+			
+	if not has_own_heart and not is_dying:
 		pillar_spawn_timer -= delta
 		if pillar_spawn_timer <= 0:
 			spawn_pillar()
@@ -196,11 +208,22 @@ func spawn_variety_enemies(count: int = -1):
 
 func spawn_pillar():
 	# Spawn 3 hearts
+	# ADD VARIATION: Pulsar tends to spawn closer, Fortress further
+	var is_duo = get_tree().get_nodes_in_group("bosses").size() > 1
 	var start_angle = randf() * TAU
+	
 	for i in range(3):
-		var angle = start_angle + (TAU / 3.0) * i
-		# Random distance between 40% and 90% of border radius (closer to boss than before)
-		var dist = randf_range(border_radius * 0.4, border_radius - 150.0)
+		var angle = start_angle + (TAU / 3.0) * i + randf_range(-0.2, 0.2) # Added jitter
+		
+		# Fortress hearts: Middle to outer range
+		var min_dist = border_radius * 0.5
+		var max_dist = border_radius - 150.0
+		
+		if is_duo:
+			# Push them further out if Pulsar is also present
+			min_dist = border_radius * 0.6
+			
+		var dist = randf_range(min_dist, max_dist)
 		var pos = global_position + Vector2(dist, 0).rotated(angle)
 		
 		var pillar_script = load("res://scripts/boss_pillar.gd")
@@ -241,8 +264,9 @@ func fire_hectic_burst():
 		spawn_boss_bullet(Vector2.RIGHT.rotated(TAU/16 * i), 400.0)
 	
 	# Small delay for second ring effect within the same pattern
-	var t = get_tree().create_timer(0.2)
-	t.timeout.connect(func():
+	var t_hectic = create_tween().bind_node(self)
+	t_hectic.tween_interval(0.2)
+	t_hectic.tween_callback(func():
 		for i in range(12):
 			spawn_boss_bullet(Vector2.RIGHT.rotated((TAU/12 * i) + 0.2), 350.0)
 	)
@@ -306,7 +330,7 @@ func start_death_sequence():
 	# 2. Clear all other enemies and enemy bullets
 	var enemies = get_tree().get_nodes_in_group("enemies")
 	for enemy in enemies:
-		if enemy != self and is_instance_valid(enemy):
+		if enemy != self and is_instance_valid(enemy) and not enemy.is_in_group("bosses"):
 			if enemy.has_method("spawn_death_particles"):
 				enemy.spawn_death_particles()
 			enemy.queue_free()
@@ -322,20 +346,20 @@ func start_death_sequence():
 		get_node("/root/AudioManager").set_muffled(true)
 		get_node("/root/AudioManager").play_sfx("boss_spawn", 1.5, 0.5) # Low pitch boom
 	
-	var t = create_tween()
+	var hectic_tween = create_tween()
 	# Series of violent shakes and flashes
 	for i in range(12):
 		var pos_offset = Vector2(randf_range(-40, 40), randf_range(-40, 40))
-		t.tween_callback(func(): 
+		hectic_tween.tween_callback(func(): 
 			spawn_small_explosion(global_position + pos_offset)
 			if player: player.add_shake(8.0)
 			poly.modulate = Color(10, 10, 10, 1) # Pure white flash
 		)
-		t.tween_interval(0.1)
-		t.tween_property(poly, "modulate", Color(2.0, 0.2, 0.2, 1.0), 0.05)
+		hectic_tween.tween_interval(0.1)
+		hectic_tween.tween_property(poly, "modulate", Color(2.0, 0.2, 0.2, 1.0), 0.05)
 	
 	# 4. Final massive explosion and reward
-	t.tween_callback(die)
+	hectic_tween.tween_callback(die)
 
 func spawn_small_explosion(pos: Vector2):
 	var p = CPUParticles2D.new()
@@ -382,9 +406,15 @@ func die():
 		gd.add_shards(shard_reward) # AWARD SHARDS
 		gd.save_game()
 		
-	# REMOVE ARENA BARRIER AND HEARTS
-	if is_instance_valid(arena_barrier):
-		arena_barrier.queue_free()
+	# REMOVE ARENA BARRIER AND HEARTS ONLY IF LAST BOSS
+	var other_bosses = get_tree().get_nodes_in_group("bosses")
+	if other_bosses.size() <= 1: # We are the last one (group includes us until next frame)
+		if is_instance_valid(arena_barrier):
+			arena_barrier.queue_free()
+		
+		# Also cleanup any orphaned borders
+		for b in get_tree().get_nodes_in_group("boss_arena"):
+			b.queue_free()
 		
 	if player:
 		player.dash_nerf_active = false

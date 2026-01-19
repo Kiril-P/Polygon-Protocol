@@ -49,13 +49,13 @@ func setup_visuals():
 	
 	# Entrance effect
 	scale = Vector2.ZERO
-	var t_in = create_tween()
-	t_in.tween_property(self, "scale", Vector2(1.5, 1.5), 0.5).set_trans(Tween.TRANS_BACK)
+	var t_pillar_in = create_tween().bind_node(self)
+	t_pillar_in.tween_property(self, "scale", Vector2(1.5, 1.5), 0.5).set_trans(Tween.TRANS_BACK)
 	
 	# Constant Pulse animation
-	var t = create_tween().set_loops(9999)
-	t.tween_property(poly, "scale", Vector2(1.2, 1.2), 0.3).set_trans(Tween.TRANS_SINE)
-	t.tween_property(poly, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_SINE)
+	var t_pillar_pulse = create_tween().set_loops().bind_node(poly)
+	t_pillar_pulse.tween_property(poly, "scale", Vector2(1.2, 1.2), 0.3).set_trans(Tween.TRANS_SINE)
+	t_pillar_pulse.tween_property(poly, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_SINE)
 
 func _on_body_entered(body):
 	if is_dying: return

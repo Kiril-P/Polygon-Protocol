@@ -2,6 +2,7 @@ extends Node
 
 # Persistent data file path
 const SAVE_PATH = "user://save_game.dat"
+const CURRENT_SAVE_VERSION = 2 # Increment this to force a reset for all players
 
 # Meta-progression variables
 var total_shards: int = 0
@@ -17,9 +18,9 @@ var run_time: float = 0.0 # Current run survival time
 var use_mouse_controls: bool = true
 var show_tutorial: bool = true
 var audio_settings = {
-	"master": 0.8,
-	"music": 0.6,
-	"sfx": 0.7
+	"master": 0.35,
+	"music": 0.25,
+	"sfx": 0.30
 }
 var permanent_upgrades = {
 	"starting_hearts": 0,
@@ -30,7 +31,8 @@ var permanent_upgrades = {
 	"shield_regen": 0,    # Regenerates shield
 	"emergency_overdrive": 0,
 	"shard_multiplier": 0,
-	"repulsive_armor": 0
+	"repulsive_armor": 0,
+	"dash_resistance": 0
 }
 
 var leaderboard: Array = [] # Array of dictionaries: {name, score, kills, level, time}
@@ -53,7 +55,7 @@ var difficulty_level: int = 2 # 1-5, 2 is normal
 
 # Scene Management
 var next_scene_path: String = ""
-var is_quick_start: bool = false
+var is_first_run: bool = true # Track if this is the first ever run
 
 func has_upgrade(id: String) -> bool:
 	return permanent_upgrades.get(id, 0) > 0
@@ -133,6 +135,7 @@ func save_game():
 	var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file:
 		var data = {
+			"version": CURRENT_SAVE_VERSION,
 			"total_shards": total_shards,
 			"high_score": high_score,
 			"high_score_points": high_score_points,
@@ -148,7 +151,7 @@ func save_game():
 			"leaderboard": leaderboard,
 			"player_name": player_name,
 			"player_id": player_id,
-			"is_quick_start": is_quick_start
+			"is_first_run": is_first_run
 		}
 		file.store_var(data)
 
@@ -158,6 +161,15 @@ func load_game():
 		if file:
 			var data = file.get_var()
 			if data:
+				# VERSION CHECK: If the save is old, we reset progression stats
+				var saved_version = data.get("version", 1)
+				if saved_version < CURRENT_SAVE_VERSION:
+					print("Old save version detected. Resetting progression.")
+					# We keep audio and control settings but reset progression
+					_load_settings_only(data)
+					save_game() # Overwrite with new version
+					return
+
 				total_shards = data.get("total_shards", 0)
 				high_score = data.get("high_score", 0.0)
 				high_score_points = data.get("high_score_points", 0)
@@ -173,7 +185,7 @@ func load_game():
 				leaderboard = data.get("leaderboard", [])
 				player_name = data.get("player_name", "Player")
 				player_id = data.get("player_id", "")
-				is_quick_start = data.get("is_quick_start", false)
+				is_first_run = data.get("is_first_run", true)
 				
 				# Generate ID if missing
 				if player_id == "":
@@ -186,8 +198,26 @@ func load_game():
 		# Initial setup
 		player_id = str(randi()) + str(Time.get_unix_time_from_system())
 		save_game()
+		apply_audio_settings()
 
 func apply_audio_settings():
-	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Master"), linear_to_db(audio_settings.master))
-	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Music"), linear_to_db(audio_settings.music))
-	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("SFX"), linear_to_db(audio_settings.sfx))
+	var master_idx = AudioServer.get_bus_index("Master")
+	if master_idx != -1:
+		AudioServer.set_bus_volume_db(master_idx, linear_to_db(audio_settings.master))
+		
+	var music_idx = AudioServer.get_bus_index("Music")
+	if music_idx != -1:
+		AudioServer.set_bus_volume_db(music_idx, linear_to_db(audio_settings.music))
+		
+	var sfx_idx = AudioServer.get_bus_index("SFX")
+	if sfx_idx != -1:
+		AudioServer.set_bus_volume_db(sfx_idx, linear_to_db(audio_settings.sfx))
+
+func _load_settings_only(data: Dictionary):
+	# Helper to keep user preferences while resetting game stats
+	use_mouse_controls = data.get("use_mouse_controls", true)
+	show_tutorial = data.get("show_tutorial", true)
+	audio_settings = data.get("audio_settings", audio_settings)
+	player_name = data.get("player_name", "Player")
+	player_id = data.get("player_id", "")
+	apply_audio_settings()

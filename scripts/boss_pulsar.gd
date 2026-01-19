@@ -11,6 +11,10 @@ var phase: int = 1
 var laser_rotation: float = 0.0
 var laser_speed: float = 1.0
 var laser_nodes: Array[Line2D] = []
+var warning_tweens: Array[Tween] = []
+var platform_nodes: Array[Area2D] = []
+var platform_angle: float = 0.0
+@export var platform_speed: float = 0.3 # Slow enough to follow easily
 var lasers_active: bool = true
 var lasers_charging: bool = false
 
@@ -39,6 +43,7 @@ func _ready():
 	setup_visuals()
 	setup_arena_border()
 	setup_lasers()
+	setup_platforms()
 	
 	# Spawn initial enemies ONCE at the start of the boss fight
 	# If this is the final fight (multiple bosses), spawn fewer each
@@ -65,8 +70,14 @@ func setup_visuals():
 	poly.add_child(inner)
 
 func setup_arena_border():
+	# If another boss already has an arena, don't create a second one
+	var existing_borders = get_tree().get_nodes_in_group("boss_arena")
+	if existing_borders.size() > 0:
+		return
+		
 	var border = Line2D.new()
 	border.name = "ArenaBorder"
+	border.add_to_group("boss_arena")
 	var pts = PackedVector2Array()
 	for i in range(65):
 		pts.append(Vector2(border_radius, 0).rotated((TAU / 64.0) * i))
@@ -99,6 +110,10 @@ func setup_lasers():
 		l.queue_free()
 	laser_nodes.clear()
 	
+	for t in warning_tweens:
+		if t: t.kill()
+	warning_tweens.clear()
+	
 	var count = 2
 	if phase == 2: count = 3
 	elif phase == 3: count = 5
@@ -107,35 +122,115 @@ func setup_lasers():
 	
 	for i in range(count):
 		var laser = Line2D.new()
-		laser.width = 5.0 # Slightly thicker warning
-		laser.default_color = Color(0, 1, 1, 0.15) # Very transparent Cyan warning
+		laser.width = 4.0 
+		laser.default_color = Color(0, 1, 1, 0.2) # Transparent Cyan warning
 		laser.points = PackedVector2Array([Vector2.ZERO, Vector2(border_radius, 0)])
 		add_child(laser)
 		laser_nodes.append(laser)
 		
+		# Add a very thin "Core" for the warning too, but keep it faint
+		var core = Line2D.new()
+		core.name = "Core"
+		core.width = 1.0
+		core.default_color = Color(1, 1, 1, 0.1)
+		core.points = laser.points
+		laser.add_child(core)
+		
 		# Warning Flash (Transparent to slightly visible)
-		var t = create_tween().set_loops(10)
-		t.tween_property(laser, "default_color:a", 0.4, 0.1)
-		t.tween_property(laser, "default_color:a", 0.05, 0.1)
+		var t_warn = create_tween().set_loops().bind_node(laser)
+		t_warn.tween_property(laser, "default_color:a", 0.5, 0.15).set_trans(Tween.TRANS_SINE)
+		t_warn.tween_property(laser, "default_color:a", 0.1, 0.15).set_trans(Tween.TRANS_SINE)
+		warning_tweens.append(t_warn)
 	
 	# Delay before lasers become active
-	var timer = get_tree().create_timer(2.0)
-	timer.timeout.connect(func():
+	var t_activate = create_tween().bind_node(self)
+	t_activate.tween_interval(2.0)
+	t_activate.tween_callback(func():
 		lasers_charging = false
+		for t in warning_tweens:
+			if t: t.kill()
+		warning_tweens.clear()
+		
 		for laser in laser_nodes:
 			if not is_instance_valid(laser): continue
-			laser.width = 16.0 # Thicker base
-			laser.default_color = Color(0, 1, 1, 1.0) # FULL OPAQUE Cyan
-			laser.modulate = Color(1.5, 2.0, 2.0) # HDR Glow boost
+			
+			# DAMAGING STATE: Bright, Opaque, Glowing
+			laser.width = 12.0
+			laser.default_color = Color(0, 0.8, 1.0, 1.0) # Solid Neon Cyan
+			# High HDR values for intense glow
+			laser.modulate = Color(2.5, 3.5, 4.0, 1.0) 
+			
+			var core = laser.get_node_or_null("Core")
+			if core:
+				core.width = 4.0
+				core.default_color = Color(1, 1, 1, 1.0) # Pure white core
+				core.modulate = Color(2, 2, 2, 1) # Extra bright core
 			
 			# Menacing Pulse animation (Thicker and faster)
-			var t = create_tween().set_loops(9999)
-			t.tween_property(laser, "width", 24.0, 0.08).set_trans(Tween.TRANS_SINE)
-			t.tween_property(laser, "width", 16.0, 0.08).set_trans(Tween.TRANS_SINE)
+			var pulse = create_tween().set_loops().bind_node(laser)
+			pulse.tween_property(laser, "width", 18.0, 0.08).set_trans(Tween.TRANS_SINE)
+			pulse.tween_property(laser, "width", 12.0, 0.08).set_trans(Tween.TRANS_SINE)
 			
 		if has_node("/root/AudioManager"):
 			get_node("/root/AudioManager").play_sfx("glitch", 5.0, 1.2, 1.5)
 	)
+
+func setup_platforms():
+	for p in platform_nodes:
+		p.queue_free()
+	platform_nodes.clear()
+	
+	for i in range(2):
+		var platform = Area2D.new()
+		platform.name = "ShelterPlatform"
+		# Set collision mask to detect player (layer 2)
+		platform.collision_layer = 0
+		platform.collision_mask = 2 
+		add_child(platform)
+		platform_nodes.append(platform)
+		
+		# Visuals
+		var platform_poly = Polygon2D.new()
+		var width = 180.0 # Slightly shorter as requested
+		var thickness = 50.0
+		platform_poly.polygon = PackedVector2Array([
+			Vector2(-width/2, -thickness/2),
+			Vector2(width/2, -thickness/2),
+			Vector2(width/2, thickness/2),
+			Vector2(-width/2, thickness/2)
+		])
+		platform_poly.color = Color(0.0, 1.0, 0.5, 0.4) # Slightly more opaque
+		platform_poly.modulate = Color(1.2, 2.0, 1.5) # Neon Glow
+		platform.add_child(platform_poly)
+		
+		# Inner "Battery" Core Visual
+		var core = Polygon2D.new()
+		core.polygon = PackedVector2Array([
+			Vector2(-width/2 + 15, -10),
+			Vector2(width/2 - 15, -10),
+			Vector2(width/2 - 15, 10),
+			Vector2(-width/2 + 15, 10)
+		])
+		core.color = Color(1, 1, 1, 0.8)
+		platform.add_child(core)
+		
+		# Collision for the Area2D (Refueling/Shelter Detection)
+		var coll = CollisionShape2D.new()
+		var shape = RectangleShape2D.new()
+		shape.size = Vector2(width, thickness)
+		coll.shape = shape
+		platform.add_child(coll)
+		
+		# PHYSICAL COLLISION: Add a StaticBody2D so it blocks bullets
+		var static_body = StaticBody2D.new()
+		platform.add_child(static_body)
+		# Set to Layer 1 (World) so bullets/enemies treat it as a wall
+		static_body.collision_layer = 1
+		static_body.collision_mask = 0 # It doesn't need to move based on anything
+		
+		var physical_coll = CollisionShape2D.new()
+		physical_coll.shape = shape # Reuse the same shape
+		static_body.add_child(physical_coll)
 
 func _physics_process(delta: float):
 	if is_dying: return
@@ -154,6 +249,31 @@ func _physics_process(delta: float):
 		var angle = (laser_rotation * dir) + (angle_step * i)
 		laser_nodes[i].rotation = angle
 		check_laser_collision(laser_nodes[i])
+
+	# Platform Rotation & Refueling
+	platform_angle += platform_speed * delta
+	var player_in_platform = false
+	for i in range(platform_nodes.size()):
+		var angle = platform_angle + (PI * i) # Opposite sides
+		var radius = border_radius * 0.55 # Positioned between boss and player typical range
+		platform_nodes[i].position = Vector2(radius, 0).rotated(angle)
+		platform_nodes[i].rotation = angle + PI/2 # Perpendicular to radius
+		
+		if player and is_instance_valid(player) and platform_nodes[i].overlaps_body(player):
+			player_in_platform = true
+			# REFUEL DASH ENERGY
+			if "current_energy" in player and "max_energy" in player:
+				var refill_rate = 70.0 # Even faster refill
+				player.current_energy = min(player.max_energy, player.current_energy + refill_rate * delta)
+				player.energy_changed.emit(player.current_energy, player.max_energy)
+				
+				# Visual feedback: Make the player glow green while refueling
+				player.modulate = Color(0.8, 2.5, 1.0)
+	
+	if player and is_instance_valid(player) and not player_in_platform:
+		# Reset modulate if not dashing (player_controller handles dashing modulate)
+		if "is_dashing" in player and not player.is_dashing:
+			player.modulate = Color(1, 1, 1, 1)
 			
 	# Heart Spawning logic
 	var active_hearts = get_tree().get_nodes_in_group("boss_hearts")
@@ -218,11 +338,22 @@ func spawn_variety_enemies(count: int = -1):
 			enemy.set_xp_value(1)
 
 func spawn_three_hearts():
+	# ADD VARIATION: Pulsar tends to spawn closer, Fortress further
+	var is_duo = get_tree().get_nodes_in_group("bosses").size() > 1
 	var start_angle = randf() * TAU
+	
 	for i in range(3):
-		var angle = start_angle + (TAU / 3.0) * i
-		# Random distance between 40% and 90% of border radius
-		var dist = randf_range(border_radius * 0.4, border_radius - 150.0)
+		var angle = start_angle + (TAU / 3.0) * i + randf_range(-0.2, 0.2) # Added jitter
+		
+		# Pulsar hearts: Inner to middle range
+		var min_dist = border_radius * 0.3
+		var max_dist = border_radius * 0.7
+		
+		if is_duo:
+			# Keep them tighter to the center if Fortress is also present
+			max_dist = border_radius * 0.55
+			
+		var dist = randf_range(min_dist, max_dist)
 		var pos = Vector2(dist, 0).rotated(angle)
 		
 		var heart_script = load("res://scripts/boss_pillar.gd")
@@ -236,15 +367,68 @@ func spawn_three_hearts():
 func check_laser_collision(laser: Line2D):
 	if not player or not is_instance_valid(player) or lasers_charging: return
 	
-	var to_player = player.global_position - global_position
 	var laser_dir = Vector2.RIGHT.rotated(laser.rotation)
+	var max_len = border_radius
+	var is_blocked = false
 	
+	# SHELTER CHECK: Check if any platform is blocking this laser
+	for platform in platform_nodes:
+		var to_platform = platform.global_position - global_position
+		var platform_angle_val = to_platform.angle()
+		var dist_to_platform = to_platform.length()
+		
+		# If laser hits the platform
+		if abs(angle_difference(laser.rotation, platform_angle_val)) < 0.15: # Tight angle for the platform width
+			max_len = dist_to_platform
+			is_blocked = true
+			break # Assuming platforms don't overlap in a way that matters for the first hit
+	
+	# Update visual length
+	laser.points = PackedVector2Array([Vector2.ZERO, Vector2(max_len, 0)])
+	var core = laser.get_node_or_null("Core")
+	if core:
+		core.points = laser.points
+
+	if is_blocked:
+		return # Laser is blocked by shelter!
+
+	var to_player = player.global_position - global_position
 	var projection = to_player.dot(laser_dir)
-	if projection > 0 and projection < border_radius:
+	if projection > 0 and projection < max_len:
 		var closest_point = laser_dir * projection
 		if player.global_position.distance_to(global_position + closest_point) < 35.0:
 			if player.has_method("take_damage"):
 				player.take_damage(1)
+
+func remove_one_platform():
+	if platform_nodes.is_empty(): return
+	
+	# Take the last one added
+	var p = platform_nodes.pop_back()
+	if is_instance_valid(p):
+		# Animation for disappearing
+		var t = create_tween()
+		# Flash red to warn the player it's failing
+		var visuals = p.get_children()
+		for v in visuals:
+			if v is Polygon2D:
+				t.parallel().tween_property(v, "color", Color(1, 0, 0, 0.8), 0.5)
+				t.parallel().tween_property(v, "modulate", Color(5, 2, 2), 0.5)
+		
+		t.tween_interval(0.5) # Hold the warning
+		
+		# Violent shake before deletion
+		for i in range(10):
+			t.tween_property(p, "position", p.position + Vector2(randf_range(-15, 15), randf_range(-15, 15)), 0.05)
+		
+		# Shrink and fade
+		t.parallel().tween_property(p, "scale", Vector2.ZERO, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+		t.parallel().tween_property(p, "modulate:a", 0.0, 0.3)
+		
+		t.tween_callback(p.queue_free)
+		
+		if has_node("/root/AudioManager"):
+			get_node("/root/AudioManager").play_sfx("glitch", 2.0, 0.8, 1.2)
 
 func take_damage(amount: float):
 	if is_dying: return
@@ -269,6 +453,7 @@ func take_damage(amount: float):
 		phase = 2
 		laser_speed *= 1.2
 		setup_lasers()
+		remove_one_platform() # First platform gone
 		if has_node("/root/AudioManager"):
 			get_node("/root/AudioManager").play_sfx("boss_spawn", 1.2)
 			get_node("/root/AudioManager").set_boss_music_mode(true, 2)
@@ -278,6 +463,7 @@ func take_damage(amount: float):
 		laser_speed *= 1.2
 		poly.color = Color(0.1, 0.0, 0.2) # Deep Purple Void
 		setup_lasers()
+		remove_one_platform() # Second platform gone
 		if has_node("/root/AudioManager"):
 			get_node("/root/AudioManager").play_sfx("boss_spawn", 1.5)
 			get_node("/root/AudioManager").set_boss_music_mode(true, 3)
@@ -292,13 +478,15 @@ func start_death_sequence():
 	# 1. Stop all attacks and movement
 	lasers_active = false
 	for l in laser_nodes:
-		l.visible = false
+		if is_instance_valid(l): l.visible = false
+	for p in platform_nodes:
+		if is_instance_valid(p): p.queue_free()
 	spawn_timer = 9999.0
 	
 	# 2. Clear all other enemies and enemy bullets
 	var enemies = get_tree().get_nodes_in_group("enemies")
 	for enemy in enemies:
-		if enemy != self and is_instance_valid(enemy):
+		if enemy != self and is_instance_valid(enemy) and not enemy.is_in_group("bosses"):
 			if enemy.has_method("spawn_death_particles"):
 				enemy.spawn_death_particles()
 			enemy.queue_free()
@@ -313,20 +501,20 @@ func start_death_sequence():
 		get_node("/root/AudioManager").set_muffled(true)
 		get_node("/root/AudioManager").play_sfx("boss_spawn", 2.0, 0.4) # Very deep boom
 	
-	var t = create_tween()
+	var death_tween = create_tween()
 	# Series of violent shakes and flashes (More intense for Pulsar)
 	for i in range(16):
 		var pos_offset = Vector2(randf_range(-60, 60), randf_range(-60, 60))
-		t.tween_callback(func(): 
+		death_tween.tween_callback(func(): 
 			spawn_small_explosion(global_position + pos_offset)
 			if player: player.add_shake(12.0)
 			poly.modulate = Color(15, 15, 15, 1) # Super white flash
 		)
-		t.tween_interval(0.08)
-		t.tween_property(poly, "modulate", Color(0, 1.5, 2.0, 1.0), 0.04)
+		death_tween.tween_interval(0.08)
+		death_tween.tween_property(poly, "modulate", Color(0, 1.5, 2.0, 1.0), 0.04)
 	
 	# 4. Final massive explosion and reward
-	t.tween_callback(die)
+	death_tween.tween_callback(die)
 
 func spawn_small_explosion(pos: Vector2):
 	var p = CPUParticles2D.new()
@@ -375,8 +563,15 @@ func die():
 		gd.add_shards(shard_reward) # AWARD SHARDS
 		gd.save_game()
 	
-	if is_instance_valid(arena_barrier):
-		arena_barrier.queue_free()
+	# REMOVE ARENA BARRIER AND HEARTS ONLY IF LAST BOSS
+	var other_bosses = get_tree().get_nodes_in_group("bosses")
+	if other_bosses.size() <= 1: # We are the last one
+		if is_instance_valid(arena_barrier):
+			arena_barrier.queue_free()
+			
+		# Also cleanup any orphaned borders
+		for b in get_tree().get_nodes_in_group("boss_arena"):
+			b.queue_free()
 		
 	var hearts = get_tree().get_nodes_in_group("boss_hearts")
 	for h in hearts:

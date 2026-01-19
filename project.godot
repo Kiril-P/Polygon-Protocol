@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="Mini Jam 202 - Power Up"
+config/name="Polygon Protocol"
 run/main_scene="uid://c8y7q2w1x4j5r"
 config/features=PackedStringArray("4.5", "Forward Plus", "Mobile")
 boot_splash/bg_color=Color(0.0509804, 0.0509804, 0.0509804, 1)
@@ -76,11 +76,11 @@ textures/vram_compression/import_etc2_astc=true
 anti_aliasing/quality/msaa_2d=2
 environment/defaults/default_clear_color=Color(0.05, 0.05, 0.05, 1)
 viewport/transparent_background=true
-anti_aliasing/quality/screen_space_aa=1
+anti_aliasing/quality/screen_space_aa=0
 
 [rendering_device]
 
 vulkan/max_queued_frames=2
-renderer/rendering_method="forward_plus"
-renderer/rendering_method.mobile="mobile"
+renderer/rendering_method="compatibility"
+renderer/rendering_method.mobile="compatibility"
 renderer/rendering_method.web="compatibility"

@@ -69,7 +69,7 @@ func fire_wall():
 
 func spawn_bullet(dir: Vector2):
 	var bullet = bullet_scene.instantiate()
-	bullet.global_position = global_position + dir * 60.0 # Further out
+	bullet.global_position = global_position + dir * 45.0 # Reduced from 60 to prevent shooting through platforms
 	get_parent().add_child(bullet)
 	
 	bullet.fired_by_enemy = true # Safety flag
@@ -78,8 +78,9 @@ func spawn_bullet(dir: Vector2):
 	bullet.damage = 10.0
 	bullet.add_to_group("enemy_bullets")
 	
-	# ONLY collide with player (Layer 2)
+	# Collide with player (Layer 2) and Platforms (Layer 1)
 	bullet.collision_mask = 0
+	bullet.set_collision_mask_value(1, true)
 	bullet.set_collision_mask_value(2, true)
 	
 	# Make it very large

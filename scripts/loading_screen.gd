@@ -33,14 +33,11 @@ func _ready():
 	# Decide where to go
 	if has_node("/root/GlobalData"):
 		var gd = get_node("/root/GlobalData")
-		# If this is the VERY first time (never even finished a run or changed this flag)
+		# If this is the VERY first time (never even got a first upgrade)
 		# we go straight to the game. Otherwise, we go to main menu.
-		if not gd.is_quick_start and (gd.next_scene_path == "" or gd.next_scene_path == null):
+		if gd.is_first_run and gd.next_scene_path.is_empty():
 			target_scene_path = "res://scenes/game.tscn"
-			# Mark that we've done the quick start once
-			gd.is_quick_start = true
-			gd.save_game()
-		elif gd.next_scene_path != "" and gd.next_scene_path != null:
+		elif not gd.next_scene_path.is_empty():
 			target_scene_path = gd.next_scene_path
 		else:
 			target_scene_path = "res://scenes/main_menu.tscn"

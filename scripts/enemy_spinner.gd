@@ -68,7 +68,7 @@ func fire_spiral():
 
 func spawn_bullet(dir: Vector2):
 	var bullet = bullet_scene.instantiate()
-	bullet.global_position = global_position + dir * 40.0 # Further out
+	bullet.global_position = global_position + dir * 20.0 # Reduced from 40 to prevent shooting through platforms
 	get_parent().add_child(bullet)
 	
 	bullet.fired_by_enemy = true # Safety flag
@@ -77,8 +77,9 @@ func spawn_bullet(dir: Vector2):
 	bullet.damage = damage
 	bullet.add_to_group("enemy_bullets")
 	
-	# ONLY collide with player (Layer 2)
+	# Collide with player (Layer 2) and Platforms (Layer 1)
 	bullet.collision_mask = 0
+	bullet.set_collision_mask_value(1, true)
 	bullet.set_collision_mask_value(2, true)
 	
 	# Make it larger

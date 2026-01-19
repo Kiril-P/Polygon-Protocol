@@ -105,17 +105,26 @@ var upgrade_pool = [
 
 var applied_special_upgrades = []
 var upgrade_counts = {} # Track how many times each upgrade was picked
+var first_upgrade_of_run: bool = true # Track if this is the first level up of the session
 var level_up_pending: int = 0
 var is_ui_active: bool = false
 
 func get_random_upgrades(count: int = 3) -> Array:
 	var player = get_tree().get_first_node_in_group("player")
 	var is_circle = player and player.current_shape == 0
+	var gd = get_node("/root/GlobalData") if has_node("/root/GlobalData") else null
+	var force_specials = first_upgrade_of_run and gd and gd.is_first_run
 	
 	var pool = []
 	for upgrade in upgrade_pool:
+		var is_special = upgrade.get("is_special", false)
+		
+		# If forcing specials, skip anything that isn't special
+		if force_specials and not is_special:
+			continue
+			
 		# Check if already applied (only for special ones)
-		if upgrade.get("is_special", false) and upgrade["id"] in applied_special_upgrades:
+		if is_special and upgrade["id"] in applied_special_upgrades:
 			# Some multi-pick specials are handled in apply_upgrade, 
 			# but we still want to diminish them.
 			var multi_pick_specials = ["gravity_well", "bounce", "explosive", "prismatic_beam"]
@@ -134,7 +143,7 @@ func get_random_upgrades(count: int = 3) -> Array:
 				continue
 		
 		# Rarity check for special upgrades (e.g. 20% chance to even be in the pool this time)
-		if upgrade.get("is_special", false):
+		if is_special and not force_specials:
 			if randf() > 0.2: # 75% chance to skip a special upgrade from the available pool
 				continue
 		
@@ -180,6 +189,7 @@ func _on_player_level_up():
 func reset_upgrades():
 	applied_special_upgrades.clear()
 	upgrade_counts.clear() # Clear counts for new run
+	first_upgrade_of_run = true
 	level_up_pending = 0
 	is_ui_active = false
 
@@ -202,6 +212,15 @@ func apply_upgrade(upgrade_data: Dictionary):
 	var upgrade_id = upgrade_data["id"]
 	upgrade_counts[upgrade_id] = upgrade_counts.get(upgrade_id, 0) + 1
 	
+	var gd = get_node("/root/GlobalData") if has_node("/root/GlobalData") else null
+	var is_first_run_evolution = false
+	if first_upgrade_of_run:
+		first_upgrade_of_run = false
+		if gd and gd.is_first_run:
+			is_first_run_evolution = true
+			gd.is_first_run = false
+			gd.save_game()
+	
 	if player:
 		# Use the diminished value already calculated in get_random_upgrades
 		player.apply_upgrade(upgrade_id, upgrade_data["value"])
@@ -221,3 +240,14 @@ func apply_upgrade(upgrade_data: Dictionary):
 		# Resume the game
 		is_ui_active = false
 		get_tree().paused = false
+		
+		# EVOLVE TO TRIANGLE: On the first ever upgrade of the first ever run
+		# We do this AFTER unpausing to ensure trigger_evolution_visual works correctly
+		if is_first_run_evolution and player:
+			if player.current_shape == 0:
+				player.current_shape = 3
+				player.next_evolution_level = player.level + (player.current_shape + 1)
+				player.update_shape_visuals()
+				# Trigger the visual effect without blocking the rest of the application
+				if player.has_method("trigger_evolution_visual"):
+					player.trigger_evolution_visual()

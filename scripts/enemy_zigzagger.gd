@@ -62,6 +62,7 @@ func fire_aimed_shot():
 	b.speed = 300.0
 	b.damage = damage
 	b.add_to_group("enemy_bullets")
+	b.set_collision_mask_value(1, true)
 	b.set_collision_mask_value(2, true)
 	if b.has_node("BulletSprite"):
 		b.get_node("BulletSprite").color = Color(0.8, 1.0, 0.4)

@@ -31,3 +31,6 @@ Bin/
 # Temporary files
 *.tmp
 *.tscn*.tmp
+/build
+/build
+/build

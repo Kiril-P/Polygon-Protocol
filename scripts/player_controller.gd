@@ -98,13 +98,14 @@ func _ready():
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	current_hearts = max_hearts
 	current_energy = max_energy
-	update_shape_visuals()
 	
-	# Initial Meta-Upgrades
+	# Initial Setup & Meta-Upgrades
 	if has_node("/root/GlobalData"):
 		var gd = get_node("/root/GlobalData")
 		if gd.is_upgrade_active("energy_shield"):
 			spawn_shield()
+			
+	update_shape_visuals()
 	
 	# Set Player Palette
 	sprite.color = Color(0.0, 0.8, 1.0) # Neon Cyan
@@ -276,6 +277,26 @@ func _input(event):
 		if event.keycode == KEY_L:
 			add_xp(xp_to_next_level)
 			print("DEBUG: Level Up Forced")
+		
+		# BOSS DEBUG SPAWNS
+		if event.keycode == KEY_K:
+			var spawner = get_tree().get_first_node_in_group("spawner")
+			if spawner:
+				spawner.spawn_major_boss(80)
+				print("DEBUG: Boss 1 (Fortress) Spawned")
+		if event.keycode == KEY_J:
+			var spawner = get_tree().get_first_node_in_group("spawner")
+			if spawner:
+				spawner.spawn_major_boss(180)
+				print("DEBUG: Boss 2 (Pulsar) Spawned")
+		if event.keycode == KEY_H:
+			var spawner = get_tree().get_first_node_in_group("spawner")
+			if spawner:
+				spawner.time_passed = 350.0
+				spawner.bosses_spawned.erase(360)
+				spawner.choice_made_360 = false
+				spawner.choice_active = false
+				print("DEBUG: Fast-forward to 6-min Boss Choice")
 
 func skip_tutorial():
 	if tutorial_tween:
@@ -359,6 +380,11 @@ func _physics_process(delta: float):
 		
 		# REDUCED consumption mult from 1.8 to 1.4 for better feel
 		var consumption_mult = 1.4 if dash_nerf_active else 1.0
+		
+		# PROTOCOL OVERRIDE: Maintain 50% efficiency during nerf
+		if dash_nerf_active and has_node("/root/GlobalData") and get_node("/root/GlobalData").is_upgrade_active("dash_resistance"):
+			consumption_mult = 1.2 # Much better than 1.4
+			
 		current_energy -= energy_consumption * consumption_mult * delta
 		
 		if current_energy <= 0: 
@@ -382,7 +408,10 @@ func _physics_process(delta: float):
 			else:
 				var current_recovery = energy_recovery
 				if dash_nerf_active:
-					current_recovery *= 0.6 # Recovery is 40% slower (Reduced from 60%)
+					var nerf_mult = 0.6 # Recovery is 40% slower
+					if has_node("/root/GlobalData") and get_node("/root/GlobalData").is_upgrade_active("dash_resistance"):
+						nerf_mult = 0.8 # Only 20% slower
+					current_recovery *= nerf_mult
 				current_energy += current_recovery * delta
 				if current_energy > max_energy: current_energy = max_energy
 				energy_changed.emit(current_energy, max_energy)
@@ -449,13 +478,13 @@ func spawn_shield():
 	visual.color = Color(0.2, 0.6, 1.0, 0.3)
 	
 	# Rotating animation
-	var tween = create_tween().set_loops(9999)
-	tween.tween_property(shield_node, "rotation", TAU, 2.0).as_relative()
+	var t_shield_rot = create_tween().set_loops().bind_node(shield_node)
+	t_shield_rot.tween_property(shield_node, "rotation", TAU, 2.0).as_relative()
 	
 	# Pulse effect
-	var pulse = create_tween().set_loops(9999)
-	pulse.tween_property(visual, "modulate:a", 0.6, 0.5)
-	pulse.tween_property(visual, "modulate:a", 0.2, 0.5)
+	var t_shield_pulse = create_tween().set_loops().bind_node(visual)
+	t_shield_pulse.tween_property(visual, "modulate:a", 0.6, 0.5)
+	t_shield_pulse.tween_property(visual, "modulate:a", 0.2, 0.5)
 
 func spawn_ghost():
 	var ghost = Polygon2D.new()
@@ -507,63 +536,56 @@ func handle_prismatic_beam(delta: float):
 		for i in range(vertices):
 			# Outer Beam (Glow)
 			var outer = Line2D.new()
-			outer.width = 8.0
+			outer.width = 15.0
 			outer.default_color = Color(0, 0.8, 1, 0.4) # Transparent Cyan
 			add_child(outer)
 			beam_nodes.append(outer)
 			
 			# Inner Beam (Core)
 			var inner = Line2D.new()
-			inner.width = 2.0
+			inner.width = 5.0
 			inner.default_color = Color(1, 1, 1, 0.9) # Solid White
 			add_child(inner)
 			beam_nodes.append(inner)
 
 	var angle_step = TAU / vertices
-	var beam_length = 400.0 + (prismatic_beam_level - 1) * 200.0
-	var base_outer_width = 8.0 + (prismatic_beam_level - 1) * 4.0
-	var base_inner_width = 2.0 + (prismatic_beam_level - 1) * 1.5
+	var beam_length = 600.0 + (prismatic_beam_level - 1) * 300.0
+	var base_outer_width = 12.0 + (prismatic_beam_level - 1) * 8.0
+	var base_inner_width = 4.0 + (prismatic_beam_level - 1) * 3.0
 	
 	for i in range(vertices):
 		# LOCAL-SPACE math ensures perfect alignment with the rotating shape
 		var local_angle = angle_step * i
 		var dir = Vector2.RIGHT.rotated(local_angle)
 		
-		var start_pos = dir * 25.0
+		var start_pos = dir * 5.0 # ORIGIN: Closer to center to look properly attached
 		var current_start_world = global_position + start_pos.rotated(rotation)
 		var current_dir_world = dir.rotated(rotation)
 		var current_length = beam_length
 		
 		var beam_points_local = [start_pos]
 		
-		# Support for Beam Bouncing
-		var bounces_left = bullet_bounces
-		while bounces_left >= 0:
-			var query = PhysicsRayQueryParameters2D.create(current_start_world, current_start_world + current_dir_world * current_length)
-			query.collision_mask = 4 # Enemies
-			var result = get_world_2d().direct_space_state.intersect_ray(query)
+		# NO MORE BOUNCING FOR BEAMS (Simplified for performance and clarity)
+		var query = PhysicsRayQueryParameters2D.create(current_start_world, current_start_world + current_dir_world * current_length)
+		query.collision_mask = 1 | 4 # Layer 1 (Platforms) and Layer 3 (Enemies)
+		var result = get_world_2d().direct_space_state.intersect_ray(query)
+		
+		if result:
+			var hit_pos_world = result.position
+			beam_points_local.append(to_local(hit_pos_world))
 			
-			if result:
-				var hit_pos_world = result.position
-				beam_points_local.append(to_local(hit_pos_world))
-				
-				var collider = result.collider
-				if collider.has_method("take_damage"):
-					collider.take_damage(bullet_damage * damage_multiplier * delta * 6.0)
-					if randf() < 0.3:
-						spawn_beam_impact(hit_pos_world)
-				
-				if bounces_left > 0:
-					var normal = result.normal
-					current_dir_world = current_dir_world.bounce(normal)
-					current_start_world = hit_pos_world + current_dir_world * 2.0
-					current_length *= 0.8
-					bounces_left -= 1
-				else:
-					break
-			else:
-				beam_points_local.append(to_local(current_start_world + current_dir_world * current_length))
-				break
+			var collider = result.collider
+			if collider.is_in_group("enemies") and collider.has_method("take_damage"):
+				# DAMAGE: 6.0x base damage
+				collider.take_damage(bullet_damage * damage_multiplier * delta * 6.0)
+				if randf() < 0.3:
+					spawn_beam_impact(hit_pos_world)
+			elif collider.collision_layer & 1:
+				# Hit a platform or wall, spawn impact
+				if randf() < 0.2:
+					spawn_beam_impact(hit_pos_world)
+		else:
+			beam_points_local.append(to_local(current_start_world + current_dir_world * current_length))
 		
 		var points = PackedVector2Array(beam_points_local)
 		
@@ -684,7 +706,7 @@ func shoot():
 		get_parent().add_child(bullet)
 		
 		# Position bullet at edge of shape
-		var spawn_offset = Vector2(30, 0).rotated(bullet_angle)
+		var spawn_offset = Vector2(15, 0).rotated(bullet_angle) # Reduced to 15 to prevent shooting through platforms
 		bullet.global_position = global_position + spawn_offset
 		
 		# Set bullet properties
@@ -812,9 +834,9 @@ func trigger_level_up_blast():
 	timer.timeout.connect(func(): Engine.time_scale = 1.0)
 	
 	# 2. Visual Shockwave (Scale pop)
-	var blast_visual = Polygon2D.new()
-	get_parent().add_child(blast_visual)
-	blast_visual.global_position = global_position
+	var blast_v = Polygon2D.new()
+	get_parent().add_child(blast_v)
+	blast_v.global_position = global_position
 	
 	# Dust Explosion Particles
 	var dust = CPUParticles2D.new()
@@ -838,13 +860,13 @@ func trigger_level_up_blast():
 	for i in range(32):
 		var angle = (TAU / 32) * i
 		points.append(Vector2(10, 0).rotated(angle))
-	blast_visual.polygon = points
-	blast_visual.color = Color(1.5, 1.5, 2.0, 0.8) # Bright blue-white
+	blast_v.polygon = points
+	blast_v.color = Color(1.5, 1.5, 2.0, 0.8) # Bright blue-white
 	
 	var tween = create_tween()
-	tween.tween_property(blast_visual, "scale", Vector2(60, 60), 0.5).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-	tween.parallel().tween_property(blast_visual, "modulate:a", 0.0, 0.5)
-	tween.tween_callback(blast_visual.queue_free)
+	tween.tween_property(blast_v, "scale", Vector2(60, 60), 0.5).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(blast_v, "modulate:a", 0.0, 0.5)
+	tween.tween_callback(blast_v.queue_free)
 	
 	# 3. Push back enemies
 	var enemies = get_tree().get_nodes_in_group("enemies")
@@ -1379,7 +1401,7 @@ func take_damage(_amount: float):
 	health_changed.emit(current_hearts, max_hearts)
 	
 	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("player_hit", 5.0) # Boosted volume
+		get_node("/root/AudioManager").play_sfx("player_hit", 4.0) # Reset from boost
 		
 	add_shake(60.0) # Massive hit impact
 	
@@ -1410,21 +1432,21 @@ func take_damage(_amount: float):
 
 func trigger_repulsive_pushback():
 	# Visual Shockwave
-	var blast = Polygon2D.new()
-	get_parent().add_child(blast)
-	blast.global_position = global_position
+	var repulsive_blast = Polygon2D.new()
+	get_parent().add_child(repulsive_blast)
+	repulsive_blast.global_position = global_position
 	
 	var points = PackedVector2Array()
 	for i in range(32):
 		var angle = (TAU / 32) * i
 		points.append(Vector2(10, 0).rotated(angle))
-	blast.polygon = points
-	blast.color = Color(1.0, 0.2, 0.4, 0.6) # Reddish shockwave
+	repulsive_blast.polygon = points
+	repulsive_blast.color = Color(1.0, 0.2, 0.4, 0.6) # Reddish shockwave
 	
 	var tween = create_tween()
-	tween.tween_property(blast, "scale", Vector2(25, 25), 0.4).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-	tween.parallel().tween_property(blast, "modulate:a", 0.0, 0.4)
-	tween.tween_callback(blast.queue_free)
+	tween.tween_property(repulsive_blast, "scale", Vector2(25, 25), 0.4).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(repulsive_blast, "modulate:a", 0.0, 0.4)
+	tween.tween_callback(repulsive_blast.queue_free)
 	
 	# Push back nearby enemies
 	var enemies = get_tree().get_nodes_in_group("enemies")
