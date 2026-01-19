@@ -1,0 +1,39 @@
+[gd_scene load_steps=4 format=3 uid="uid://b6b5cvp68bng7"]
+
+[ext_resource type="Script" uid="uid://cyja4a2ii2bqr" path="res://scripts/player_controller.gd" id="1_3vyb7"]
+[ext_resource type="PackedScene" uid="uid://bjumygplv6k07" path="res://scenes/bullet.tscn" id="2_g2els"]
+
+[sub_resource type="Gradient" id="Gradient_g2els"]
+offsets = PackedFloat32Array(0, 0.5958904, 1)
+colors = PackedColorArray(6.256998e-07, 0.38620812, 0.5873103, 1, 0.09589098, 0.44506487, 0.62688327, 0.93231267, 1, 1, 1, 0.29411766)
+
+[node name="CharacterBody2D" type="CharacterBody2D" groups=["player"]]
+collision_mask = 5
+script = ExtResource("1_3vyb7")
+bullet_scene = ExtResource("2_g2els")
+
+[node name="ShapeSprite" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(20, 0, 14, 14, 0, 20, -14, 14, -20, 0, -14, -14, 0, -20, 14, -14)
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="."]
+polygon = PackedVector2Array(20, 0, 14, 14, 0, 20, -14, 14, -20, 0, -14, -14, 0, -20, 14, -14)
+
+[node name="Area2D" type="Area2D" parent="."]
+collision_mask = 5
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Area2D"]
+polygon = PackedVector2Array(20, 0, 14, 14, 0, 20, -14, 14, -20, 0, -14, -14, 0, -20, 14, -14)
+
+[node name="Camera2D" type="Camera2D" parent="."]
+zoom = Vector2(-0.53, -0.53)
+position_smoothing_enabled = true
+rotation_smoothing_enabled = true
+
+[node name="DashParticles" type="CPUParticles2D" parent="."]
+emitting = false
+amount = 50
+lifetime = 0.3
+gravity = Vector2(0, 0)
+scale_amount_min = 4.0
+scale_amount_max = 4.0
+color_ramp = SubResource("Gradient_g2els")

@@ -1,0 +1,25 @@
+[gd_scene load_steps=8 format=3 uid="uid://f2ddmfkkhhru"]
+
+[ext_resource type="PackedScene" uid="uid://b6b5cvp68bng7" path="res://scenes/player.tscn" id="1_uwrxv"]
+[ext_resource type="Script" uid="uid://b5rlodbs4ga30" path="res://scripts/spawner.gd" id="2_lnu2h"]
+[ext_resource type="PackedScene" uid="uid://kqqwyvtt77ry" path="res://scenes/enemy.tscn" id="2_yqjtg"]
+[ext_resource type="PackedScene" uid="uid://dq6u3o4hdr0rx" path="res://scenes/upgrade_ui.tscn" id="4_lbhrr"]
+[ext_resource type="PackedScene" uid="uid://i0kn8jpr7ati" path="res://scenes/enemy_shooter.tscn" id="4_p57ef"]
+[ext_resource type="PackedScene" uid="uid://bfq122qkhqsi6" path="res://scenes/hud.tscn" id="5_iywne"]
+
+[sub_resource type="Environment" id="Environment_mwb40"]
+
+[node name="GameScene" type="Node2D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_mwb40")
+
+[node name="CharacterBody2D" parent="." instance=ExtResource("1_uwrxv")]
+
+[node name="Spawner" type="Node2D" parent="."]
+script = ExtResource("2_lnu2h")
+enemy_types = Array[PackedScene]([ExtResource("2_yqjtg"), ExtResource("4_p57ef")])
+
+[node name="UpgradeUI" parent="." instance=ExtResource("4_lbhrr")]
+
+[node name="HUD" parent="UpgradeUI" instance=ExtResource("5_iywne")]
