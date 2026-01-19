@@ -17,6 +17,16 @@ mono_crash.*.json
 
 # Build ignores
 build/
+Build/
+bin/
+Bin/
+*.exe
+*.zip
+*.7z
+*.pck
+*.apk
+*.ipa
+*.app
 
 # Temporary files
 *.tmp
