@@ -5,6 +5,7 @@ extends CharacterBody2D
 @export var max_health: float = 12000.0
 @export var damage: float = 20.0
 @export var xp_value: int = 500
+@export var shard_reward: int = 150 # Large shard reward for boss
 
 var player: Node2D = null
 var is_dying: bool = false
@@ -267,23 +268,85 @@ func take_damage(amount: float):
 	t.tween_property(poly, "modulate", Color(2.0, 0.2, 0.2, 1.0), 0.1)
 	
 	if health <= 0:
-		die()
+		start_death_sequence()
 
-func die():
+func start_death_sequence():
 	if is_dying: return
 	is_dying = true
 	
+	# 1. Stop all attacks and movement
+	fire_timer = 9999.0
+	spawn_timer = 9999.0
+	pillar_spawn_timer = 9999.0
+	
+	# 2. Clear all other enemies and enemy bullets
+	var enemies = get_tree().get_nodes_in_group("enemies")
+	for enemy in enemies:
+		if enemy != self and is_instance_valid(enemy):
+			if enemy.has_method("spawn_death_particles"):
+				enemy.spawn_death_particles()
+			enemy.queue_free()
+			
+	var bullets = get_tree().get_nodes_in_group("enemy_bullets")
+	for b in bullets:
+		if is_instance_valid(b):
+			b.queue_free()
+			
+	# 3. Dramatic visual sequence
+	# Muffle music/SFX for impact
 	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("enemy_death", 5.0, 0.5, 0.8, 1.0)
+		get_node("/root/AudioManager").set_muffled(true)
+		get_node("/root/AudioManager").play_sfx("boss_spawn", 1.5, 0.5) # Low pitch boom
+	
+	var t = create_tween()
+	# Series of violent shakes and flashes
+	for i in range(12):
+		var pos_offset = Vector2(randf_range(-40, 40), randf_range(-40, 40))
+		t.tween_callback(func(): 
+			spawn_small_explosion(global_position + pos_offset)
+			if player: player.add_shake(8.0)
+			poly.modulate = Color(10, 10, 10, 1) # Pure white flash
+		)
+		t.tween_interval(0.1)
+		t.tween_property(poly, "modulate", Color(2.0, 0.2, 0.2, 1.0), 0.05)
+	
+	# 4. Final massive explosion and reward
+	t.tween_callback(die)
+
+func spawn_small_explosion(pos: Vector2):
+	var p = CPUParticles2D.new()
+	get_parent().add_child(p)
+	p.global_position = pos
+	p.amount = 20
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.spread = 180.0
+	p.gravity = Vector2.ZERO
+	p.initial_velocity_min = 100.0
+	p.initial_velocity_max = 200.0
+	p.scale_amount_min = 2.0
+	p.scale_amount_max = 5.0
+	p.color = Color(1.0, 0.5, 0.0) # Orange/Fire
+	p.emitting = true
+	get_tree().create_timer(1.0).timeout.connect(p.queue_free)
+	
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("enemy_death", -5.0, 1.5, 2.0)
+
+func die():
+	# Final cleanup and rewards
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").set_muffled(false)
+		get_node("/root/AudioManager").play_sfx("enemy_death", 10.0, 0.3, 0.6)
 	
 	# Screen shake
 	if player and player.has_method("add_shake"):
-		player.add_shake(20.0)
+		player.add_shake(30.0)
 	
 	# Big explosion particles
 	spawn_death_particles()
 	
-	# Massive XP
+	# Rewards
 	if player and player.has_method("add_xp"):
 		player.add_xp(xp_value)
 		
@@ -291,7 +354,9 @@ func die():
 		var gd = get_node("/root/GlobalData")
 		gd.total_kills += 1
 		gd.run_kills += 1
-		gd.add_score(xp_value * 10, player.combo_count if player else 0)
+		gd.add_score(xp_value * 20, player.combo_count if player else 0)
+		gd.add_shards(shard_reward) # AWARD SHARDS
+		gd.save_game()
 		
 	# REMOVE ARENA BARRIER AND HEARTS
 	if is_instance_valid(arena_barrier):

@@ -3,6 +3,7 @@ extends CharacterBody2D
 @export var health: float = 30000.0
 @export var max_health: float = 30000.0
 @export var xp_value: int = 1500
+@export var shard_reward: int = 300 # Even larger reward for second boss
 
 var player: Node2D = null
 var is_dying: bool = false
@@ -232,12 +233,85 @@ func take_damage(amount: float):
 			get_node("/root/AudioManager").play_sfx("boss_spawn", 1.5)
 	
 	if health <= 0:
-		die()
+		start_death_sequence()
 
-func die():
+func start_death_sequence():
 	if is_dying: return
 	is_dying = true
 	
+	# 1. Stop all attacks and movement
+	lasers_active = false
+	for l in laser_nodes:
+		l.visible = false
+	spawn_timer = 9999.0
+	
+	# 2. Clear all other enemies and enemy bullets
+	var enemies = get_tree().get_nodes_in_group("enemies")
+	for enemy in enemies:
+		if enemy != self and is_instance_valid(enemy):
+			if enemy.has_method("spawn_death_particles"):
+				enemy.spawn_death_particles()
+			enemy.queue_free()
+			
+	var bullets = get_tree().get_nodes_in_group("enemy_bullets")
+	for b in bullets:
+		if is_instance_valid(b):
+			b.queue_free()
+			
+	# 3. Dramatic visual sequence
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").set_muffled(true)
+		get_node("/root/AudioManager").play_sfx("boss_spawn", 2.0, 0.4) # Very deep boom
+	
+	var t = create_tween()
+	# Series of violent shakes and flashes (More intense for Pulsar)
+	for i in range(16):
+		var pos_offset = Vector2(randf_range(-60, 60), randf_range(-60, 60))
+		t.tween_callback(func(): 
+			spawn_small_explosion(global_position + pos_offset)
+			if player: player.add_shake(12.0)
+			poly.modulate = Color(15, 15, 15, 1) # Super white flash
+		)
+		t.tween_interval(0.08)
+		t.tween_property(poly, "modulate", Color(0, 1.5, 2.0, 1.0), 0.04)
+	
+	# 4. Final massive explosion and reward
+	t.tween_callback(die)
+
+func spawn_small_explosion(pos: Vector2):
+	var p = CPUParticles2D.new()
+	get_parent().add_child(p)
+	p.global_position = pos
+	p.amount = 25
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.spread = 180.0
+	p.gravity = Vector2.ZERO
+	p.initial_velocity_min = 150.0
+	p.initial_velocity_max = 300.0
+	p.scale_amount_min = 3.0
+	p.scale_amount_max = 7.0
+	p.color = Color(0.0, 1.0, 1.0) # Cyan Fire for Pulsar
+	p.emitting = true
+	get_tree().create_timer(1.0).timeout.connect(p.queue_free)
+	
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("enemy_death", -2.0, 1.2, 1.8)
+
+func die():
+	# Final cleanup and rewards
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").set_muffled(false)
+		get_node("/root/AudioManager").play_sfx("enemy_death", 15.0, 0.2, 0.5)
+	
+	# Screen shake
+	if player and player.has_method("add_shake"):
+		player.add_shake(45.0)
+	
+	# Big explosion particles
+	spawn_death_particles()
+	
+	# Rewards
 	if player:
 		player.dash_nerf_active = false
 		if player.has_method("add_xp"):
@@ -247,7 +321,9 @@ func die():
 		var gd = get_node("/root/GlobalData")
 		gd.total_kills += 1
 		gd.run_kills += 1
-		gd.add_score(xp_value * 10, player.combo_count if player else 0)
+		gd.add_score(xp_value * 30, player.combo_count if player else 0)
+		gd.add_shards(shard_reward) # AWARD SHARDS
+		gd.save_game()
 	
 	if is_instance_valid(arena_barrier):
 		arena_barrier.queue_free()
@@ -258,3 +334,20 @@ func die():
 			h.queue_free()
 			
 	queue_free()
+
+func spawn_death_particles():
+	var p = CPUParticles2D.new()
+	get_parent().add_child(p)
+	p.global_position = global_position
+	p.amount = 100
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.spread = 180.0
+	p.gravity = Vector2.ZERO
+	p.initial_velocity_min = 300.0
+	p.initial_velocity_max = 800.0
+	p.scale_amount_min = 5.0
+	p.scale_amount_max = 15.0
+	p.color = Color(0.0, 1.0, 1.0)
+	p.emitting = true
+	get_tree().create_timer(2.0).timeout.connect(p.queue_free)
