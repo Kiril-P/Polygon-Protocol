@@ -42,16 +42,17 @@ func _on_SavePlayerData_request_completed(result, response_code, headers, body) 
 	if is_instance_valid(SavePlayerData): 
 		SilentWolf.free_request(wrSavePlayerData, SavePlayerData)
 	
+	var sw_result: Dictionary = { "success": false, "error": "No connection" }
 	if status_check:
 		var json_body = JSON.parse_string(body.get_string_from_utf8())
-		var sw_result: Dictionary = SilentWolf.build_result(json_body)
+		sw_result = SilentWolf.build_result(json_body)
 		if json_body.success:
 			SWLogger.info("SilentWolf save player data success for player: " + str(json_body.player_name))
 			var player_name = json_body.player_name
 			#sw_result["player_name"] = player_name 
 		else:
 			SWLogger.error("SilentWolf save player data failure: " + str(json_body.error))
-		sw_save_player_data_complete.emit(sw_result) 
+	sw_save_player_data_complete.emit(sw_result) 
 
 
 func get_player_data(player_name: String) -> Node:
@@ -73,9 +74,10 @@ func _on_GetPlayerData_request_completed(result, response_code, headers, body) -
 	if is_instance_valid(GetPlayerData): 
 		SilentWolf.free_request(wrGetPlayerData, GetPlayerData)
 	
+	var sw_result: Dictionary = { "success": false, "error": "No connection" }
 	if status_check:
 		var json_body = JSON.parse_string(body.get_string_from_utf8())
-		var sw_result: Dictionary = SilentWolf.build_result(json_body)
+		sw_result = SilentWolf.build_result(json_body)
 		if json_body.success:
 			SWLogger.info("SilentWolf get player data success for player: " + str(json_body.player_name))
 			player_name = json_body.player_name
@@ -84,7 +86,7 @@ func _on_GetPlayerData_request_completed(result, response_code, headers, body) -
 			sw_result["player_data"] = player_data
 		else:
 			SWLogger.error("SilentWolf get player data failure: " + str(json_body.error))
-		sw_get_player_data_complete.emit(sw_result)
+	sw_get_player_data_complete.emit(sw_result)
 
 
 func delete_player_weapons(player_name: String) -> void:
@@ -124,9 +126,10 @@ func _on_DeletePlayerData_request_completed(result, response_code, headers, body
 	if is_instance_valid(DeletePlayerData): 
 		DeletePlayerData.queue_free()
 	
+	var sw_result: Dictionary = { "success": false, "error": "No connection" }
 	if status_check:
 		var json_body = JSON.parse_string(body.get_string_from_utf8())
-		var sw_result: Dictionary = SilentWolf.build_result(json_body)
+		sw_result = SilentWolf.build_result(json_body)
 		if json_body.success:
 			SWLogger.info("SilentWolf delete player data success for player: " + str(json_body.player_name))
 			var player_name = json_body.player_name
@@ -136,7 +139,7 @@ func _on_DeletePlayerData_request_completed(result, response_code, headers, body
 			sw_result["player_data"] = player_data
 		else:
 			SWLogger.error("SilentWolf delete player data failure: " + str(json_body.error))
-		sw_delete_player_data_complete.emit(sw_result)
+	sw_delete_player_data_complete.emit(sw_result)
 
 
 func get_stats() -> Dictionary:

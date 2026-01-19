@@ -80,6 +80,8 @@ var upgrade_pool = [
 ]
 
 var applied_special_upgrades = []
+var level_up_pending: int = 0
+var is_ui_active: bool = false
 
 func get_random_upgrades(count: int = 3) -> Array:
 	var player = get_tree().get_first_node_in_group("player")
@@ -112,6 +114,19 @@ func _ready():
 		player.level_up_ready.connect(_on_player_level_up)
 
 func _on_player_level_up():
+	level_up_pending += 1
+	if is_ui_active:
+		return
+		
+	show_next_upgrade()
+
+func show_next_upgrade():
+	if level_up_pending <= 0:
+		is_ui_active = false
+		get_tree().paused = false
+		return
+		
+	is_ui_active = true
 	var options = get_random_upgrades(3)
 	# Pause the game and show UI
 	get_tree().paused = true
@@ -126,5 +141,11 @@ func apply_upgrade(upgrade_data: Dictionary):
 		if upgrade_data.get("is_special", false):
 			applied_special_upgrades.append(upgrade_data["id"])
 	
-	# Resume the game
-	get_tree().paused = false
+	level_up_pending -= 1
+	if level_up_pending > 0:
+		# Show next upgrade immediately
+		show_next_upgrade()
+	else:
+		# Resume the game
+		is_ui_active = false
+		get_tree().paused = false

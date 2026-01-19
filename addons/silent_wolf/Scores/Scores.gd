@@ -104,15 +104,16 @@ func _on_SaveScore_request_completed(result, response_code, headers, body) -> vo
 	var status_check = SWUtils.check_http_response(response_code, headers, body)
 	SilentWolf.free_request(wrSaveScore, SaveScore)
 	
+	var sw_result: Dictionary = { "success": false, "error": "No connection" }
 	if status_check:
 		var json_body = JSON.parse_string(body.get_string_from_utf8())
-		var sw_result: Dictionary = SilentWolf.build_result(json_body)
+		sw_result = SilentWolf.build_result(json_body)
 		if json_body.success:
 			SWLogger.info("SilentWolf save score success.")
 			sw_result["score_id"] = json_body.score_id
 		else:
 			SWLogger.error("SilentWolf save score failure: " + str(json_body.error))
-		sw_save_score_complete.emit(sw_result)
+	sw_save_score_complete.emit(sw_result)
 
 
 func get_scores(maximum: int=10, ldboard_name: String="main", period_offset: int=0) -> Node:
@@ -132,9 +133,10 @@ func _on_GetScores_request_completed(result, response_code, headers, body) -> vo
 	var status_check = SWUtils.check_http_response(response_code, headers, body)
 	SilentWolf.free_request(wrGetScores, GetScores)
 	
+	var sw_result: Dictionary = { "success": false, "error": "No connection" }
 	if status_check:
 		var json_body = JSON.parse_string(body.get_string_from_utf8())
-		var sw_result: Dictionary = SilentWolf.build_result(json_body)
+		sw_result = SilentWolf.build_result(json_body)
 		if json_body.success:
 			SWLogger.info("SilentWolf get scores success, found " + str(json_body.top_scores.size()) + " scores.")
 			scores = translate_score_fields_in_array(json_body.top_scores)
@@ -151,7 +153,7 @@ func _on_GetScores_request_completed(result, response_code, headers, body) -> vo
 			sw_result["ld_name"] = ld_name
 		else:
 			SWLogger.error("SilentWolf get scores failure: " + str(json_body.error))
-		sw_get_scores_complete.emit(sw_result)
+	sw_get_scores_complete.emit(sw_result)
 
 
 func get_scores_by_player(player_name: String, maximum: int=10, ldboard_name: String="main", period_offset: int=0) -> Node:
@@ -174,9 +176,10 @@ func _on_GetScoresByPlayer_request_completed(result, response_code, headers, bod
 	var status_check = SWUtils.check_http_response(response_code, headers, body)
 	SilentWolf.free_request(wrScoresByPlayer, ScoresByPlayer)
 	
+	var sw_result: Dictionary = { "success": false, "error": "No connection" }
 	if status_check:
 		var json_body = JSON.parse_string(body.get_string_from_utf8())
-		var sw_result: Dictionary = SilentWolf.build_result(json_body)
+		sw_result = SilentWolf.build_result(json_body)
 		if json_body.success:
 			SWLogger.info("SilentWolf get scores by player success, found " + str(json_body.top_scores.size()) + " scores.")
 			player_scores = translate_score_fields_in_array(json_body.top_scores)
@@ -187,7 +190,7 @@ func _on_GetScoresByPlayer_request_completed(result, response_code, headers, bod
 			sw_result["scores"] = player_scores
 		else:
 			SWLogger.error("SilentWolf get scores by player failure: " + str(json_body.error))
-		sw_get_player_scores_complete.emit(sw_result)	
+	sw_get_player_scores_complete.emit(sw_result)	
 
 
 func get_top_score_by_player(player_name: String, maximum: int=10, ldboard_name: String="main", period_offset: int=0) -> Node:
@@ -210,9 +213,10 @@ func _on_GetTopScoreByPlayer_request_completed(result, response_code, headers, b
 	var status_check = SWUtils.check_http_response(response_code, headers, body)
 	SilentWolf.free_request(wrTopScoreByPlayer, TopScoreByPlayer)
 	
+	var sw_result: Dictionary = { "success": false, "error": "No connection" }
 	if status_check:
 		var json_body = JSON.parse_string(body.get_string_from_utf8())
-		var sw_result: Dictionary = SilentWolf.build_result(json_body)
+		sw_result = SilentWolf.build_result(json_body)
 		if json_body.success:
 			SWLogger.info("SilentWolf get top score by player success, found top score? " + str(!json_body.top_score.is_empty()))
 			if !json_body.top_score.is_empty():
@@ -224,7 +228,7 @@ func _on_GetTopScoreByPlayer_request_completed(result, response_code, headers, b
 				sw_result["top_score"] = player_top_score
 		else:
 			SWLogger.error("SilentWolf get top score by player failure: " + str(json_body.error))
-		sw_top_player_score_complete.emit(sw_result)	
+	sw_top_player_score_complete.emit(sw_result)	
 
 
 # The score attribute could be either a score_value (int) or score_id (Sstring)
@@ -255,15 +259,16 @@ func _on_GetScorePosition_request_completed(result, response_code, headers, body
 	var status_check = SWUtils.check_http_response(response_code, headers, body)
 	SilentWolf.free_request(wrScorePosition, ScorePosition)
 	
+	var sw_result: Dictionary = { "success": false, "error": "No connection" }
 	if status_check:
 		var json_body = JSON.parse_string(body.get_string_from_utf8())
-		var sw_result: Dictionary = SilentWolf.build_result(json_body)
+		sw_result = SilentWolf.build_result(json_body)
 		if json_body.success:
 			SWLogger.info("SilentWolf get score position success: " + str(json_body.position))
 			sw_result["position"] =  int(json_body.position)
 		else:
 			SWLogger.error("SilentWolf get score position failure: " + str(json_body.error))
-		sw_get_position_complete.emit(sw_result)
+	sw_get_position_complete.emit(sw_result)
 
 
 # The score attribute couldd be either a score_value (int) or score_id (Sstring)
@@ -293,9 +298,10 @@ func _on_ScoresAround_request_completed(result, response_code, headers, body) ->
 	
 	SilentWolf.free_request(wrScoresAround, ScoresAround)
 	
+	var sw_result: Dictionary = { "success": false, "error": "No connection" }
 	if status_check:
 		var json_body = JSON.parse_string(body.get_string_from_utf8())
-		var sw_result: Dictionary = SilentWolf.build_result(json_body)
+		sw_result = SilentWolf.build_result(json_body)
 		if json_body.success:
 			SWLogger.info("SilentWolf get scores around success.")
 			sw_result["scores_above"] = translate_score_fields_in_array(json_body.scores_above)
@@ -304,7 +310,7 @@ func _on_ScoresAround_request_completed(result, response_code, headers, body) ->
 				sw_result["position"] = json_body.score_position
 		else:
 			SWLogger.error("SilentWolf get scores around failure: " + str(json_body.error))
-		sw_get_scores_around_complete.emit(sw_result)
+	sw_get_scores_around_complete.emit(sw_result)
 
 
 
@@ -323,14 +329,15 @@ func _on_DeleteScore_request_completed(result, response_code, headers, body) -> 
 	var status_check = SWUtils.check_http_response(response_code, headers, body)
 	SilentWolf.free_request(wrDeleteScore, DeleteScore)
 	
+	var sw_result: Dictionary = { "success": false, "error": "No connection" }
 	if status_check:
 		var json_body = JSON.parse_string(body.get_string_from_utf8())
-		var sw_result: Dictionary = SilentWolf.build_result(json_body)
+		sw_result = SilentWolf.build_result(json_body)
 		if json_body.success:
 			SWLogger.info("SilentWolf delete score success")
 		else:
 			SWLogger.error("SilentWolf delete score failure: " + str(json_body.error))
-		sw_delete_score_complete.emit(sw_result)
+	sw_delete_score_complete.emit(sw_result)
 
 
 # Deletes all your scores for your game
@@ -351,14 +358,15 @@ func _on_WipeLeaderboard_request_completed(result, response_code, headers, body)
 	var status_check = SWUtils.check_http_response(response_code, headers, body)
 	SilentWolf.free_request(wrWipeLeaderboard, WipeLeaderboard)
 	
+	var sw_result: Dictionary = { "success": false, "error": "No connection" }
 	if status_check:
 		var json_body = JSON.parse_string(body.get_string_from_utf8())
-		var sw_result: Dictionary = SilentWolf.build_result(json_body)
+		sw_result = SilentWolf.build_result(json_body)
 		if json_body.success:
 			SWLogger.info("SilentWolf wipe leaderboard success.")
 		else:
 			SWLogger.error("SilentWolf wipe leaderboard failure: " + str(json_body.error))
-		sw_wipe_leaderboard_complete.emit(sw_result)
+	sw_wipe_leaderboard_complete.emit(sw_result)
 
 
 func add_to_local_scores(game_result: Dictionary, ld_name: String="main") -> void:

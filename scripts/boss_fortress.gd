@@ -175,8 +175,9 @@ func spawn_pillar():
 	var start_angle = randf() * TAU
 	for i in range(3):
 		var angle = start_angle + (TAU / 3.0) * i
-	# Position slightly inside the border (150px in to ensure they are well within arena)
-		var pos = global_position + Vector2(border_radius - 150.0, 0).rotated(angle)
+		# Random distance between 40% and 90% of border radius (closer to boss than before)
+		var dist = randf_range(border_radius * 0.4, border_radius - 150.0)
+		var pos = global_position + Vector2(dist, 0).rotated(angle)
 		
 		var pillar_script = load("res://scripts/boss_pillar.gd")
 		var heart = Area2D.new()

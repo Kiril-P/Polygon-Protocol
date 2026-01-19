@@ -22,7 +22,7 @@ func show_dash_nerf_warning():
 		t.tween_interval(2.0)
 		t.tween_property(warn, "modulate:a", 0.0, 0.3)
 		t.tween_callback(func(): 
-			warn.text = "ELIMINATE THE CORE"
+			warn.text = "DESTROY HIS HEARTS TO DEAL MASSIVE DAMAGE"
 			warn.modulate.a = 0
 		)
 		t.tween_property(warn, "modulate:a", 1.0, 0.3)

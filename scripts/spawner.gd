@@ -28,8 +28,8 @@ func _process(delta: float):
 	if not tutorial_finished:
 		return
 		
-	# BOSS MILESTONES: Pause timer at 60s and 120s
-	var milestone_times = [60, 120]
+	# BOSS MILESTONES: Pause timer at 80s (1:20) and 180s (3:00)
+	var milestone_times = [80, 180]
 	for m in milestone_times:
 		# Show warning 10 seconds before (Trigger only once)
 		if int(time_passed) == m - 10 and not bosses_spawned.has(m):
@@ -143,33 +143,33 @@ func spawn_enemy():
 	var available_indices = []
 	
 	# 0: Chaser, 1: Fairy, 2: Shooter, 3: Spinner, 4: Tank, 5: Zigzagger, 6: Kamikaze
-	if time_passed < 50: # Phase 1: Early Game Stagger (Extended to 50s)
+	if time_passed < 80: # Phase 1: Early Game Stagger (Extended to 80s)
 		available_indices.append_array([0, 0, 0, 1, 1, 6]) # Triple weight for chasers
-		if time_passed >= 40:
-			available_indices.append(5) # Zigzaggers at 40s
+		if time_passed >= 50:
+			available_indices.append(5) # Zigzaggers at 50s
 			
-	elif time_passed < 130: # Phase 2: Mid Game Stagger (Extended to 130s)
+	elif time_passed < 180: # Phase 2: Mid Game Stagger (Extended to 180s)
 		# Fodder base
 		available_indices.append_array([0, 0, 0, 0, 1, 1, 1, 6, 6, 6]) 
 		available_indices.append(5) # Zigzaggers
 		
 		# Heavies (Much rarer)
-		if time_passed >= 55:
+		if time_passed >= 90:
 			available_indices.append(2) # Spinners
-		if time_passed >= 75:
+		if time_passed >= 110:
 			# Reduced tanks further
 			pass 
-		if time_passed >= 90:
+		if time_passed >= 140:
 			available_indices.append(3) # Shooters
-	else: # Phase 3: Total Chaos (130s+)
+	else: # Phase 3: Total Chaos (180s+)
 		# Heavy weight on fodder to prevent tank overcrowding
 		# 0: Chaser(x5), 1: Fairy(x4), 6: Kamikaze(x4), 5: Zigzagger(x2), 2: Shooter(x1), 3: Spinner(x1), 4: Tank(x0.5)
 		available_indices = [0, 0, 0, 0, 0, 1, 1, 1, 1, 6, 6, 6, 6, 5, 5, 2, 3, 4]
 	
 	var index = available_indices[randi() % available_indices.size()]
 	
-	# BOSS SPAWN: Every 3 minutes (180s), spawn a giant tank
-	if int(time_passed) % 180 == 0 and int(time_passed) > 0:
+	# MINI-BOSS SPAWN: Every 2 minutes (120s), spawn a giant tank
+	if int(time_passed) % 120 == 0 and int(time_passed) > 0:
 		# Just spawn an extra tank for now but make it bigger
 		index = 4 
 		if has_node("/root/AudioManager"):
@@ -203,8 +203,8 @@ func spawn_enemy():
 	# SET POSITION BEFORE ADD_CHILD
 	enemy.global_position = spawn_pos
 	
-	# BOSS SCALING: If this is a boss (giant tank), scale it up
-	if int(time_passed) % 180 == 0 and int(time_passed) > 0 and enemy.is_in_group("enemies"):
+	# BOSS SCALING: If this is a mini-boss (giant tank), scale it up
+	if int(time_passed) % 120 == 0 and int(time_passed) > 0 and enemy.is_in_group("enemies"):
 		enemy.scale = Vector2(4.0, 4.0)
 		if "health" in enemy: enemy.health *= 10.0
 		if "xp_value" in enemy: enemy.xp_value *= 50
@@ -253,7 +253,7 @@ func spawn_major_boss(milestone: int):
 			get_node("/root/AudioManager").set_boss_music_mode(false)
 	)
 	
-	if milestone == 120:
+	if milestone == 180:
 		boss.set_script(load("res://scripts/boss_pulsar.gd"))
 	else:
 		boss.set_script(load("res://scripts/boss_fortress.gd"))

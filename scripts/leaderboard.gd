@@ -131,41 +131,55 @@ func refresh_leaderboard():
 			var sw_result = await get_node("/root/SilentWolf").Scores.get_scores(10).sw_get_scores_complete
 			load_label.queue_free()
 			
-			var scores = sw_result.scores
-			if scores.size() == 0:
-				var empty_label = Label.new()
-				empty_label.text = "NO GLOBAL DATA FOUND"
-				empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				leaderboard_container.add_child(empty_label)
+			if sw_result.success:
+				var scores = sw_result.scores
+				if scores.size() == 0:
+					var empty_label = Label.new()
+					empty_label.text = "NO GLOBAL DATA FOUND"
+					empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+					leaderboard_container.add_child(empty_label)
+				else:
+					var rank = 1
+					for score_entry in scores:
+						var meta = score_entry.get("metadata", {})
+						var e_kills = str(meta.get("kills", "0"))
+						var e_level = str(meta.get("level", "0"))
+						var e_time_raw = float(meta.get("time", 0.0))
+						var e_time_str = "%d:%02d" % [int(e_time_raw / 60), int(e_time_raw) % 60]
+						
+						var is_local = false
+						var p_name = score_entry.get("player_name", "UNKNOWN")
+						if gd.player_id != "" and p_name == gd.player_name:
+							is_local = true
+						
+						create_entry(str(rank), p_name, str(int(score_entry.get("score", 0))), e_kills, e_level, e_time_str, false, is_local)
+						rank += 1
 			else:
-				var rank = 1
-				for score_entry in scores:
-					var meta = score_entry.get("metadata", {})
-					var e_kills = str(meta.get("kills", "0"))
-					var e_level = str(meta.get("level", "0"))
-					var e_time_raw = float(meta.get("time", 0.0))
-					var e_time_str = "%d:%02d" % [int(e_time_raw / 60), int(e_time_raw) % 60]
-					
-					var is_local = false
-					var p_name = score_entry.get("player_name", "UNKNOWN")
-					if gd.player_id != "" and p_name == gd.player_name:
-						is_local = true
-					
-					create_entry(str(rank), p_name, str(int(score_entry.get("score", 0))), e_kills, e_level, e_time_str, false, is_local)
-					rank += 1
+				# Request failed (e.g. no connection)
+				var error_label = Label.new()
+				error_label.text = "COULD NOT CONNECT TO ONLINE SERVICES - SHOWING LOCAL DATA"
+				error_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				error_label.modulate = Color(1.0, 0.5, 0.5)
+				leaderboard_container.add_child(error_label)
+				
+				# Fallback to local
+				show_local_leaderboard(gd)
 		else:
 			load_label.text = "ONLINE SERVICES UNAVAILABLE - SHOWING LOCAL DATA"
 			# Fallback to local
-			var entries = gd.leaderboard.duplicate()
-			entries.sort_custom(func(a, b): return a["score"] > b["score"])
-			var rank = 1
-			for entry in entries:
-				var e_time = entry.get("time", 0.0)
-				var e_time_str = "%d:%02d" % [int(e_time / 60), int(e_time) % 60]
-				create_entry(str(rank), entry["name"], str(entry["score"]), str(entry["kills"]), str(entry["level"]), e_time_str, false, entry.get("id") == gd.player_id)
-				rank += 1
+			show_local_leaderboard(gd)
 	
 	is_loading = false
+
+func show_local_leaderboard(gd):
+	var entries = gd.leaderboard.duplicate()
+	entries.sort_custom(func(a, b): return a["score"] > b["score"])
+	var rank = 1
+	for entry in entries:
+		var e_time = entry.get("time", 0.0)
+		var e_time_str = "%d:%02d" % [int(e_time / 60), int(e_time) % 60]
+		create_entry(str(rank), entry["name"], str(entry["score"]), str(entry["kills"]), str(entry["level"]), e_time_str, false, entry.get("id") == gd.player_id)
+		rank += 1
 
 func create_entry(rank, p_name, score, kills, level, time_val, is_header = false, is_local = false):
 	var h_box = HBoxContainer.new()
@@ -212,7 +226,11 @@ func _on_save_pressed():
 				"player_id": gd.player_id # Help identify unique users
 			}
 			# Note: SilentWolf uses 'main' leaderboard by default
-			await get_node("/root/SilentWolf").Scores.save_score(name_text, gd.high_score_points, "main", metadata).sw_save_score_complete
+			var sw_result = await get_node("/root/SilentWolf").Scores.save_score(name_text, gd.high_score_points, "main", metadata).sw_save_score_complete
+			if not sw_result.success:
+				save_button.text = "UPLOAD FAILED - RETRY?"
+				save_button.disabled = false
+				return
 		
 		save_button.disabled = false
 		save_button.text = "SAVE SCORE"

@@ -49,6 +49,7 @@ var current_rotation: float = 0.0
 var combo_count: int = 0
 var combo_timer: float = 0.0
 var highest_combo_run: int = 0
+var is_dead: bool = false
 var combo_speed_boost: float = 0.0
 const COMBO_MAX_TIME: float = 1.4 # Reduced from 1.8 to make it even harder
 
@@ -708,6 +709,10 @@ func add_shake(intensity: float):
 	shake_intensity = intensity
 
 func toggle_pause():
+	# NEVER allow pausing or unpausing if the player is dead
+	if is_dead:
+		return
+		
 	# NEVER allow unpausing if the Upgrade UI is open
 	var upgrade_ui = get_tree().get_first_node_in_group("upgrade_ui")
 	if upgrade_ui and upgrade_ui.visible:
@@ -1189,6 +1194,9 @@ func update_health_visuals():
 		sprite.modulate.a = 1.0
 
 func die():
+	if is_dead: return
+	is_dead = true
+	
 	# Reset time scale in case we died during hitstop
 	Engine.time_scale = 1.0
 	

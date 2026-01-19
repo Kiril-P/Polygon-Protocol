@@ -21,9 +21,17 @@ func setup_visuals():
 		Vector2(15, -10), Vector2(15, 0)
 	])
 	poly.polygon = pts
-	poly.color = Color(1, 0.2, 0.6) # Neon Pink/Heart
-	poly.modulate = Color(2.5, 1.5, 1.5, 1) # Extra Glow
+	poly.color = Color(1.0, 0.9, 0.0) # Bright Yellow/Gold
+	poly.modulate = Color(2.5, 2.5, 0.5, 1) # Intense Glow
 	add_child(poly)
+	
+	# Add an outline to make it pop even more
+	var outline = Line2D.new()
+	outline.points = pts
+	outline.add_point(pts[0]) # Close the loop
+	outline.width = 2.0
+	outline.default_color = Color.BLACK
+	poly.add_child(outline)
 	
 	# Add a collision shape
 	var shape = CollisionShape2D.new()
@@ -89,6 +97,6 @@ func spawn_particles():
 	p.initial_velocity_max = 300.0
 	p.scale_amount_min = 3.0
 	p.scale_amount_max = 6.0
-	p.color = Color(1, 0.2, 0.6)
+	p.color = Color(1.0, 0.9, 0.0) # Match heart color (Yellow/Gold)
 	p.emitting = true
 	get_tree().create_timer(1.0).timeout.connect(p.queue_free)
