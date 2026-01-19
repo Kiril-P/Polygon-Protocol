@@ -73,13 +73,13 @@ func style_menu_button(btn: Button, is_special: bool):
 	hover.shadow_color = Color(0.0, 1.0, 1.0, 0.2) if not is_special else Color(1.0, 0.8, 0.0, 0.2)
 	hover.shadow_size = 8
 	
-	var pressed = hover.duplicate()
-	pressed.bg_color = Color(0.3, 0.1, 0.4, 0.9)
-	pressed.border_color = Color(1.0, 0.0, 1.0, 1.0)
+	var style_pressed = hover.duplicate()
+	style_pressed.bg_color = Color(0.3, 0.1, 0.4, 0.9)
+	style_pressed.border_color = Color(1.0, 0.0, 1.0, 1.0)
 	
 	btn.add_theme_stylebox_override("normal", normal)
 	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_stylebox_override("pressed", style_pressed)
 	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 
 func _on_mouse_entered():

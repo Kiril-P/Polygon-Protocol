@@ -14,10 +14,10 @@ var fire_timer: float = 0.0
 var pillar_spawn_timer: float = 5.0 # Increased initial delay
 var border_radius: float = 1200.0
 var arena_barrier: StaticBody2D = null
+var heart_color: Color = Color(1.0, 0.2, 0.4) # Fortress hearts: Pink/Red
 
 # Enemy variety
 var spawn_timer: float = 2.0
-var kamikaze_scene = load("res://scenes/enemy_kamikaze.tscn")
 var chaser_scene = load("res://scenes/enemy.tscn")
 var shooter_scene = load("res://scenes/enemy_shooter.tscn")
 
@@ -38,6 +38,11 @@ func _ready():
 	setup_boss_visuals()
 	setup_arena_border()
 	spawn_entrance_effect()
+	
+	# Spawn initial enemies ONCE at the start of the boss fight
+	# If this is the final fight (multiple bosses), spawn fewer each
+	var bosses = get_tree().get_nodes_in_group("bosses")
+	spawn_variety_enemies(5 if bosses.size() > 1 else 10)
 
 func setup_arena_border():
 	var border = Line2D.new()
@@ -143,30 +148,48 @@ func _physics_process(delta: float):
 			spawn_pillar()
 			pillar_spawn_timer = 2.0 # Short delay before next wave spawns
 			
-	# Spawn variety enemies for pressure
+	# Enemy spawning during fight (Normal spawning but limited)
 	spawn_timer -= delta
 	if spawn_timer <= 0 and not is_dying:
-		spawn_variety_enemies()
+		var boss_enemies = get_tree().get_nodes_in_group("boss_minions")
+		var is_final = get_tree().get_nodes_in_group("bosses").size() > 1
+		var max_minions = 10 if phase == 1 else 5
+		# Final fight has specific limits
+		if is_final:
+			max_minions = 10 if phase == 1 else 5
+			
+		if boss_enemies.size() < max_minions:
+			spawn_variety_enemies(3 if phase == 1 else 2)
 		spawn_timer = randf_range(3.5, 5.5)
 
-func spawn_variety_enemies():
-	var count = 3 if phase == 1 else 6
+func spawn_variety_enemies(count: int = -1):
+	if count == -1:
+		var is_final = get_tree().get_nodes_in_group("bosses").size() > 1
+		count = 3 if phase == 1 else (2 if is_final else 2) # Use smaller bursts for P2
+	
 	for i in range(count):
-		# Border is 1200
-		var dist = randf_range(300, border_radius - 150)
-		var spawn_pos = global_position + Vector2(dist, 0).rotated(randf() * TAU)
+		# Border is 1200. Spawn far from player but within border.
+		var spawn_pos = Vector2.ZERO
+		var valid_spawn = false
+		var attempts = 0
+		while not valid_spawn and attempts < 10:
+			var dist = randf_range(400, border_radius - 150)
+			spawn_pos = global_position + Vector2(dist, 0).rotated(randf() * TAU)
+			# Ensure it's at least 400 pixels from player
+			if player and spawn_pos.distance_to(player.global_position) > 400.0:
+				valid_spawn = true
+			attempts += 1
 		
 		var roll = randf()
 		var enemy
-		if roll < 0.4:
-			enemy = kamikaze_scene.instantiate()
-		elif roll < 0.7:
+		if roll < 0.6:
 			enemy = chaser_scene.instantiate()
 		else:
 			enemy = shooter_scene.instantiate()
 			
 		get_parent().add_child(enemy)
 		enemy.global_position = spawn_pos
+		enemy.add_to_group("boss_minions")
 		
 		if enemy.has_method("set_xp_value"):
 			enemy.set_xp_value(1)
@@ -261,6 +284,7 @@ func take_damage(amount: float):
 		poly.modulate = Color(5.0, 0.2, 1.0) # Purplish Rage Glow
 		if has_node("/root/AudioManager"):
 			get_node("/root/AudioManager").play_sfx("boss_spawn", 1.2) # Re-use spawn sound for phase change
+			get_node("/root/AudioManager").set_boss_music_mode(true, 2)
 	
 	# Visual Flash
 	var t = create_tween()

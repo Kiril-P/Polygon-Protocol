@@ -182,7 +182,9 @@ func hit_player(player_node: Node):
 
 func hit_enemy(enemy: Node):
 	if enemy.has_method("take_damage"):
-		enemy.take_damage(damage)
+		# KINETIC DAMAGE: Bonus damage based on speed (Base speed is ~400)
+		var speed_mult = 1.0 + max(0, (speed - 400.0) / 600.0)
+		enemy.take_damage(damage * speed_mult)
 	
 	if explodes_on_hit:
 		create_explosion()
@@ -192,6 +194,17 @@ func hit_enemy(enemy: Node):
 	
 	if splits_on_hit:
 		split_bullet()
+	
+	# BOUNCE OFF ENEMIES
+	if bounces > 0:
+		# Bounce direction away from enemy center
+		var bounce_dir = (global_position - enemy.global_position).normalized()
+		# Combine with current direction for a more "glancing" bounce
+		direction = (direction.bounce(bounce_dir) + bounce_dir * 0.2).normalized()
+		_on_bounced()
+		# Add a bit of "safe" distance to prevent re-colliding immediately
+		global_position += direction * 5.0
+		return # Don't process pierce if we bounced
 	
 	hits_remaining -= 1
 	if hits_remaining <= 0:

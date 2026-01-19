@@ -28,20 +28,30 @@ func _process(delta: float):
 	if not tutorial_finished:
 		return
 		
-	# BOSS MILESTONES: Pause timer at 80s (1:20) and 180s (3:00)
-	var milestone_times = [80, 180]
+	# BOSS MILESTONES: Pause timer at 80s (1:20) and 180s (3:00) and 300s (5:00)
+	var milestone_times = [80, 180, 300]
 	for m in milestone_times:
 		# Show warning 10 seconds before (Trigger only once)
 		if int(time_passed) == m - 10 and not bosses_spawned.has(m):
 			var hud = get_tree().get_first_node_in_group("hud")
 			if hud and hud.has_method("show_boss_warning"):
-				hud.show_boss_warning()
+				hud.show_boss_warning(10)
 		
 		if int(time_passed) == m and not bosses_spawned.has(m):
-			spawn_major_boss(m)
+			if m == 300:
+				# Spawn BOTH bosses at 5 minutes
+				spawn_major_boss(80) # Fortress
+				spawn_major_boss(180) # Pulsar
+			else:
+				spawn_major_boss(m)
+			
 			bosses_spawned.append(m)
 			boss_active = true
 			
+	# Update boss_active state based on actual nodes in group
+	var active_bosses = get_tree().get_nodes_in_group("bosses")
+	boss_active = active_bosses.size() > 0
+	
 	if not boss_active:
 		time_passed += delta
 	
@@ -225,32 +235,42 @@ func spawn_major_boss(milestone: int):
 	if existing_enemies.size() > 5 and has_node("/root/AudioManager"):
 		get_node("/root/AudioManager").play_sfx("glitch", -5.0, 0.8, 1.2)
 
-	for i in range(existing_enemies.size()):
-		var enemy = existing_enemies[i]
+	for enemy in existing_enemies:
 		if is_instance_valid(enemy):
 			# Stagger the deaths slightly for a "wave" effect
 			var delay = randf_range(0.0, 0.5)
-			get_tree().create_timer(delay).timeout.connect(func():
-				if is_instance_valid(enemy):
+			var kill_lambda = func(e):
+				if is_instance_valid(e):
 					# Create death particles but NO SOUND for mass-kill
-					if enemy.has_method("spawn_death_particles"):
-						enemy.spawn_death_particles()
-					
-					# Manually handle XP/Score so they don't lose it
-					if player and player.has_method("add_xp"):
-						player.add_xp(enemy.xp_value if "xp_value" in enemy else 10)
-					
-					enemy.queue_free()
-			)
+					if e.has_method("spawn_death_particles"):
+						e.spawn_death_particles()
+					e.queue_free()
+			
+			get_tree().create_timer(delay).timeout.connect(kill_lambda.bind(enemy))
 
 	var boss = CharacterBody2D.new()
-	# Connect death signal to resume timer
+	boss.add_to_group("bosses") # Add to group immediately
+	
+	# Connect death signal to resume timer only if it's the last boss
 	boss.tree_exited.connect(func(): 
-		boss_active = false
-		if player:
-			player.dash_nerf_active = false
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").set_boss_music_mode(false)
+		# SAFETY: If we are restarting or changing scenes, the tree might be null
+		var tree = get_tree()
+		if not tree: return
+		
+		# Wait a frame to ensure the group size is updated
+		await tree.process_frame
+		
+		# Check tree again after await
+		tree = get_tree()
+		if not tree: return
+		
+		var active_bosses = tree.get_nodes_in_group("bosses")
+		if active_bosses.size() == 0:
+			boss_active = false
+			if player:
+				player.dash_nerf_active = false
+			if has_node("/root/AudioManager"):
+				get_node("/root/AudioManager").set_boss_music_mode(false, 1)
 	)
 	
 	if milestone == 180:
@@ -283,6 +303,6 @@ func spawn_major_boss(milestone: int):
 	
 	if has_node("/root/AudioManager"):
 		get_node("/root/AudioManager").play_sfx("boss_spawn", 10.0) 
-		get_node("/root/AudioManager").set_boss_music_mode(true)
+		get_node("/root/AudioManager").set_boss_music_mode(true, 1) 
 		
 	get_parent().add_child(boss)

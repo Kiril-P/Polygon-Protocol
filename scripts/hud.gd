@@ -249,11 +249,14 @@ func setup_warning_label():
 	warn.visible = false
 	$Control.add_child(warn)
 
-func show_boss_warning():
+func show_boss_warning(seconds: int = 0):
 	var warn = $Control.get_node_or_null("BossWarning")
 	if warn:
 		warn.visible = true
-		warn.text = "CORRUPTED PROTOCOL INBOUND"
+		if seconds > 0:
+			warn.text = "CORRUPTED PROTOCOL INBOUND - %ds" % seconds
+		else:
+			warn.text = "CORRUPTED PROTOCOL INBOUND"
 		warn.modulate = Color(2.0, 0.2, 0.2, 0.0) # Intense Red Glow
 		warn.scale = Vector2(0.5, 0.5)
 		

@@ -1,10 +1,14 @@
 extends Area2D
 
 var boss: Node2D = null
+var heart_color: Color = Color(1.0, 0.9, 0.0) # Default Gold
 var is_dying: bool = false
 
 func _ready():
 	add_to_group("boss_hearts")
+	# Check if boss has a custom heart color
+	if boss and boss.get("heart_color"):
+		heart_color = boss.get("heart_color")
 	setup_visuals()
 	body_entered.connect(_on_body_entered)
 
@@ -21,8 +25,11 @@ func setup_visuals():
 		Vector2(15, -10), Vector2(15, 0)
 	])
 	poly.polygon = pts
-	poly.color = Color(1.0, 0.9, 0.0) # Bright Yellow/Gold
-	poly.modulate = Color(2.5, 2.5, 0.5, 1) # Intense Glow
+	poly.color = heart_color
+	# Calculate a glow version of the color
+	var glow_color = heart_color * 2.5
+	glow_color.a = 1.0
+	poly.modulate = glow_color
 	add_child(poly)
 	
 	# Add an outline to make it pop even more
@@ -97,6 +104,6 @@ func spawn_particles():
 	p.initial_velocity_max = 300.0
 	p.scale_amount_min = 3.0
 	p.scale_amount_max = 6.0
-	p.color = Color(1.0, 0.9, 0.0) # Match heart color (Yellow/Gold)
+	p.color = heart_color # Match heart color
 	p.emitting = true
 	get_tree().create_timer(1.0).timeout.connect(p.queue_free)

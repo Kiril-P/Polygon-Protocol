@@ -35,6 +35,24 @@ func _ready():
 	setup_button_animations()
 	style_all_buttons()
 	animate_splash_text()
+	add_controls_hint()
+
+func add_controls_hint():
+	var hint = Label.new()
+	hint.text = "CHANGE CONTROLS IN OPTIONS"
+	hint.add_theme_font_size_override("font_size", 18)
+	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
+	hint.add_theme_constant_override("outline_size", 4)
+	hint.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.3))
+	
+	add_child(hint)
+	hint.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	hint.position += Vector2(20, -20) # Offset from corner
+	
+	# Suble pulsing
+	var t = create_tween().set_loops()
+	t.tween_property(hint, "modulate:a", 0.3, 1.5).set_trans(Tween.TRANS_SINE)
+	t.tween_property(hint, "modulate:a", 0.8, 1.5).set_trans(Tween.TRANS_SINE)
 
 func animate_splash_text():
 	if not splash_label: return
@@ -70,13 +88,13 @@ func style_menu_button(btn: Button):
 	hover.shadow_size = 10
 	
 	# Pressed Style
-	var pressed = hover.duplicate()
-	pressed.bg_color = Color(0.3, 0.1, 0.4, 0.8)
-	pressed.border_color = Color(1.0, 0.0, 1.0, 1.0) # Magenta flash
+	var style_pressed = hover.duplicate()
+	style_pressed.bg_color = Color(0.3, 0.1, 0.4, 0.8)
+	style_pressed.border_color = Color(1.0, 0.0, 1.0, 1.0) # Magenta flash
 	
 	btn.add_theme_stylebox_override("normal", normal)
 	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_stylebox_override("pressed", style_pressed)
 	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	
 	# Text styling

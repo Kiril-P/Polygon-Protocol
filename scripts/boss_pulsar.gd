@@ -12,13 +12,14 @@ var laser_rotation: float = 0.0
 var laser_speed: float = 1.0
 var laser_nodes: Array[Line2D] = []
 var lasers_active: bool = true
+var lasers_charging: bool = false
 
 var arena_barrier: StaticBody2D = null
 var border_radius: float = 1450.0
+var heart_color: Color = Color(0.0, 1.0, 1.0) # Pulsar hearts: Cyan
 
 # Enemy variety
 var spawn_timer: float = 2.0
-var kamikaze_scene = load("res://scenes/enemy_kamikaze.tscn")
 var fairy_scene = load("res://scenes/enemy_fairy.tscn")
 var shooter_scene = load("res://scenes/enemy_shooter.tscn")
 
@@ -38,6 +39,11 @@ func _ready():
 	setup_visuals()
 	setup_arena_border()
 	setup_lasers()
+	
+	# Spawn initial enemies ONCE at the start of the boss fight
+	# If this is the final fight (multiple bosses), spawn fewer each
+	var bosses = get_tree().get_nodes_in_group("bosses")
+	spawn_variety_enemies(5 if bosses.size() > 1 else 10)
 
 func setup_visuals():
 	# Massive Eye Core
@@ -97,19 +103,39 @@ func setup_lasers():
 	if phase == 2: count = 3
 	elif phase == 3: count = 5
 	
-	var angle_step = TAU / float(count)
+	lasers_charging = true
+	
 	for i in range(count):
 		var laser = Line2D.new()
-		laser.width = 12.0
-		laser.default_color = Color(0, 1, 1, 0.8)
+		laser.width = 5.0 # Slightly thicker warning
+		laser.default_color = Color(0, 1, 1, 0.15) # Very transparent Cyan warning
 		laser.points = PackedVector2Array([Vector2.ZERO, Vector2(border_radius, 0)])
 		add_child(laser)
 		laser_nodes.append(laser)
 		
-		# Glow
-		var t = create_tween().set_loops(9999)
-		t.tween_property(laser, "width", 18.0, 0.1)
-		t.tween_property(laser, "width", 12.0, 0.1)
+		# Warning Flash (Transparent to slightly visible)
+		var t = create_tween().set_loops(10)
+		t.tween_property(laser, "default_color:a", 0.4, 0.1)
+		t.tween_property(laser, "default_color:a", 0.05, 0.1)
+	
+	# Delay before lasers become active
+	var timer = get_tree().create_timer(2.0)
+	timer.timeout.connect(func():
+		lasers_charging = false
+		for laser in laser_nodes:
+			if not is_instance_valid(laser): continue
+			laser.width = 16.0 # Thicker base
+			laser.default_color = Color(0, 1, 1, 1.0) # FULL OPAQUE Cyan
+			laser.modulate = Color(1.5, 2.0, 2.0) # HDR Glow boost
+			
+			# Menacing Pulse animation (Thicker and faster)
+			var t = create_tween().set_loops(9999)
+			t.tween_property(laser, "width", 24.0, 0.08).set_trans(Tween.TRANS_SINE)
+			t.tween_property(laser, "width", 16.0, 0.08).set_trans(Tween.TRANS_SINE)
+			
+		if has_node("/root/AudioManager"):
+			get_node("/root/AudioManager").play_sfx("glitch", 5.0, 1.2, 1.5)
+	)
 
 func _physics_process(delta: float):
 	if is_dying: return
@@ -140,32 +166,52 @@ func _physics_process(delta: float):
 	if not has_own_heart and not is_dying:
 		spawn_three_hearts()
 		
-	# Spawn variety enemies
+	# Variety enemy spawning during fight for Pulsar (Pressure)
 	spawn_timer -= delta
 	if spawn_timer <= 0 and not is_dying:
-		spawn_variety_enemies()
+		var boss_enemies = get_tree().get_nodes_in_group("boss_minions")
+		var is_final = get_tree().get_nodes_in_group("bosses").size() > 1
+		var max_minions = 10 if phase == 1 else 5
+		# Final fight overriding limits
+		if is_final:
+			max_minions = 10 if phase == 1 else 5
+			
+		if boss_enemies.size() < max_minions:
+			spawn_variety_enemies()
 		# More frequent spawns for pressure
 		spawn_timer = randf_range(3.0, 5.0)
 
-func spawn_variety_enemies():
+func spawn_variety_enemies(count: int = -1):
 	# More enemies based on phase
-	var count = 3 if phase == 1 else 5
+	if count == -1:
+		var is_final = get_tree().get_nodes_in_group("bosses").size() > 1
+		if is_final:
+			count = 2 if phase == 1 else 1
+		else:
+			count = 3 if phase == 1 else 4
+	
 	for i in range(count):
-		# Ensure they spawn WELL within the arena (border is 1450)
-		var dist = randf_range(400, border_radius - 200)
-		var spawn_pos = global_position + Vector2(dist, 0).rotated(randf() * TAU)
+		# Ensure they spawn WELL within the arena (border is 1450). Spawn far from player.
+		var spawn_pos = Vector2.ZERO
+		var valid_spawn = false
+		var attempts = 0
+		while not valid_spawn and attempts < 10:
+			var dist = randf_range(400, border_radius - 200)
+			spawn_pos = global_position + Vector2(dist, 0).rotated(randf() * TAU)
+			if player and spawn_pos.distance_to(player.global_position) > 450.0:
+				valid_spawn = true
+			attempts += 1
 		
 		var roll = randf()
 		var enemy
-		if roll < 0.3:
-			enemy = kamikaze_scene.instantiate()
-		elif roll < 0.7:
+		if roll < 0.5:
 			enemy = fairy_scene.instantiate()
 		else:
 			enemy = shooter_scene.instantiate()
 			
 		get_parent().add_child(enemy)
 		enemy.global_position = spawn_pos
+		enemy.add_to_group("boss_minions")
 		
 		# Low XP to prevent boss-farming level ups
 		if enemy.has_method("set_xp_value"):
@@ -175,7 +221,9 @@ func spawn_three_hearts():
 	var start_angle = randf() * TAU
 	for i in range(3):
 		var angle = start_angle + (TAU / 3.0) * i
-		var pos = Vector2(border_radius - 150.0, 0).rotated(angle)
+		# Random distance between 40% and 90% of border radius
+		var dist = randf_range(border_radius * 0.4, border_radius - 150.0)
+		var pos = Vector2(dist, 0).rotated(angle)
 		
 		var heart_script = load("res://scripts/boss_pillar.gd")
 		var heart = Area2D.new()
@@ -186,7 +234,7 @@ func spawn_three_hearts():
 		heart.add_to_group("boss_hearts")
 
 func check_laser_collision(laser: Line2D):
-	if not player or not is_instance_valid(player): return
+	if not player or not is_instance_valid(player) or lasers_charging: return
 	
 	var to_player = player.global_position - global_position
 	var laser_dir = Vector2.RIGHT.rotated(laser.rotation)
@@ -223,6 +271,7 @@ func take_damage(amount: float):
 		setup_lasers()
 		if has_node("/root/AudioManager"):
 			get_node("/root/AudioManager").play_sfx("boss_spawn", 1.2)
+			get_node("/root/AudioManager").set_boss_music_mode(true, 2)
 			
 	elif health_percent < 0.34 and phase == 2:
 		phase = 3
@@ -231,6 +280,7 @@ func take_damage(amount: float):
 		setup_lasers()
 		if has_node("/root/AudioManager"):
 			get_node("/root/AudioManager").play_sfx("boss_spawn", 1.5)
+			get_node("/root/AudioManager").set_boss_music_mode(true, 3)
 	
 	if health <= 0:
 		start_death_sequence()

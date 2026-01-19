@@ -141,8 +141,11 @@ func load_music_tracks():
 	music_tracks.shuffle()
 	current_music_index = -1 # So the first play_next_track starts at 0
 
-func set_boss_music_mode(enabled: bool):
-	var target_pitch = 1.15 if enabled else 1.0
+func set_boss_music_mode(enabled: bool, phase: int):
+	var target_pitch = 1.0
+	if enabled:
+		target_pitch = 1.15 + (phase - 1) * 0.15 # Phase 1: 1.15, Phase 2: 1.30, Phase 3: 1.45
+	
 	var base_vol = 0.0
 	if has_node("/root/GlobalData"):
 		base_vol = linear_to_db(get_node("/root/GlobalData").audio_settings.music)

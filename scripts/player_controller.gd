@@ -61,6 +61,11 @@ var bullet_bounces: int = 0
 var bullet_homing: float = 0.0
 var bullet_explosive: bool = false
 var explosion_radius: float = 50.0
+var dash_lifesteal_chance: float = 0.0
+var gravity_well_level: int = 0
+var prismatic_beam_active: bool = false
+var prismatic_beam_level: int = 0
+var beam_nodes: Array[Line2D] = []
 
 # Visuals
 @onready var sprite: Polygon2D = $ShapeSprite
@@ -112,9 +117,9 @@ func _ready():
 		_gd.run_level = 1
 		_gd.run_time = 0.0
 		overdrive_available = _gd.is_upgrade_active("emergency_overdrive")
-		
-		# RECURSIVE EVOLUTION
-		# (Removed)
+	
+	if has_node("/root/UpgradeManager"):
+		get_node("/root/UpgradeManager").reset_upgrades()
 	
 	# Apply Permanent Stat Boosts
 	apply_upgrade("init_permanent", 0)
@@ -265,6 +270,12 @@ func _input(event):
 	if is_tutorial_active:
 		if event is InputEventKey and event.keycode == KEY_SPACE and event.pressed:
 			skip_tutorial()
+	
+	# DEBUG KEYS
+	if OS.is_debug_build() and event is InputEventKey and event.pressed:
+		if event.keycode == KEY_L:
+			add_xp(xp_to_next_level)
+			print("DEBUG: Level Up Forced")
 
 func skip_tutorial():
 	if tutorial_tween:
@@ -320,7 +331,7 @@ func _physics_process(delta: float):
 			vulnerable = false
 		
 		if vulnerable:
-			check_contact_damage()
+			check_contact_damage(delta)
 	
 	# DASH/BOOST INPUT
 	if (Input.is_action_pressed("dash") or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)) and current_energy > 0:
@@ -346,8 +357,8 @@ func _physics_process(delta: float):
 		# Screen rumble for dashing
 		add_shake(2.0)
 		
-		# REDUCED consumption mult from 2.5 to 1.8 for better feel
-		var consumption_mult = 1.8 if dash_nerf_active else 1.0
+		# REDUCED consumption mult from 1.8 to 1.4 for better feel
+		var consumption_mult = 1.4 if dash_nerf_active else 1.0
 		current_energy -= energy_consumption * consumption_mult * delta
 		
 		if current_energy <= 0: 
@@ -371,7 +382,7 @@ func _physics_process(delta: float):
 			else:
 				var current_recovery = energy_recovery
 				if dash_nerf_active:
-					current_recovery *= 0.4 # Recovery is 60% slower
+					current_recovery *= 0.6 # Recovery is 40% slower (Reduced from 60%)
 				current_energy += current_recovery * delta
 				if current_energy > max_energy: current_energy = max_energy
 				energy_changed.emit(current_energy, max_energy)
@@ -383,6 +394,10 @@ func _physics_process(delta: float):
 			reset_combo()
 		else:
 			combo_changed.emit(combo_count, combo_timer / COMBO_MAX_TIME)
+
+	# CENTRIFUGAL SAW: Constant contact damage based on rotation
+	if rotation_speed > 3.5:
+		handle_saw_damage(delta)
 
 	handle_movement(delta)
 	handle_rotation(delta)
@@ -400,6 +415,12 @@ func _physics_process(delta: float):
 		if ghost_timer <= 0:
 			spawn_ghost()
 			ghost_timer = ghost_delay
+		
+		if gravity_well_level > 0:
+			handle_gravity_well(delta)
+
+	if prismatic_beam_active:
+		handle_prismatic_beam(delta)
 
 	# Shield Regeneration logic
 	if not has_shield and has_node("/root/GlobalData") and get_node("/root/GlobalData").is_upgrade_active("shield_regen"):
@@ -455,6 +476,152 @@ func spawn_ghost():
 	tween.tween_property(ghost, "modulate:a", 0.0, 0.3)
 	tween.tween_callback(ghost.queue_free)
 
+func handle_gravity_well(delta: float):
+	var enemies = get_tree().get_nodes_in_group("enemies")
+	var pull_radius = 170.0 + (gravity_well_level - 1) * 60.0
+	var pull_strength = 900.0 + (gravity_well_level - 1) * 400.0
+	
+	for enemy in enemies:
+		if not is_instance_valid(enemy) or (enemy.has_method("is_in_group") and enemy.is_in_group("bosses")):
+			continue
+		
+		var dist = global_position.distance_to(enemy.global_position)
+		if dist < pull_radius:
+			var dir = (global_position - enemy.global_position).normalized()
+			# Stronger pull the further they are (within radius)
+			var force = dir * pull_strength * delta * (1.0 - (dist / pull_radius))
+			enemy.global_position += force
+
+func handle_prismatic_beam(delta: float):
+	if current_shape < 3: return
+	
+	# Create/Update beam nodes
+	var vertices = current_shape
+	if beam_nodes.size() != vertices * 2: # Inner and outer beams
+		# Cleanup old beams
+		for b in beam_nodes:
+			if is_instance_valid(b): b.queue_free()
+		beam_nodes.clear()
+		
+		# Create new beams
+		for i in range(vertices):
+			# Outer Beam (Glow)
+			var outer = Line2D.new()
+			outer.width = 8.0
+			outer.default_color = Color(0, 0.8, 1, 0.4) # Transparent Cyan
+			add_child(outer)
+			beam_nodes.append(outer)
+			
+			# Inner Beam (Core)
+			var inner = Line2D.new()
+			inner.width = 2.0
+			inner.default_color = Color(1, 1, 1, 0.9) # Solid White
+			add_child(inner)
+			beam_nodes.append(inner)
+
+	var angle_step = TAU / vertices
+	var beam_length = 400.0 + (prismatic_beam_level - 1) * 200.0
+	var base_outer_width = 8.0 + (prismatic_beam_level - 1) * 4.0
+	var base_inner_width = 2.0 + (prismatic_beam_level - 1) * 1.5
+	
+	for i in range(vertices):
+		# LOCAL-SPACE math ensures perfect alignment with the rotating shape
+		var local_angle = angle_step * i
+		var dir = Vector2.RIGHT.rotated(local_angle)
+		
+		var start_pos = dir * 25.0
+		var current_start_world = global_position + start_pos.rotated(rotation)
+		var current_dir_world = dir.rotated(rotation)
+		var current_length = beam_length
+		
+		var beam_points_local = [start_pos]
+		
+		# Support for Beam Bouncing
+		var bounces_left = bullet_bounces
+		while bounces_left >= 0:
+			var query = PhysicsRayQueryParameters2D.create(current_start_world, current_start_world + current_dir_world * current_length)
+			query.collision_mask = 4 # Enemies
+			var result = get_world_2d().direct_space_state.intersect_ray(query)
+			
+			if result:
+				var hit_pos_world = result.position
+				beam_points_local.append(to_local(hit_pos_world))
+				
+				var collider = result.collider
+				if collider.has_method("take_damage"):
+					collider.take_damage(bullet_damage * damage_multiplier * delta * 6.0)
+					if randf() < 0.3:
+						spawn_beam_impact(hit_pos_world)
+				
+				if bounces_left > 0:
+					var normal = result.normal
+					current_dir_world = current_dir_world.bounce(normal)
+					current_start_world = hit_pos_world + current_dir_world * 2.0
+					current_length *= 0.8
+					bounces_left -= 1
+				else:
+					break
+			else:
+				beam_points_local.append(to_local(current_start_world + current_dir_world * current_length))
+				break
+		
+		var points = PackedVector2Array(beam_points_local)
+		
+		# Apply points to both inner and outer beams
+		var outer_beam = beam_nodes[i * 2]
+		var inner_beam = beam_nodes[i * 2 + 1]
+		
+		outer_beam.points = points
+		inner_beam.points = points
+		
+		outer_beam.visible = true
+		inner_beam.visible = true
+		
+		# Animate width slightly for "humming" effect
+		outer_beam.width = base_outer_width + sin(Time.get_ticks_msec() * 0.02) * 2.0
+		inner_beam.width = base_inner_width + sin(Time.get_ticks_msec() * 0.02) * 0.5
+
+func spawn_beam_impact(pos: Vector2):
+	var p = CPUParticles2D.new()
+	get_parent().add_child(p)
+	p.global_position = pos
+	p.amount = 5
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.lifetime = 0.2
+	p.spread = 180.0
+	p.gravity = Vector2.ZERO
+	p.initial_velocity_min = 50.0
+	p.initial_velocity_max = 100.0
+	p.scale_amount_min = 1.0
+	p.scale_amount_max = 3.0
+	p.color = Color(0, 1, 1)
+	p.emitting = true
+	get_tree().create_timer(0.2).timeout.connect(p.queue_free)
+
+func handle_saw_damage(delta: float):
+	if not has_node("Area2D"): return
+	var bodies = $Area2D.get_overlapping_bodies()
+	for body in bodies:
+		if body.is_in_group("enemies"):
+			if "is_dying" in body and body.is_dying:
+				continue
+			
+			# DAMAGE SCALING: 
+			# 1. Base Saw Damage: Always running if overlapping
+			# 2. Dash Synergy: If player is dashing, saw damage is applied once as a multiplier to the dash hit
+			
+			var saw_damage = rotation_speed * 1.5 * delta * 60.0
+			
+			if is_dashing:
+				# While dashing, we don't apply 'tick' damage here to prevent double-dipping.
+				# Instead, the dash logic in _on_area_2d_body_entered will handle the massive hit.
+				continue
+			else:
+				body.take_damage(saw_damage * damage_multiplier)
+				if randf() < 0.1:
+					spawn_beam_impact(body.global_position)
+
 func handle_movement(delta: float):
 	var speed = (dash_speed if is_dashing else base_speed) * speed_multiplier
 	var input_dir = Vector2.ZERO
@@ -483,10 +650,6 @@ func handle_movement(delta: float):
 	else:
 		# Faster deceleration for snappier stop
 		velocity = velocity.move_toward(Vector2.ZERO, speed * 15 * delta)
-	
-	# DEBUG: Press 'L' to level up instantly
-	if OS.is_debug_build() and Input.is_key_pressed(KEY_L):
-		add_xp(xp_to_next_level)
 
 func handle_rotation(delta: float):
 	# Auto-rotate the shape
@@ -494,7 +657,10 @@ func handle_rotation(delta: float):
 	rotation = current_rotation
 
 func handle_shooting(delta: float):
-	if current_shape < 3:  # Circle has no shooting
+	if current_shape < 3 or prismatic_beam_active:
+		# Hide beams if they exist
+		for b in beam_nodes:
+			if is_instance_valid(b): b.visible = false
 		return
 	
 	fire_timer -= delta
@@ -523,7 +689,8 @@ func shoot():
 		
 		# Set bullet properties
 		bullet.direction = Vector2.RIGHT.rotated(bullet_angle)
-		bullet.speed = bullet_speed
+		# Centrifugal Boost: Rotating faster adds a tiny bit of extra speed to bullets
+		bullet.speed = bullet_speed + (rotation_speed * 10.0)
 		bullet.damage = bullet_damage * damage_multiplier
 		bullet.pierce = bullet_pierce
 		
@@ -808,14 +975,28 @@ func pause_game_fractured():
 	canvas.add_child(bg)
 	
 	# Pause Menu UI Container
+	var main_hbox = HBoxContainer.new()
+	main_hbox.name = "MainHBox"
+	main_hbox.set_anchors_preset(Control.PRESET_CENTER)
+	main_hbox.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	main_hbox.grow_vertical = Control.GROW_DIRECTION_BOTH
+	main_hbox.add_theme_constant_override("separation", 100)
+	main_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	canvas.add_child(main_hbox)
+	
 	var menu_ui = VBoxContainer.new()
 	menu_ui.name = "PauseMenuUI"
-	menu_ui.set_anchors_preset(Control.PRESET_CENTER)
-	menu_ui.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	menu_ui.grow_vertical = Control.GROW_DIRECTION_BOTH
 	menu_ui.alignment = BoxContainer.ALIGNMENT_CENTER
 	menu_ui.add_theme_constant_override("separation", 20)
-	canvas.add_child(menu_ui)
+	main_hbox.add_child(menu_ui)
+	
+	# Side Menu (Options)
+	var options_ui = VBoxContainer.new()
+	options_ui.name = "OptionsUI"
+	options_ui.alignment = BoxContainer.ALIGNMENT_CENTER
+	options_ui.add_theme_constant_override("separation", 15)
+	options_ui.custom_minimum_size = Vector2(300, 0)
+	main_hbox.add_child(options_ui)
 	
 	# Run Stats (New addition)
 	var gd = get_node("/root/GlobalData") if has_node("/root/GlobalData") else null
@@ -854,7 +1035,7 @@ func pause_game_fractured():
 		spacer.custom_minimum_size = Vector2(0, 20)
 		menu_ui.add_child(spacer)
 	
-	# Title
+	# PAUSED Title
 	var label = Label.new()
 	label.text = "PAUSED"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -863,7 +1044,7 @@ func pause_game_fractured():
 	label.add_theme_constant_override("outline_size", 16)
 	menu_ui.add_child(label)
 	
-	# Create Buttons helper function for animations
+	# Helper for styling buttons
 	var style_btn = func(btn: Button):
 		var normal = StyleBoxFlat.new()
 		normal.bg_color = Color(0.1, 0.1, 0.2, 0.6)
@@ -880,13 +1061,13 @@ func pause_game_fractured():
 		hover.shadow_color = Color(0.0, 1.0, 1.0, 0.3)
 		hover.shadow_size = 10
 		
-		var pressed = hover.duplicate()
-		pressed.bg_color = Color(0.3, 0.1, 0.4, 0.9)
-		pressed.border_color = Color(1.0, 0.0, 1.0, 1.0)
+		var style_pressed = hover.duplicate()
+		style_pressed.bg_color = Color(0.3, 0.1, 0.4, 0.9)
+		style_pressed.border_color = Color(1.0, 0.0, 1.0, 1.0)
 		
 		btn.add_theme_stylebox_override("normal", normal)
 		btn.add_theme_stylebox_override("hover", hover)
-		btn.add_theme_stylebox_override("pressed", pressed)
+		btn.add_theme_stylebox_override("pressed", style_pressed)
 		btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 		
 		btn.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
@@ -894,7 +1075,7 @@ func pause_game_fractured():
 		btn.add_theme_constant_override("outline_size", 4)
 		btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
 
-	var setup_btn = func(btn: Button, size: int):
+	var setup_btn = func(btn: Button, size: int, canvas_ref: CanvasLayer):
 		style_btn.call(btn)
 		btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		btn.add_theme_font_size_override("font_size", size)
@@ -902,14 +1083,16 @@ func pause_game_fractured():
 		btn.focus_mode = Control.FOCUS_NONE
 		
 		btn.mouse_entered.connect(func():
+			if not is_instance_valid(canvas_ref): return
 			if has_node("/root/AudioManager"):
 				get_node("/root/AudioManager").play_sfx("hover")
-			var t = canvas.create_tween()
+			var t = canvas_ref.create_tween()
 			t.tween_property(btn, "scale", Vector2(1.1, 1.1), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 			t.parallel().tween_property(btn, "modulate", Color(1.5, 1.5, 2.0), 0.2)
 		)
 		btn.mouse_exited.connect(func():
-			var t = canvas.create_tween()
+			if not is_instance_valid(canvas_ref): return
+			var t = canvas_ref.create_tween()
 			t.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_SINE)
 			t.parallel().tween_property(btn, "modulate", Color.WHITE, 0.2)
 		)
@@ -921,18 +1104,136 @@ func pause_game_fractured():
 		btn.button_up.connect(func():
 			btn.scale = Vector2(1.1, 1.1)
 		)
-	
+
+	# Helper for styling sliders
+	var style_slider = func(slider: HSlider, label_text: String, container: VBoxContainer):
+		var lbl = Label.new()
+		lbl.text = label_text
+		lbl.add_theme_font_size_override("font_size", 16)
+		lbl.modulate = Color(0.7, 0.7, 1.0)
+		container.add_child(lbl)
+		
+		slider.custom_minimum_size = Vector2(200, 20)
+		slider.step = 0.05
+		slider.max_value = 1.0
+		container.add_child(slider)
+		
+		# SFX on value change
+		slider.value_changed.connect(func(_v):
+			if has_node("/root/AudioManager"):
+				get_node("/root/AudioManager").play_sfx("hover", -15.0)
+		)
+
+	#side bar labels for audio following actual values
+	if gd:
+		var audio_title = Label.new()
+		audio_title.text = "AUDIO SETTINGS"
+		audio_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		audio_title.add_theme_font_size_override("font_size", 20)
+		audio_title.modulate = Color(0.0, 1.0, 1.0)
+		options_ui.add_child(audio_title)
+		
+		var master_s = HSlider.new()
+		master_s.value = gd.audio_settings.master
+		style_slider.call(master_s, "MASTER VOLUME", options_ui)
+		master_s.value_changed.connect(func(v):
+			AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Master"), linear_to_db(v))
+			gd.audio_settings.master = v
+			gd.save_game()
+		)
+		
+		var music_s = HSlider.new()
+		music_s.value = gd.audio_settings.music
+		style_slider.call(music_s, "MUSIC VOLUME", options_ui)
+		music_s.value_changed.connect(func(v):
+			var bus_idx = AudioServer.get_bus_index("Music")
+			if bus_idx != -1: AudioServer.set_bus_volume_db(bus_idx, linear_to_db(v))
+			gd.audio_settings.music = v
+			gd.save_game()
+		)
+		
+		var sfx_s = HSlider.new()
+		sfx_s.value = gd.audio_settings.sfx
+		style_slider.call(sfx_s, "SFX VOLUME", options_ui)
+		sfx_s.value_changed.connect(func(v):
+			var bus_idx = AudioServer.get_bus_index("SFX")
+			if bus_idx != -1: AudioServer.set_bus_volume_db(bus_idx, linear_to_db(v))
+			gd.audio_settings.sfx = v
+			gd.save_game()
+		)
+		
+		var input_title = Label.new()
+		input_title.text = "GAMEPLAY SETTINGS"
+		input_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		input_title.add_theme_font_size_override("font_size", 20)
+		input_title.modulate = Color(0.0, 1.0, 1.0)
+		options_ui.add_child(input_title)
+
+		# Mouse Controls Toggle
+		var mouse_btn = Button.new()
+		mouse_btn.text = "INPUT: MOUSE" if gd.use_mouse_controls else "INPUT: WASD"
+		setup_btn.call(mouse_btn, 18, canvas)
+		mouse_btn.pressed.connect(func():
+			gd.use_mouse_controls = !gd.use_mouse_controls
+			mouse_btn.text = "INPUT: MOUSE" if gd.use_mouse_controls else "INPUT: WASD"
+			gd.save_game()
+		)
+		options_ui.add_child(mouse_btn)
+
+		# Tutorial Toggle
+		var tut_btn = Button.new()
+		tut_btn.text = "TUTORIAL: ON" if gd.show_tutorial else "TUTORIAL: OFF"
+		setup_btn.call(tut_btn, 18, canvas)
+		tut_btn.pressed.connect(func():
+			gd.show_tutorial = !gd.show_tutorial
+			tut_btn.text = "TUTORIAL: ON" if gd.show_tutorial else "TUTORIAL: OFF"
+			gd.save_game()
+		)
+		options_ui.add_child(tut_btn)
+
+		# Difficulty Selector
+		var diff_title = Label.new()
+		diff_title.text = "DIFFICULTY (DURING RUN)"
+		diff_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		diff_title.add_theme_font_size_override("font_size", 16)
+		diff_title.modulate = Color(1.0, 0.5, 0.0)
+		options_ui.add_child(diff_title)
+		
+		var diff_hbox = HBoxContainer.new()
+		diff_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		diff_hbox.add_theme_constant_override("separation", 10)
+		options_ui.add_child(diff_hbox)
+		
+		var diff_btns = []
+		for i in range(1, 6):
+			var d_btn = Button.new()
+			d_btn.text = str(i)
+			d_btn.custom_minimum_size = Vector2(40, 40)
+			d_btn.toggle_mode = true
+			setup_btn.call(d_btn, 16, canvas)
+			d_btn.button_pressed = (gd.difficulty_level == i)
+			diff_hbox.add_child(d_btn)
+			diff_btns.append(d_btn)
+			
+			d_btn.pressed.connect(func():
+				gd.difficulty_level = i
+				gd.save_game()
+				# Update other buttons visually
+				for b in diff_btns:
+					b.button_pressed = (b == d_btn)
+			)
+
 	# Resume Button
 	var resume_btn = Button.new()
 	resume_btn.text = "RESUME"
-	setup_btn.call(resume_btn, 32)
+	setup_btn.call(resume_btn, 32, canvas)
 	resume_btn.pressed.connect(toggle_pause)
 	menu_ui.add_child(resume_btn)
 	
 	# Main Menu Button
 	var main_menu_btn = Button.new()
 	main_menu_btn.text = "BACK TO MAIN MENU"
-	setup_btn.call(main_menu_btn, 24)
+	setup_btn.call(main_menu_btn, 24, canvas)
 	main_menu_btn.pressed.connect(func():
 		get_tree().paused = false
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
@@ -975,11 +1276,11 @@ func pause_game_fractured():
 			tween.parallel().tween_property(piece, "modulate:a", 0.0, 0.7)
 			
 	# Fade in the UI slightly after shards start moving
-	menu_ui.modulate.a = 0
+	main_hbox.modulate.a = 0
 	bg.modulate.a = 0
 	var ui_tween = canvas.create_tween()
 	ui_tween.tween_property(bg, "modulate:a", 1.0, 0.4)
-	ui_tween.parallel().tween_property(menu_ui, "modulate:a", 1.0, 0.4).set_delay(0.2)
+	ui_tween.parallel().tween_property(main_hbox, "modulate:a", 1.0, 0.4).set_delay(0.2)
 
 func evolve_shape():
 	if current_shape == 0:
@@ -1029,6 +1330,19 @@ func spawn_player_death_particles():
 	# Auto-delete particles
 	var timer = get_tree().create_timer(2.0)
 	timer.timeout.connect(particles.queue_free)
+
+func heal(amount: int):
+	current_hearts += amount
+	if current_hearts > max_hearts:
+		current_hearts = max_hearts
+	
+	health_changed.emit(current_hearts, max_hearts)
+	update_health_visuals()
+	
+	# Visual feedback for healing
+	var tween = create_tween()
+	tween.tween_property(sprite, "modulate", Color(0, 5, 0, 1), 0.1) # Green flash
+	tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
 
 func take_damage(_amount: float):
 	if iframe_timer > 0:
@@ -1265,11 +1579,7 @@ func apply_upgrade(upgrade_type: String, value: float):
 		"dash_trail":
 			dash_trail_damage = value
 		"heal":
-			current_hearts += 1
-			if current_hearts > max_hearts:
-				max_hearts = current_hearts
-			health_changed.emit(current_hearts, max_hearts)
-			update_health_visuals()
+			heal(1)
 		"bounce":
 			bullet_bounces += int(value)
 		"homing":
@@ -1284,8 +1594,19 @@ func apply_upgrade(upgrade_type: String, value: float):
 		"rotation_speed":
 			rotation_speed *= (1.0 + value)
 		"explosive":
-			bullet_explosive = true
-			explosion_radius = value
+			if not bullet_explosive:
+				bullet_explosive = true
+				explosion_radius = value
+			else:
+				explosion_radius += 25.0
+				damage_multiplier += 0.2 # Scaling explosion impact
+		"dash_lifesteal":
+			dash_lifesteal_chance += value
+		"gravity_well":
+			gravity_well_level += 1
+		"prismatic_beam":
+			prismatic_beam_active = true
+			prismatic_beam_level += 1
 		"init_permanent":
 			if has_node("/root/GlobalData"):
 				var gd = get_node("/root/GlobalData")
@@ -1307,7 +1628,7 @@ func apply_upgrade(upgrade_type: String, value: float):
 				if bonus_damage > 0:
 					damage_multiplier += 0.2 # 20% base boost
 
-func check_contact_damage():
+func check_contact_damage(_delta: float):
 	if not has_node("Area2D") or iframe_timer > 0: return
 	
 	# Check for enemy bullets (Areas)
@@ -1338,7 +1659,16 @@ func _on_area_2d_body_entered(body):
 			
 		if is_dashing:
 			# Dash does high damage (enough to kill basic enemies)
-			body.take_damage(50.0 * damage_multiplier) 
+			# SAW SYNERGY: Dash damage is multiplied by rotation speed (effectively sharpening the blades)
+			var saw_mult = max(1.0, rotation_speed / 2.0)
+			var damage = 50.0 * damage_multiplier * saw_mult
+			
+			# Lifesteal check: if this hit will kill the enemy
+			if dash_lifesteal_chance > 0 and "health" in body and body.health <= damage and not body.is_dying:
+				if randf() < dash_lifesteal_chance:
+					heal(1)
+					
+			body.take_damage(damage) 
 			add_shake(5.0)
 			
 			# Visual pop on hit

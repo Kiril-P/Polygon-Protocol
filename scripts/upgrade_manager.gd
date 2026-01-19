@@ -43,7 +43,7 @@ var upgrade_pool = [
 	{
 		"id": "bounce",
 		"name": "RECOIL MATRIX",
-		"description": "CRITICAL: Bullets bounce off screen edges",
+		"description": "CRITICAL: Bullets | Lasers bounce off screen edges | enemies",
 		"value": 1.0,
 		"icon": "res://assets/kenney_rune-pack/PNG/Black/Tile (outline)/runeBlack_tileOutline_015.png",
 		"is_special": true
@@ -58,16 +58,40 @@ var upgrade_pool = [
 	{
 		"id": "bullet_speed",
 		"name": "Aero Rounds",
-		"description": "+40% Bullet Speed",
+		"description": "+40% Bullet Speed & Kinetic Damage",
 		"value": 0.4,
 		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_023.png"
 	},
 	{
 		"id": "rotation_speed",
 		"name": "Centrifuge",
-		"description": "+50% Rotation Speed",
+		"description": "+50% Rotation Speed & Saw Damage",
 		"value": 0.5,
 		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_025.png"
+	},
+	{
+		"id": "dash_lifesteal",
+		"name": "SANGUINE DASH",
+		"description": "SPECIAL: Chance to heal 1 heart when killing enemies with a dash",
+		"value": 0.1,
+		"icon": "res://assets/kenney_rune-pack/PNG/Black/Tile (outline)/runeBlack_tileOutline_012.png",
+		"is_special": true
+	},
+	{
+		"id": "gravity_well",
+		"name": "GRAVITY WELL",
+		"description": "SPECIAL: Dashing sucks nearby enemies into your wake",
+		"value": 400.0,
+		"icon": "res://assets/kenney_rune-pack/PNG/Black/Tile (outline)/runeBlack_tileOutline_020.png",
+		"is_special": true
+	},
+	{
+		"id": "prismatic_beam",
+		"name": "PRISMATIC BEAM",
+		"description": "ULTRA: Replace bullets with continuous neon lasers",
+		"value": 1.0,
+		"icon": "res://assets/kenney_rune-pack/PNG/Black/Tile (outline)/runeBlack_tileOutline_027.png",
+		"is_special": true
 	},
 	{
 		"id": "explosive",
@@ -80,6 +104,7 @@ var upgrade_pool = [
 ]
 
 var applied_special_upgrades = []
+var upgrade_counts = {} # Track how many times each upgrade was picked
 var level_up_pending: int = 0
 var is_ui_active: bool = false
 
@@ -91,22 +116,54 @@ func get_random_upgrades(count: int = 3) -> Array:
 	for upgrade in upgrade_pool:
 		# Check if already applied (only for special ones)
 		if upgrade.get("is_special", false) and upgrade["id"] in applied_special_upgrades:
-			continue
+			# Some multi-pick specials are handled in apply_upgrade, 
+			# but we still want to diminish them.
+			var multi_pick_specials = ["gravity_well", "bounce", "explosive", "prismatic_beam"]
+			if not upgrade["id"] in multi_pick_specials:
+				continue
 			
+		# MUTUAL EXCLUSION: Explosive vs Prismatic Beam
+		if upgrade["id"] == "prismatic_beam" and "explosive" in applied_special_upgrades:
+			continue
+		if upgrade["id"] == "explosive" and "prismatic_beam" in applied_special_upgrades:
+			continue
+
 		if is_circle:
 			# Removed 'pierce' from the forbidden list as the upgrade itself is removed
 			if upgrade["id"] in ["damage", "fire_rate", "homing", "bounce", "explosive", "bullet_speed", "rotation_speed"]:
 				continue
 		
-		# Rarity check for special upgrades (e.g. 10% chance to even be in the pool this time)
+		# Rarity check for special upgrades (e.g. 20% chance to even be in the pool this time)
 		if upgrade.get("is_special", false):
-			if randf() > 0.1: # 90% chance to skip a special upgrade from the available pool
+			if randf() > 0.2: # 75% chance to skip a special upgrade from the available pool
 				continue
-				
-		pool.append(upgrade)
+		
+		# APPLY DIMINISHING RETURNS TO THE DISPLAY DATA
+		var pick_count = upgrade_counts.get(upgrade["id"], 0)
+		var diminished_upgrade = upgrade.duplicate()
+		
+		if pick_count > 0:
+			var multiplier = pow(0.7, pick_count) # 30% reduction per level
+			diminished_upgrade["value"] = upgrade["value"] * multiplier
+			
+			# Dynamically update description if it contains a percentage
+			if "%" in diminished_upgrade["description"]:
+				# Extract the base percentage from the original description
+				# Assuming format like "+25% ..."
+				var base_percent = int(upgrade["value"] * 100)
+				var new_percent = int(diminished_upgrade["value"] * 100)
+				diminished_upgrade["description"] = diminished_upgrade["description"].replace(str(base_percent) + "%", str(new_percent) + "%")
+				diminished_upgrade["name"] += " (Level %d)" % (pick_count + 1)
+			else:
+				diminished_upgrade["name"] += " (Level %d)" % (pick_count + 1)
+				if upgrade["id"] != "max_hearts":
+					diminished_upgrade["description"] += " (Reduced Effectiveness)"
+
+		pool.append(diminished_upgrade)
 	
 	pool.shuffle()
 	return pool.slice(0, min(count, pool.size()))
+
 func _ready():
 	# Find player and connect to level_up_ready signal
 	var player = get_tree().get_first_node_in_group("player")
@@ -119,6 +176,12 @@ func _on_player_level_up():
 		return
 		
 	show_next_upgrade()
+
+func reset_upgrades():
+	applied_special_upgrades.clear()
+	upgrade_counts.clear() # Clear counts for new run
+	level_up_pending = 0
+	is_ui_active = false
 
 func show_next_upgrade():
 	if level_up_pending <= 0:
@@ -134,11 +197,20 @@ func show_next_upgrade():
 
 func apply_upgrade(upgrade_data: Dictionary):
 	var player = get_tree().get_first_node_in_group("player")
+	
+	# Increment the pick count
+	var upgrade_id = upgrade_data["id"]
+	upgrade_counts[upgrade_id] = upgrade_counts.get(upgrade_id, 0) + 1
+	
 	if player:
-		player.apply_upgrade(upgrade_data["id"], upgrade_data["value"])
+		# Use the diminished value already calculated in get_random_upgrades
+		player.apply_upgrade(upgrade_id, upgrade_data["value"])
 		
-		# Track if this was a special upgrade to prevent repeat appearances
-		if upgrade_data.get("is_special", false):
+	# Track if this was a special upgrade to prevent repeat appearances
+	if upgrade_data.get("is_special", false):
+		# Some special upgrades can be picked multiple times
+		var multi_pick_specials = ["gravity_well", "bounce", "explosive", "prismatic_beam"]
+		if not upgrade_data["id"] in multi_pick_specials:
 			applied_special_upgrades.append(upgrade_data["id"])
 	
 	level_up_pending -= 1

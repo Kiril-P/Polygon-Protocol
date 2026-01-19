@@ -59,13 +59,13 @@ func style_menu_button(btn: Button):
 	hover.shadow_color = Color(0.0, 1.0, 1.0, 0.3)
 	hover.shadow_size = 10
 	
-	var pressed = hover.duplicate()
-	pressed.bg_color = Color(0.3, 0.1, 0.4, 0.9)
-	pressed.border_color = Color(1.0, 0.0, 1.0, 1.0)
+	var style_pressed = hover.duplicate()
+	style_pressed.bg_color = Color(0.3, 0.1, 0.4, 0.9)
+	style_pressed.border_color = Color(1.0, 0.0, 1.0, 1.0)
 	
 	btn.add_theme_stylebox_override("normal", normal)
 	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_stylebox_override("pressed", style_pressed)
 	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	
 	btn.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
@@ -127,6 +127,36 @@ func _show_death_screen(stats: Dictionary):
 	var t2 = create_tween()
 	t2.tween_property(title, "scale", Vector2(1.2, 1.2), 0.1)
 	t2.tween_property(title, "scale", Vector2(1.0, 1.0), 0.1)
+	
+	add_vault_splash()
+
+func add_vault_splash():
+	var splash = Label.new()
+	splash.text = "SPEND SHARDS IN EVOLUTION VAULT"
+	splash.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	splash.add_theme_font_size_override("font_size", 22)
+	splash.add_theme_color_override("font_color", Color(0.0, 1.0, 0.8)) # Teal/Neon
+	splash.add_theme_constant_override("outline_size", 6)
+	splash.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
+	
+	control.add_child(splash)
+	splash.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	# Center it horizontally using grow direction
+	splash.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	splash.position.y -= 120 # Above buttons
+	
+	# Entry animation
+	splash.scale = Vector2.ZERO
+	splash.pivot_offset = splash.size / 2
+	var t = create_tween()
+	t.tween_interval(0.5)
+	t.tween_property(splash, "scale", Vector2(1.2, 1.2), 0.3).set_trans(Tween.TRANS_BACK)
+	t.tween_property(splash, "scale", Vector2(1.0, 1.0), 0.1)
+	
+	# Pulsing
+	var t2 = create_tween().set_loops()
+	t2.tween_property(splash, "modulate", Color(1.5, 1.5, 2.0), 0.8)
+	t2.tween_property(splash, "modulate", Color.WHITE, 0.8)
 
 func _on_restart_pressed():
 	get_tree().paused = false
