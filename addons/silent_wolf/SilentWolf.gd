@@ -145,7 +145,7 @@ func send_get_request(http_node: HTTPRequest, request_url: String):
 	headers = add_jwt_token_headers(headers)
 	print("GET headers: " + str(headers))
 	if !http_node.is_inside_tree():
-		await get_tree().create_timer(0.01).timeout
+		await http_node.tree_entered
 	SWLogger.debug("Method: GET")
 	SWLogger.debug("request_url: " + str(request_url))
 	SWLogger.debug("headers: " + str(headers))
@@ -189,7 +189,7 @@ func send_post_request(http_node, request_url, payload):
 			break
 	var use_ssl = true
 	if !http_node.is_inside_tree():
-		await get_tree().create_timer(0.01).timeout
+		await http_node.tree_entered
 	var query = JSON.stringify(payload)
 	SWLogger.debug("Method: POST")
 	SWLogger.debug("request_url: " + str(request_url))
