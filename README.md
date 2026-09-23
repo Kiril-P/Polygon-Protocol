@@ -2,8 +2,6 @@
 
 ![Dash through exposed boss hearts](docs/media/04-polygon-protocol.gif)
 
-*Staged boss encounter using the existing pentagon form and health upgrades; normal combat and damage.*
-
 <p align="center">
   <img src=".github/readme/gameplay-combat.png" alt="Polygon Protocol gameplay screenshot" width="900" />
 </p>
