@@ -84,8 +84,7 @@ func setup_button_animations():
 		btn.focus_mode = Control.FOCUS_NONE # Remove selection border
 		
 		btn.mouse_entered.connect(func():
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_sfx("hover")
+			AudioManager.play_sfx("hover")
 			var t = create_tween().set_parallel(true)
 			t.tween_property(btn, "scale", Vector2(1.1, 1.1), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 			t.tween_property(btn, "modulate", Color(1.5, 1.5, 2.0), 0.2)
@@ -97,8 +96,7 @@ func setup_button_animations():
 		)
 		
 		btn.button_down.connect(func():
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_sfx("click")
+			AudioManager.play_sfx("click")
 			btn.scale = Vector2(0.95, 0.95)
 		)
 		
@@ -113,11 +111,10 @@ func _show_death_screen(stats: Dictionary):
 	visible = true
 	var time_val = stats.get("time", 0.0)
 	var time_str = "%d:%02d" % [int(time_val / 60), int(time_val) % 60]
-	stats_label.text = "LEVEL REACHED: " + str(stats["level"]) + "\nSCORE: " + str(get_node("/root/GlobalData").run_score if has_node("/root/GlobalData") else 0) + "\nTIME SURVIVED: " + time_str + "\nSHARDS EARNED: " + str(stats["shards"]) + "\nHIGHEST COMBO: " + str(stats.get("highest_combo", 0))
+	stats_label.text = "LEVEL REACHED: " + str(stats["level"]) + "\nSCORE: " + str(GlobalData.run_score) + "\nTIME SURVIVED: " + time_str + "\nSHARDS EARNED: " + str(stats["shards"]) + "\nHIGHEST COMBO: " + str(stats.get("highest_combo", 0))
 	
-	if has_node("/root/GlobalData"):
-		total_shards_label.text = "TOTAL SHARDS: " + str(get_node("/root/GlobalData").total_shards)
-	
+	total_shards_label.text = "TOTAL SHARDS: " + str(GlobalData.total_shards)
+
 	# Stylish Fade In
 	var tween = create_tween()
 	tween.tween_property(control, "modulate:a", 1.0, 0.5).set_trans(Tween.TRANS_SINE)
@@ -164,8 +161,7 @@ func _on_restart_pressed():
 
 func _on_leaderboard_pressed():
 	get_tree().paused = false
-	if has_node("/root/GlobalData"):
-		get_node("/root/GlobalData").next_scene_path = "res://scenes/leaderboard.tscn"
+	GlobalData.next_scene_path = "res://scenes/leaderboard.tscn"
 	get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
 
 func _on_main_menu_pressed():

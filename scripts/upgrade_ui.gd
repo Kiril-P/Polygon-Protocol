@@ -10,7 +10,7 @@ func _ready():
 	visible = false
 	process_mode = PROCESS_MODE_ALWAYS
 	
-	var manager = get_node("/root/UpgradeManager")
+	var manager = UpgradeManager
 	if manager:
 		manager.request_upgrade_ui.connect(_show_upgrade_options)
 
@@ -48,10 +48,9 @@ func _show_upgrade_options(options: Array):
 
 func _on_upgrade_selected(upgrade_data: Dictionary):
 	# Selection animation before closing
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("click")
-		
-	var manager = get_node("/root/UpgradeManager")
+	AudioManager.play_sfx("click")
+	
+	var manager = UpgradeManager
 	if manager:
 		manager.apply_upgrade(upgrade_data)
 	

@@ -67,8 +67,7 @@ func setup_button_animations(btn: Button):
 	btn.focus_mode = Control.FOCUS_NONE
 	
 	btn.mouse_entered.connect(func():
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("hover")
+		AudioManager.play_sfx("hover")
 		var t = create_tween().set_parallel(true)
 		t.tween_property(btn, "scale", Vector2(1.1, 1.1), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		t.tween_property(btn, "modulate", Color(1.5, 1.5, 2.0), 0.2)
@@ -80,8 +79,7 @@ func setup_button_animations(btn: Button):
 	)
 	
 	btn.button_down.connect(func():
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("click")
+		AudioManager.play_sfx("click")
 		btn.scale = Vector2(0.95, 0.95)
 	)
 	
@@ -115,7 +113,7 @@ func setup_background():
 	particles.color = Color(0.0, 0.8, 1.0, 0.2) # Dim Cyan dots
 
 func update_ui():
-	var total = get_node("/root/GlobalData").total_shards
+	var total = GlobalData.total_shards
 	shard_label.text = "QUANTUM SHARDS: " + str(total)
 
 func create_upgrade_cards():
@@ -123,7 +121,7 @@ func create_upgrade_cards():
 	for child in grid.get_children():
 		child.queue_free()
 	
-	var gd = get_node("/root/GlobalData")
+	var gd = GlobalData
 	
 	for upg in vault_upgrades:
 		var card = create_card(upg, gd)
@@ -204,12 +202,10 @@ func create_card(data, gd):
 	btn.pressed.connect(func():
 		if owned:
 			gd.toggle_upgrade(data["id"])
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_sfx("click")
+			AudioManager.play_sfx("click")
 			create_upgrade_cards() # Refresh UI
 		elif gd.total_shards >= data["cost"]:
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_sfx("click")
+			AudioManager.play_sfx("click")
 			gd.total_shards -= data["cost"]
 			gd.permanent_upgrades[data["id"]] = 1
 			gd.save_game()
@@ -226,8 +222,7 @@ func create_card(data, gd):
 	
 	# Hover animation
 	panel.mouse_entered.connect(func():
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("hover")
+		AudioManager.play_sfx("hover")
 		var t = create_tween().set_parallel(true)
 		t.tween_property(panel, "scale", Vector2(1.05, 1.05), 0.2)
 		t.tween_property(panel, "modulate", Color(1.2, 1.2, 1.5), 0.2)
@@ -241,13 +236,11 @@ func create_card(data, gd):
 	return panel
 
 func _on_back_pressed():
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("click")
-	
+	AudioManager.play_sfx("click")
+
 	var t = create_tween()
 	t.tween_property(self, "modulate:a", 0.0, 0.3)
 	t.tween_callback(func():
-		if has_node("/root/GlobalData"):
-			get_node("/root/GlobalData").next_scene_path = "res://scenes/main_menu.tscn"
+		GlobalData.next_scene_path = "res://scenes/main_menu.tscn"
 		get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
 	)

@@ -112,7 +112,7 @@ var is_ui_active: bool = false
 func get_random_upgrades(count: int = 3) -> Array:
 	var player = get_tree().get_first_node_in_group("player")
 	var is_circle = player and player.current_shape == 0
-	var gd = get_node("/root/GlobalData") if has_node("/root/GlobalData") else null
+	var gd = GlobalData
 	var force_specials = first_upgrade_of_run and gd and gd.is_first_run
 	
 	var pool = []
@@ -173,12 +173,6 @@ func get_random_upgrades(count: int = 3) -> Array:
 	pool.shuffle()
 	return pool.slice(0, min(count, pool.size()))
 
-func _ready():
-	# Find player and connect to level_up_ready signal
-	var player = get_tree().get_first_node_in_group("player")
-	if player:
-		player.level_up_ready.connect(_on_player_level_up)
-
 func _on_player_level_up():
 	level_up_pending += 1
 	if is_ui_active:
@@ -212,7 +206,7 @@ func apply_upgrade(upgrade_data: Dictionary):
 	var upgrade_id = upgrade_data["id"]
 	upgrade_counts[upgrade_id] = upgrade_counts.get(upgrade_id, 0) + 1
 	
-	var gd = get_node("/root/GlobalData") if has_node("/root/GlobalData") else null
+	var gd = GlobalData
 	var is_first_run_evolution = false
 	if first_upgrade_of_run:
 		first_upgrade_of_run = false

@@ -23,6 +23,8 @@ var hit_enemies: Array[RID] = [] # NEW: Avoid hitting same enemy multiple times
 var hits_remaining: int
 var time_alive: float = 0.0
 var nearest_enemy: Node2D = null
+var retarget_timer: float = 0.0
+const RETARGET_INTERVAL: float = 0.1
 var fired_by_enemy: bool = false 
 
 @onready var sprite: Polygon2D = $BulletSprite
@@ -61,7 +63,10 @@ func _physics_process(delta: float):
 	
 	# Homing behavior
 	if homing_strength > 0.0:
-		find_nearest_enemy()
+		retarget_timer -= delta
+		if retarget_timer <= 0.0 or not is_instance_valid(nearest_enemy):
+			find_nearest_enemy()
+			retarget_timer = RETARGET_INTERVAL
 		if nearest_enemy:
 			var desired_direction = (nearest_enemy.global_position - global_position).normalized()
 			direction = direction.lerp(desired_direction, homing_strength * delta * 5.0).normalized()
@@ -140,9 +145,8 @@ func handle_screen_bounce():
 func _on_bounced():
 	bounces -= 1
 	rotation = direction.angle()
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("bullet_bounce", -5.0)
-	
+	AudioManager.play_sfx("bullet_bounce", -5.0)
+
 	var tween = create_tween()
 	sprite.modulate = Color(5, 5, 5, 1)
 	tween.tween_property(sprite, "modulate", Color(1, 1, 1, 1), 0.1)
@@ -189,8 +193,7 @@ func _on_body_entered(body: Node):
 			hit_player(body)
 	elif body.collision_layer & 1: # Hits Layer 1 (World/Platforms)
 		# No more bouncing off platforms - just die to keep screen clear
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("bullet_bounce", -15.0)
+		AudioManager.play_sfx("bullet_bounce", -15.0)
 		queue_free()
 
 func hit_player(player_node: Node):
@@ -235,9 +238,8 @@ func hit_enemy(enemy: Node):
 
 func create_explosion():
 	# Play SFX - Reduced volume as requested
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("bullet_explosion", -8.0)
-		
+	AudioManager.play_sfx("bullet_explosion", -8.0)
+	
 	var enemies = get_tree().get_nodes_in_group("enemies")
 	for enemy in enemies:
 		if not is_instance_valid(enemy):
@@ -346,9 +348,8 @@ func spawn_lightning_visual(from: Vector2, to: Vector2):
 
 func split_bullet():
 	# Create 2 bullets at angles
-	var bullet_scene = load("res://scenes/bullet.tscn")
 	for i in range(2):
-		var new_bullet = bullet_scene.instantiate()
+		var new_bullet = load("res://scenes/bullet.tscn").instantiate()
 		get_parent().add_child(new_bullet)
 		new_bullet.global_position = global_position
 		

@@ -162,9 +162,8 @@ func set_boss_music_mode(enabled: bool, phase: int):
 		target_pitch = 1.15 + (phase - 1) * 0.15 # Phase 1: 1.15, Phase 2: 1.30, Phase 3: 1.45
 	
 	var base_vol = 0.0
-	if has_node("/root/GlobalData"):
-		base_vol = linear_to_db(get_node("/root/GlobalData").audio_settings.music)
-	
+	base_vol = linear_to_db(GlobalData.audio_settings.music)
+
 	var target_volume = base_vol + 2.0 if enabled else base_vol
 	
 	var tween = create_tween().set_parallel(true)
@@ -202,9 +201,8 @@ func play_next_track():
 	var tween = create_tween()
 	# Respect global volume settings if they exist
 	var target_vol = 0.0
-	if has_node("/root/GlobalData"):
-		target_vol = linear_to_db(get_node("/root/GlobalData").audio_settings.music)
-	
+	target_vol = linear_to_db(GlobalData.audio_settings.music)
+
 	tween.tween_property(music_player, "volume_db", target_vol, 2.0)
 
 func _on_music_finished():

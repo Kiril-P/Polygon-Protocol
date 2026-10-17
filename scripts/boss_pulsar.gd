@@ -171,8 +171,7 @@ func setup_lasers():
 			pulse.tween_property(laser, "width", 18.0, 0.08).set_trans(Tween.TRANS_SINE)
 			pulse.tween_property(laser, "width", 12.0, 0.08).set_trans(Tween.TRANS_SINE)
 			
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("glitch", 5.0, 1.2, 1.5)
+		AudioManager.play_sfx("glitch", 5.0, 1.2, 1.5)
 	)
 
 func setup_platforms():
@@ -427,8 +426,7 @@ func remove_one_platform():
 		
 		t.tween_callback(p.queue_free)
 		
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("glitch", 2.0, 0.8, 1.2)
+		AudioManager.play_sfx("glitch", 2.0, 0.8, 1.2)
 
 func take_damage(amount: float):
 	if is_dying: return
@@ -454,20 +452,18 @@ func take_damage(amount: float):
 		laser_speed *= 1.2
 		setup_lasers()
 		remove_one_platform() # First platform gone
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("boss_spawn", 1.2)
-			get_node("/root/AudioManager").set_boss_music_mode(true, 2)
-			
+		AudioManager.play_sfx("boss_spawn", 1.2)
+		AudioManager.set_boss_music_mode(true, 2)
+		
 	elif health_percent < 0.34 and phase == 2:
 		phase = 3
 		laser_speed *= 1.2
 		poly.color = Color(0.1, 0.0, 0.2) # Deep Purple Void
 		setup_lasers()
 		remove_one_platform() # Second platform gone
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("boss_spawn", 1.5)
-			get_node("/root/AudioManager").set_boss_music_mode(true, 3)
-	
+		AudioManager.play_sfx("boss_spawn", 1.5)
+		AudioManager.set_boss_music_mode(true, 3)
+
 	if health <= 0:
 		start_death_sequence()
 
@@ -497,10 +493,9 @@ func start_death_sequence():
 			b.queue_free()
 			
 	# 3. Dramatic visual sequence
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").set_muffled(true)
-		get_node("/root/AudioManager").play_sfx("boss_spawn", 2.0, 0.4) # Very deep boom
-	
+	AudioManager.set_muffled(true)
+	AudioManager.play_sfx("boss_spawn", 2.0, 0.4) # Very deep boom
+
 	var death_tween = create_tween()
 	# Series of violent shakes and flashes (More intense for Pulsar)
 	for i in range(16):
@@ -533,15 +528,13 @@ func spawn_small_explosion(pos: Vector2):
 	p.emitting = true
 	get_tree().create_timer(1.0).timeout.connect(p.queue_free)
 	
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("enemy_death", -2.0, 1.2, 1.8)
+	AudioManager.play_sfx("enemy_death", -2.0, 1.2, 1.8)
 
 func die():
 	# Final cleanup and rewards
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").set_muffled(false)
-		get_node("/root/AudioManager").play_sfx("enemy_death", 15.0, 0.2, 0.5)
-	
+	AudioManager.set_muffled(false)
+	AudioManager.play_sfx("enemy_death", 15.0, 0.2, 0.5)
+
 	# Screen shake
 	if player and player.has_method("add_shake"):
 		player.add_shake(45.0)
@@ -555,14 +548,13 @@ func die():
 		if player.has_method("add_xp"):
 			player.add_xp(xp_value)
 	
-	if has_node("/root/GlobalData"):
-		var gd = get_node("/root/GlobalData")
-		gd.total_kills += 1
-		gd.run_kills += 1
-		gd.add_score(xp_value * 30, player.combo_count if player else 0)
-		gd.add_shards(shard_reward) # AWARD SHARDS
-		gd.save_game()
-	
+	var gd = GlobalData
+	gd.total_kills += 1
+	gd.run_kills += 1
+	gd.add_score(xp_value * 30, player.combo_count if player else 0)
+	gd.add_shards(shard_reward) # AWARD SHARDS
+	gd.save_game()
+
 	# REMOVE ARENA BARRIER AND HEARTS ONLY IF LAST BOSS
 	var other_bosses = get_tree().get_nodes_in_group("bosses")
 	if other_bosses.size() <= 1: # We are the last one

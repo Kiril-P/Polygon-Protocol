@@ -10,10 +10,9 @@ var options_scene = preload("res://scenes/options_menu.tscn")
 
 func _ready():
 	# Set music to menu mode
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").set_music_menu_mode(true)
-		get_node("/root/AudioManager").set_muffled(false)
-		
+	AudioManager.set_music_menu_mode(true)
+	AudioManager.set_muffled(false)
+	
 	# Leaderboard Button
 	var lb_button = Button.new()
 	lb_button.text = "LEADERBOARD"
@@ -117,8 +116,7 @@ func setup_button_animations():
 		btn.focus_mode = Control.FOCUS_NONE # Remove the white selection border
 		
 		btn.mouse_entered.connect(func():
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_sfx("hover")
+			AudioManager.play_sfx("hover")
 			var tween = create_tween().set_parallel(true)
 			tween.tween_property(btn, "scale", Vector2(1.1, 1.1), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 			tween.tween_property(btn, "modulate", Color(1.5, 1.5, 2.0), 0.2)
@@ -131,8 +129,7 @@ func setup_button_animations():
 		)
 		
 		btn.button_down.connect(func():
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_sfx("click")
+			AudioManager.play_sfx("click")
 			btn.scale = Vector2(0.95, 0.95)
 		)
 		
@@ -217,8 +214,7 @@ func spawn_menu_enemy():
 	
 	# Detect Click
 	enemy.pressed.connect(func():
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("enemy_death", 0.0, 0.9, 1.1, 0.3)
+		AudioManager.play_sfx("enemy_death", 0.0, 0.9, 1.1, 0.3)
 		spawn_menu_death_particles(enemy.position + poly.position, poly.color)
 		enemy.queue_free()
 		# Respawn another after a delay to keep the menu busy
@@ -306,7 +302,7 @@ func _start_game(is_quick: bool):
 	
 	# Display High Score before warping (If not quick)
 	if not is_quick:
-		var gd = get_node("/root/GlobalData")
+		var gd = GlobalData
 		if gd and gd.high_score > 0:
 			var hs_label = Label.new()
 			hs_label.text = "BEST TIME: %d:%02d" % [int(gd.high_score / 60), int(gd.high_score) % 60]
@@ -337,10 +333,8 @@ func _start_game(is_quick: bool):
 	
 	tween.set_parallel(false)
 	tween.tween_callback(func():
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").set_music_menu_mode(false)
-		if has_node("/root/GlobalData"):
-			get_node("/root/GlobalData").next_scene_path = "res://scenes/game.tscn"
+		AudioManager.set_music_menu_mode(false)
+		GlobalData.next_scene_path = "res://scenes/game.tscn"
 		get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
 	)
 
@@ -351,15 +345,13 @@ func _on_upgrade_button_pressed():
 	t.tween_property($VBoxContainer, "position:x", -500, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	t.set_parallel(false)
 	t.tween_callback(func():
-		if has_node("/root/GlobalData"):
-			get_node("/root/GlobalData").next_scene_path = "res://scenes/evolution_vault.tscn"
+		GlobalData.next_scene_path = "res://scenes/evolution_vault.tscn"
 		get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
 	)
 
 func _on_leaderboard_pressed():
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("click")
-	
+	AudioManager.play_sfx("click")
+
 	# Cool "Warp" Animation like Evolution Vault
 	start_button.disabled = true
 	upgrade_button.disabled = true
@@ -389,15 +381,13 @@ func _on_leaderboard_pressed():
 	
 	tween.set_parallel(false)
 	tween.tween_callback(func():
-		if has_node("/root/GlobalData"):
-			get_node("/root/GlobalData").next_scene_path = "res://scenes/leaderboard.tscn"
+		GlobalData.next_scene_path = "res://scenes/leaderboard.tscn"
 		get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
 	)
 
 func _on_options_button_pressed():
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("click")
-	
+	AudioManager.play_sfx("click")
+
 	var options = options_scene.instantiate()
 	add_child(options)
 	

@@ -23,7 +23,7 @@ func _ready():
 	player = get_tree().get_first_node_in_group("player")
 	
 	# Check if tutorial is disabled to start spawning immediately
-	if has_node("/root/GlobalData") and not get_node("/root/GlobalData").show_tutorial:
+	if not GlobalData.show_tutorial:
 		tutorial_finished = true
 
 func _process(delta: float):
@@ -66,7 +66,7 @@ func _process(delta: float):
 	
 	# Reduced safety window after tutorial/start
 	var current_delay = spawn_delay
-	if has_node("/root/GlobalData") and get_node("/root/GlobalData").is_first_run:
+	if GlobalData.is_first_run:
 		current_delay = 0.5 # Start almost immediately
 	elif tutorial_finished:
 		current_delay = 0.2 # Start spawning almost immediately after tutorial/start
@@ -84,12 +84,11 @@ func _process(delta: float):
 		scaling += pow(post_60_time, 1.4) * 1.2 
 		
 	var difficulty_mult = 1.0
-	if has_node("/root/GlobalData"):
-		var level = get_node("/root/GlobalData").difficulty_level
-		# 1: 0.7x, 2: 1.0x, 3: 1.5x, 4: 2.0x, 5: 3.0x
-		var multipliers = [0.0, 0.7, 1.0, 1.5, 2.0, 3.0]
-		difficulty_mult = multipliers[level]
-		
+	var level = GlobalData.difficulty_level
+	# 1: 0.7x, 2: 1.0x, 3: 1.5x, 4: 2.0x, 5: 3.0x
+	var multipliers = [0.0, 0.7, 1.0, 1.5, 2.0, 3.0]
+	difficulty_mult = multipliers[level]
+	
 	var current_spawn_rate = spawn_rate * difficulty_mult * scaling
 	
 	if not boss_active:
@@ -110,15 +109,14 @@ func spawn_hazard():
 	
 	# Show warning on first hazard if tutorial is on
 	if not corruption_warning_shown:
-		if has_node("/root/GlobalData") and get_node("/root/GlobalData").show_tutorial:
+		if GlobalData.show_tutorial:
 			var hud = get_tree().get_first_node_in_group("hud")
 			if hud and hud.has_method("show_corruption_warning"):
 				hud.show_corruption_warning()
 		corruption_warning_shown = true
 
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("glitch", 5.0, 0.5, 0.8) # Increased volume from -5.0 to 5.0
-	
+	AudioManager.play_sfx("glitch", 5.0, 0.5, 0.8) # Increased volume from -5.0 to 5.0
+
 	# Spawn hazard somewhere nearby but not right on top of player
 	var angle = randf() * TAU
 	var dist = randf_range(200, 500)
@@ -191,9 +189,8 @@ func spawn_enemy():
 	if int(time_passed) % 120 == 0 and int(time_passed) > 0:
 		# Just spawn an extra tank for now but make it bigger
 		index = 4 
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("boss_spawn")
-	
+		AudioManager.play_sfx("boss_spawn")
+
 	# Safety check for array size
 	index = clamp(index, 0, enemy_types.size() - 1)
 	
@@ -245,8 +242,8 @@ func spawn_major_boss(milestone: int, forced_pos: Vector2 = Vector2.ZERO):
 	var existing_enemies = get_tree().get_nodes_in_group("enemies")
 	
 	# Play a single "Sweep" sound if we had a lot of enemies
-	if existing_enemies.size() > 5 and has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("glitch", -5.0, 0.8, 1.2)
+	if existing_enemies.size() > 5:
+		AudioManager.play_sfx("glitch", -5.0, 0.8, 1.2)
 
 	for enemy in existing_enemies:
 		if is_instance_valid(enemy) and enemy != boss and not enemy.is_in_group("bosses"):
@@ -298,10 +295,9 @@ func spawn_major_boss(milestone: int, forced_pos: Vector2 = Vector2.ZERO):
 	boss.set_collision_mask_value(1, true) # World
 	boss.set_collision_mask_value(2, true) # Player (to avoid overlapping too much if desired)
 	
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("boss_spawn", 4.0) 
-		get_node("/root/AudioManager").set_boss_music_mode(true, 1) 
-		
+	AudioManager.play_sfx("boss_spawn", 4.0) 
+	AudioManager.set_boss_music_mode(true, 1) 
+	
 	get_parent().add_child(boss)
 	
 	# Clear bullets
@@ -325,10 +321,9 @@ func spawn_6min_choice():
 	# Pause the game for the choice
 	get_tree().paused = true
 	
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("boss_spawn", 2.0)
-		get_node("/root/AudioManager").set_muffled(true)
-	
+	AudioManager.play_sfx("boss_spawn", 2.0)
+	AudioManager.set_muffled(true)
+
 	# Spawn Choice 1: Boss Fight
 	var choice_boss = _create_choice_node("CHALLENGE BOSS", true)
 	choice_boss.global_position = player.global_position + Vector2(-300, 0)
@@ -355,9 +350,8 @@ func _on_choice_boss_selected():
 	choice_active = false
 	choice_made_360 = true
 	
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").set_muffled(false)
-		
+	AudioManager.set_muffled(false)
+	
 	# The milestone logic in _process will now trigger the boss spawn on next frame
 	_cleanup_choices()
 
@@ -367,14 +361,12 @@ func _on_choice_endless_selected():
 	choice_made_360 = true
 	bosses_spawned.append(360) # Mark as "spawned" so it doesn't trigger again
 	
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").set_muffled(false)
-		
+	AudioManager.set_muffled(false)
+	
 	_cleanup_choices()
 	
 	# Visual feedback for endless
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("level_up", 2.0)
+	AudioManager.play_sfx("level_up", 2.0)
 
 func _cleanup_choices():
 	for node in get_tree().get_nodes_in_group("choice_nodes"):
@@ -403,5 +395,4 @@ func _on_boss_tree_exited():
 		boss_active = false
 		if player:
 			player.dash_nerf_active = false
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").set_boss_music_mode(false, 1)
+		AudioManager.set_boss_music_mode(false, 1)

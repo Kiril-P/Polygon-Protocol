@@ -100,40 +100,36 @@ func _ready():
 	current_energy = max_energy
 	
 	# Initial Setup & Meta-Upgrades
-	if has_node("/root/GlobalData"):
-		var gd = get_node("/root/GlobalData")
-		if gd.is_upgrade_active("energy_shield"):
-			spawn_shield()
-			
+	var gd = GlobalData
+	if gd.is_upgrade_active("energy_shield"):
+		spawn_shield()
+		
 	update_shape_visuals()
 	
 	# Set Player Palette
 	sprite.color = Color(0.0, 0.8, 1.0) # Neon Cyan
 	
 	# Reset Run Stats
-	if has_node("/root/GlobalData"):
-		var _gd = get_node("/root/GlobalData")
-		_gd.run_kills = 0
-		_gd.run_score = 0
-		_gd.run_level = 1
-		_gd.run_time = 0.0
-		overdrive_available = _gd.is_upgrade_active("emergency_overdrive")
-	
-	if has_node("/root/UpgradeManager"):
-		get_node("/root/UpgradeManager").reset_upgrades()
-	
+	var _gd = GlobalData
+	_gd.run_kills = 0
+	_gd.run_score = 0
+	_gd.run_level = 1
+	_gd.run_time = 0.0
+	overdrive_available = _gd.is_upgrade_active("emergency_overdrive")
+
+	UpgradeManager.reset_upgrades()
+
 	# Apply Permanent Stat Boosts
 	apply_upgrade("init_permanent", 0)
 	
 	# Apply Dash Mastery
-	if has_node("/root/GlobalData") and get_node("/root/GlobalData").is_upgrade_active("dash_mastery"):
+	if GlobalData.is_upgrade_active("dash_mastery"):
 		energy_consumption *= 0.75 # 25% reduction
 	
 	# Intro Particle Burst
 	spawn_intro_particles()
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("player_spawn")
-	
+	AudioManager.play_sfx("player_spawn")
+
 	# PHYSICS SETUP (Fixes sticking)
 	# Player is Layer 2. Mask 1 (World). NO Mask 3 (Enemies).
 	collision_layer = 0
@@ -166,7 +162,7 @@ func _ready():
 	
 	# DASH TUTORIAL
 	get_tree().paused = false # Ensure game is unpaused at start
-	if has_node("/root/GlobalData") and get_node("/root/GlobalData").show_tutorial:
+	if GlobalData.show_tutorial:
 		show_full_tutorial()
 	else:
 		# If no tutorial, tell spawner it's okay to start
@@ -214,7 +210,7 @@ func show_full_tutorial():
 		spawner.time_passed = 0.0
 	
 	var label = Label.new()
-	var use_mouse = get_node("/root/GlobalData").use_mouse_controls
+	var use_mouse = GlobalData.use_mouse_controls
 	
 	label.set_anchors_preset(Control.PRESET_CENTER)
 	label.grow_horizontal = Control.GROW_DIRECTION_BOTH
@@ -371,10 +367,9 @@ func _physics_process(delta: float):
 			kick_tween.tween_property(camera, "zoom", base_zoom * 1.05, 0.1).set_trans(Tween.TRANS_BACK)
 			kick_tween.tween_property(camera, "zoom", base_zoom, 0.2).set_delay(0.1)
 			
-			if has_node("/root/AudioManager"):
-				# Lower volume (-10db) and start persistent loop
-				get_node("/root/AudioManager").start_persistent_sfx("player_dash", "dash", -10.0)
-		
+			# Lower volume (-10db) and start persistent loop
+			AudioManager.start_persistent_sfx("player_dash", "dash", -10.0)
+	
 		# Screen rumble for dashing
 		add_shake(2.0)
 		
@@ -382,7 +377,7 @@ func _physics_process(delta: float):
 		var consumption_mult = 1.4 if dash_nerf_active else 1.0
 		
 		# PROTOCOL OVERRIDE: Maintain 50% efficiency during nerf
-		if dash_nerf_active and has_node("/root/GlobalData") and get_node("/root/GlobalData").is_upgrade_active("dash_resistance"):
+		if dash_nerf_active and GlobalData.is_upgrade_active("dash_resistance"):
 			consumption_mult = 1.2 # Much better than 1.4
 			
 		current_energy -= energy_consumption * consumption_mult * delta
@@ -392,16 +387,14 @@ func _physics_process(delta: float):
 			is_dashing = false
 			modulate = Color(1, 1, 1, 1)
 			regen_delay_timer = 1.0 if dash_nerf_active else 0.5
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").stop_persistent_sfx("dash")
+			AudioManager.stop_persistent_sfx("dash")
 		energy_changed.emit(current_energy, max_energy)
 	else:
 		if is_dashing:
 			is_dashing = false
 			modulate = Color(1, 1, 1, 1)
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").stop_persistent_sfx("dash")
-		
+			AudioManager.stop_persistent_sfx("dash")
+	
 	if current_energy < max_energy:
 			if regen_delay_timer > 0:
 				regen_delay_timer -= delta
@@ -409,7 +402,7 @@ func _physics_process(delta: float):
 				var current_recovery = energy_recovery
 				if dash_nerf_active:
 					var nerf_mult = 0.6 # Recovery is 40% slower
-					if has_node("/root/GlobalData") and get_node("/root/GlobalData").is_upgrade_active("dash_resistance"):
+					if GlobalData.is_upgrade_active("dash_resistance"):
 						nerf_mult = 0.8 # Only 20% slower
 					current_recovery *= nerf_mult
 				current_energy += current_recovery * delta
@@ -452,12 +445,11 @@ func _physics_process(delta: float):
 		handle_prismatic_beam(delta)
 
 	# Shield Regeneration logic
-	if not has_shield and has_node("/root/GlobalData") and get_node("/root/GlobalData").is_upgrade_active("shield_regen"):
+	if not has_shield and GlobalData.is_upgrade_active("shield_regen"):
 		shield_regen_timer += delta
 		if shield_regen_timer >= SHIELD_REGEN_TIME:
 			spawn_shield()
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_sfx("shield_regen")
+			AudioManager.play_sfx("shield_regen")
 
 func spawn_shield():
 	has_shield = true
@@ -649,9 +641,8 @@ func handle_movement(delta: float):
 	var input_dir = Vector2.ZERO
 	
 	var use_mouse = false
-	if has_node("/root/GlobalData"):
-		use_mouse = get_node("/root/GlobalData").use_mouse_controls
-	
+	use_mouse = GlobalData.use_mouse_controls
+
 	if use_mouse:
 		var mouse_pos = get_global_mouse_position()
 		var to_mouse = mouse_pos - global_position
@@ -695,9 +686,8 @@ func shoot():
 		return
 	
 	# Play SFX
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("player_fire")
-	
+	AudioManager.play_sfx("player_fire")
+
 	# Fire bullets from each edge
 	var angle_step = TAU / current_shape
 	for i in range(current_shape):
@@ -726,8 +716,8 @@ func shoot():
 				bullet.apply_upgrade("explode", explosion_radius)
 
 func reset_combo():
-	if combo_count > 10 and has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("combo_break", -10.0, 0.8, 1.2)
+	if combo_count > 10:
+		AudioManager.play_sfx("combo_break", -10.0, 0.8, 1.2)
 	combo_count = 0
 	combo_timer = 0
 	speed_multiplier -= combo_speed_boost
@@ -762,8 +752,7 @@ func add_xp(amount: float):
 
 func level_up():
 	level += 1
-	if has_node("/root/GlobalData"):
-		get_node("/root/GlobalData").run_level = level
+	GlobalData.run_level = level
 	xp -= xp_to_next_level
 	xp_to_next_level *= 1.15  # Scaling XP requirement
 	xp_changed.emit(xp, xp_to_next_level)
@@ -795,13 +784,11 @@ func level_up():
 	trigger_level_up_blast()
 	
 	# Play SFX
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("level_up")
-	
+	AudioManager.play_sfx("level_up")
+
 	# Open Upgrade UI via Autoload
-	if has_node("/root/UpgradeManager"):
-		get_node("/root/UpgradeManager")._on_player_level_up()
-	
+	UpgradeManager._on_player_level_up()
+
 	level_up_ready.emit()
 
 func trigger_evolution_visual():
@@ -886,7 +873,7 @@ func trigger_level_up_blast():
 			push_tween.tween_property(enemy, "global_position", target_pos, 0.5).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
 	
 	# Blast Cleaning: Delete bullets if upgrade is purchased
-	if has_node("/root/GlobalData") and get_node("/root/GlobalData").is_upgrade_active("blast_cleaning"):
+	if GlobalData.is_upgrade_active("blast_cleaning"):
 		var bullets = get_tree().get_nodes_in_group("enemy_bullets")
 		for b in bullets:
 			# Visual effect for bullet deletion
@@ -912,9 +899,8 @@ func toggle_pause():
 		is_unpausing = true # Prevent movement during animation
 		
 		# Clear muffled effect
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").set_muffled(false)
-			
+		AudioManager.set_muffled(false)
+		
 		if has_node("PauseCanvas"):
 			var canvas = $PauseCanvas
 			var menu_ui = canvas.get_node_or_null("PauseMenuUI")
@@ -976,10 +962,9 @@ func pause_game_fractured():
 	velocity = Vector2.ZERO
 	
 	# Play SFX
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("pause")
-		get_node("/root/AudioManager").set_muffled(true)
-	
+	AudioManager.play_sfx("pause")
+	AudioManager.set_muffled(true)
+
 	get_tree().paused = true
 	
 	# Create Canvas Layer for the overlay
@@ -1021,7 +1006,7 @@ func pause_game_fractured():
 	main_hbox.add_child(options_ui)
 	
 	# Run Stats (New addition)
-	var gd = get_node("/root/GlobalData") if has_node("/root/GlobalData") else null
+	var gd = GlobalData
 	if gd:
 		var stats_box = VBoxContainer.new()
 		stats_box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1106,8 +1091,7 @@ func pause_game_fractured():
 		
 		btn.mouse_entered.connect(func():
 			if not is_instance_valid(canvas_ref): return
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_sfx("hover")
+			AudioManager.play_sfx("hover")
 			var t = canvas_ref.create_tween()
 			t.tween_property(btn, "scale", Vector2(1.1, 1.1), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 			t.parallel().tween_property(btn, "modulate", Color(1.5, 1.5, 2.0), 0.2)
@@ -1119,8 +1103,7 @@ func pause_game_fractured():
 			t.parallel().tween_property(btn, "modulate", Color.WHITE, 0.2)
 		)
 		btn.button_down.connect(func():
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_sfx("click")
+			AudioManager.play_sfx("click")
 			btn.scale = Vector2(0.9, 0.9)
 		)
 		btn.button_up.connect(func():
@@ -1142,8 +1125,7 @@ func pause_game_fractured():
 		
 		# SFX on value change
 		slider.value_changed.connect(func(_v):
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_sfx("hover", -15.0)
+			AudioManager.play_sfx("hover", -15.0)
 		)
 
 	#side bar labels for audio following actual values
@@ -1378,8 +1360,7 @@ func take_damage(_amount: float):
 	if has_shield:
 		has_shield = false
 		shield_regen_timer = 0.0
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("shield_break")
+		AudioManager.play_sfx("shield_break")
 		if is_instance_valid(shield_node):
 			# Shatter effect
 			var shatter_tween = create_tween()
@@ -1392,7 +1373,7 @@ func take_damage(_amount: float):
 		add_shake(20.0)
 		
 		# REPULSIVE ARMOR (Also triggers on shield break)
-		if has_node("/root/GlobalData") and get_node("/root/GlobalData").is_upgrade_active("repulsive_armor"):
+		if GlobalData.is_upgrade_active("repulsive_armor"):
 			trigger_repulsive_pushback()
 			
 		return
@@ -1400,9 +1381,8 @@ func take_damage(_amount: float):
 	current_hearts -= 1
 	health_changed.emit(current_hearts, max_hearts)
 	
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("player_hit", 4.0) # Reset from boost
-		
+	AudioManager.play_sfx("player_hit", 4.0) # Reset from boost
+	
 	add_shake(60.0) # Massive hit impact
 	
 	# Dim glow based on health
@@ -1424,7 +1404,7 @@ func take_damage(_amount: float):
 		trigger_emergency_overdrive()
 	
 	# REPULSIVE ARMOR
-	if has_node("/root/GlobalData") and get_node("/root/GlobalData").is_upgrade_active("repulsive_armor"):
+	if GlobalData.is_upgrade_active("repulsive_armor"):
 		trigger_repulsive_pushback()
 	
 	if current_hearts <= 0:
@@ -1469,9 +1449,8 @@ func trigger_emergency_overdrive():
 	is_in_overdrive = true
 	
 	# Visual/Sound
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("level_up", 5.0, 1.5, 2.0)
-	
+	AudioManager.play_sfx("level_up", 5.0, 1.5, 2.0)
+
 	# Boost stats
 	var original_speed = speed_multiplier
 	var original_rate = fire_rate
@@ -1545,25 +1524,23 @@ func die():
 	if spawner:
 		time_survived = spawner.time_passed
 	
-	if has_node("/root/GlobalData"):
-		var gd = get_node("/root/GlobalData")
-		gd.run_time = spawner.time_passed if spawner else 0.0
-		if gd.has_upgrade("shard_multiplier"):
-			shards_earned = int(shards_earned * 1.5)
-			
-		gd.add_shards(shards_earned)
-		if gd.run_score > gd.high_score_points:
-			gd.high_score_points = gd.run_score
-			gd.best_kills = gd.run_kills
-			gd.best_level = gd.run_level
-			gd.high_score = time_survived
-		gd.save_game()
-	
+	var gd = GlobalData
+	gd.run_time = spawner.time_passed if spawner else 0.0
+	if gd.has_upgrade("shard_multiplier"):
+		shards_earned = int(shards_earned * 1.5)
+		
+	gd.add_shards(shards_earned)
+	if gd.run_score > gd.high_score_points:
+		gd.high_score_points = gd.run_score
+		gd.best_kills = gd.run_kills
+		gd.best_level = gd.run_level
+		gd.high_score = time_survived
+	gd.save_game()
+
 	# Play SFX
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("game_over")
-		get_node("/root/AudioManager").set_muffled(true) # Muffle on death screen too
-	
+	AudioManager.play_sfx("game_over")
+	AudioManager.set_muffled(true) # Muffle on death screen too
+
 	add_shake(100.0) # Screen-shattering death shake
 	emit_signal("game_over", {
 		"level": level,
@@ -1630,25 +1607,24 @@ func apply_upgrade(upgrade_type: String, value: float):
 			prismatic_beam_active = true
 			prismatic_beam_level += 1
 		"init_permanent":
-			if has_node("/root/GlobalData"):
-				var gd = get_node("/root/GlobalData")
+			var gd = GlobalData
+			
+			var extra_hearts = 0
+			if gd.is_upgrade_active("starting_hearts"):
+				extra_hearts = gd.get_upgrade_level("starting_hearts")
 				
-				var extra_hearts = 0
-				if gd.is_upgrade_active("starting_hearts"):
-					extra_hearts = gd.get_upgrade_level("starting_hearts")
-					
-				if extra_hearts > 0:
-					max_hearts += extra_hearts
-					current_hearts = max_hearts
-					health_changed.emit(current_hearts, max_hearts)
-					update_health_visuals()
+			if extra_hearts > 0:
+				max_hearts += extra_hearts
+				current_hearts = max_hearts
+				health_changed.emit(current_hearts, max_hearts)
+				update_health_visuals()
+			
+			var bonus_damage = 0
+			if gd.is_upgrade_active("sharp_edges"):
+				bonus_damage = gd.get_upgrade_level("sharp_edges")
 				
-				var bonus_damage = 0
-				if gd.is_upgrade_active("sharp_edges"):
-					bonus_damage = gd.get_upgrade_level("sharp_edges")
-					
-				if bonus_damage > 0:
-					damage_multiplier += 0.2 # 20% base boost
+			if bonus_damage > 0:
+				damage_multiplier += 0.2 # 20% base boost
 
 func check_contact_damage(_delta: float):
 	if not has_node("Area2D") or iframe_timer > 0: return

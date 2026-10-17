@@ -83,9 +83,8 @@ func style_menu_button(btn: Button, is_special: bool):
 	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 
 func _on_mouse_entered():
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("hover")
-		
+	AudioManager.play_sfx("hover")
+	
 	pivot_offset = size / 2
 	var tween = create_tween().set_parallel(true)
 	tween.tween_property(self, "scale", Vector2(1.1, 1.1), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

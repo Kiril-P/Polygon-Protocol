@@ -61,17 +61,16 @@ func style_menu_button(btn: Button):
 	btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
 
 func setup_initial_values():
-	if has_node("/root/GlobalData"):
-		var gd = get_node("/root/GlobalData")
-		if master_slider: master_slider.value = gd.audio_settings.master
-		if music_slider: music_slider.value = gd.audio_settings.music
-		if sfx_slider: sfx_slider.value = gd.audio_settings.sfx
-		update_button_texts()
+	var gd = GlobalData
+	if master_slider: master_slider.value = gd.audio_settings.master
+	if music_slider: music_slider.value = gd.audio_settings.music
+	if sfx_slider: sfx_slider.value = gd.audio_settings.sfx
+	update_button_texts()
 
 func setup_difficulty_selector():
 	if not difficulty_container: return
 	
-	var gd = get_node("/root/GlobalData")
+	var gd = GlobalData
 	var current_diff = gd.difficulty_level if gd else 2
 	
 	for i in range(1, 6):
@@ -105,11 +104,10 @@ func setup_difficulty_selector():
 	update_difficulty_buttons(current_diff)
 
 func _on_difficulty_selected(level: int):
-	if has_node("/root/GlobalData"):
-		var gd = get_node("/root/GlobalData")
-		gd.difficulty_level = level
-		gd.save_game()
-		update_difficulty_buttons(level)
+	var gd = GlobalData
+	gd.difficulty_level = level
+	gd.save_game()
+	update_difficulty_buttons(level)
 
 func update_difficulty_buttons(selected_level: int):
 	for i in range(difficulty_buttons.size()):
@@ -127,45 +125,40 @@ func update_difficulty_buttons(selected_level: int):
 func _on_master_volume_changed(value: float):
 	if is_setting_up: return
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Master"), linear_to_db(value))
-	if has_node("/root/GlobalData"):
-		get_node("/root/GlobalData").audio_settings.master = value
-		get_node("/root/GlobalData").save_game()
+	GlobalData.audio_settings.master = value
+	GlobalData.save_game()
 
 func _on_music_volume_changed(value: float):
 	if is_setting_up: return
 	var bus_idx = AudioServer.get_bus_index("Music")
 	if bus_idx != -1:
 		AudioServer.set_bus_volume_db(bus_idx, linear_to_db(value))
-	if has_node("/root/GlobalData"):
-		get_node("/root/GlobalData").audio_settings.music = value
-		get_node("/root/GlobalData").save_game()
+	GlobalData.audio_settings.music = value
+	GlobalData.save_game()
 
 func _on_sfx_volume_changed(value: float):
 	if is_setting_up: return
 	var bus_idx = AudioServer.get_bus_index("SFX")
 	if bus_idx != -1:
 		AudioServer.set_bus_volume_db(bus_idx, linear_to_db(value))
-	if has_node("/root/GlobalData"):
-		get_node("/root/GlobalData").audio_settings.sfx = value
-		get_node("/root/GlobalData").save_game()
-		# Play a tiny test sound when moving SFX slider
-		play_menu_sfx("enemy_hit")
+	GlobalData.audio_settings.sfx = value
+	GlobalData.save_game()
+	# Play a tiny test sound when moving SFX slider
+	play_menu_sfx("enemy_hit")
 
 func _on_mouse_controls_button_pressed():
-	if has_node("/root/GlobalData"):
-		var gd = get_node("/root/GlobalData")
-		gd.use_mouse_controls = !gd.use_mouse_controls
-		gd.save_game()
-		update_button_texts()
-		play_menu_sfx("click")
+	var gd = GlobalData
+	gd.use_mouse_controls = !gd.use_mouse_controls
+	gd.save_game()
+	update_button_texts()
+	play_menu_sfx("click")
 
 func _on_tutorial_button_pressed():
-	if has_node("/root/GlobalData"):
-		var gd = get_node("/root/GlobalData")
-		gd.show_tutorial = !gd.show_tutorial
-		gd.save_game()
-		update_button_texts()
-		play_menu_sfx("click")
+	var gd = GlobalData
+	gd.show_tutorial = !gd.show_tutorial
+	gd.save_game()
+	update_button_texts()
+	play_menu_sfx("click")
 
 func setup_as_overlay(callback: Callable):
 	close_callback = callback
@@ -180,10 +173,9 @@ func _on_back_button_pressed():
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 func update_button_texts():
-	if has_node("/root/GlobalData"):
-		var gd = get_node("/root/GlobalData")
-		if mouse_controls_btn: mouse_controls_btn.text = "INPUT: MOUSE" if gd.use_mouse_controls else "INPUT: WASD"
-		if tutorial_btn: tutorial_btn.text = "TUTORIAL: ON" if gd.show_tutorial else "TUTORIAL: OFF"
+	var gd = GlobalData
+	if mouse_controls_btn: mouse_controls_btn.text = "INPUT: MOUSE" if gd.use_mouse_controls else "INPUT: WASD"
+	if tutorial_btn: tutorial_btn.text = "TUTORIAL: ON" if gd.show_tutorial else "TUTORIAL: OFF"
 
 func setup_button_animations():
 	var btns = [mouse_controls_btn, tutorial_btn, back_button]
@@ -213,5 +205,4 @@ func setup_button_animations():
 		)
 
 func play_menu_sfx(sfx_name: String):
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx(sfx_name)
+	AudioManager.play_sfx(sfx_name)

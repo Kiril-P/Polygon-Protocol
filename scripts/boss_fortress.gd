@@ -306,10 +306,9 @@ func take_damage(amount: float):
 		# Drastic visual change for Phase 2
 		poly.color = Color(0.3, 0.0, 0.0) # Blood Red Core
 		poly.modulate = Color(5.0, 0.2, 1.0) # Purplish Rage Glow
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("boss_spawn", 1.2) # Re-use spawn sound for phase change
-			get_node("/root/AudioManager").set_boss_music_mode(true, 2)
-	
+		AudioManager.play_sfx("boss_spawn", 1.2) # Re-use spawn sound for phase change
+		AudioManager.set_boss_music_mode(true, 2)
+
 	# Visual Flash
 	var t = create_tween()
 	poly.modulate = Color(5, 5, 5, 1)
@@ -342,10 +341,9 @@ func start_death_sequence():
 			
 	# 3. Dramatic visual sequence
 	# Muffle music/SFX for impact
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").set_muffled(true)
-		get_node("/root/AudioManager").play_sfx("boss_spawn", 1.5, 0.5) # Low pitch boom
-	
+	AudioManager.set_muffled(true)
+	AudioManager.play_sfx("boss_spawn", 1.5, 0.5) # Low pitch boom
+
 	var hectic_tween = create_tween()
 	# Series of violent shakes and flashes
 	for i in range(12):
@@ -378,15 +376,13 @@ func spawn_small_explosion(pos: Vector2):
 	p.emitting = true
 	get_tree().create_timer(1.0).timeout.connect(p.queue_free)
 	
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("enemy_death", -5.0, 1.5, 2.0)
+	AudioManager.play_sfx("enemy_death", -5.0, 1.5, 2.0)
 
 func die():
 	# Final cleanup and rewards
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").set_muffled(false)
-		get_node("/root/AudioManager").play_sfx("enemy_death", 10.0, 0.3, 0.6)
-	
+	AudioManager.set_muffled(false)
+	AudioManager.play_sfx("enemy_death", 10.0, 0.3, 0.6)
+
 	# Screen shake
 	if player and player.has_method("add_shake"):
 		player.add_shake(30.0)
@@ -398,14 +394,13 @@ func die():
 	if player and player.has_method("add_xp"):
 		player.add_xp(xp_value)
 		
-	if has_node("/root/GlobalData"):
-		var gd = get_node("/root/GlobalData")
-		gd.total_kills += 1
-		gd.run_kills += 1
-		gd.add_score(xp_value * 20, player.combo_count if player else 0)
-		gd.add_shards(shard_reward) # AWARD SHARDS
-		gd.save_game()
-		
+	var gd = GlobalData
+	gd.total_kills += 1
+	gd.run_kills += 1
+	gd.add_score(xp_value * 20, player.combo_count if player else 0)
+	gd.add_shards(shard_reward) # AWARD SHARDS
+	gd.save_game()
+	
 	# REMOVE ARENA BARRIER AND HEARTS ONLY IF LAST BOSS
 	var other_bosses = get_tree().get_nodes_in_group("bosses")
 	if other_bosses.size() <= 1: # We are the last one (group includes us until next frame)
