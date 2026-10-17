@@ -34,3 +34,7 @@ Bin/
 /build
 /build
 /build
+
+# Godot editor temp scenes
+*.tmp
+.DS_Store
