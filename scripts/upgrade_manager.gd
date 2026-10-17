@@ -100,9 +100,73 @@ var upgrade_pool = [
 		"value": 50.0,
 		"icon": "res://assets/kenney_rune-pack/PNG/Black/Tile (outline)/runeBlack_tileOutline_027.png",
 		"is_special": true
+	},
+	{
+		"id": "pierce",
+		"name": "Piercing Rounds",
+		"description": "Bullets pass through +1 enemy",
+		"value": 1.0,
+		"no_diminish": true,
+		"max_picks": 3,
+		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_002.png"
+	},
+	{
+		"id": "homing",
+		"name": "Seeker Rounds",
+		"description": "Bullets curve toward the nearest enemy",
+		"value": 0.5,
+		"no_diminish": true,
+		"max_picks": 3,
+		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_004.png"
+	},
+	{
+		"id": "dash_trail",
+		"name": "Plasma Wake",
+		"description": "Dashing leaves plasma that burns enemies",
+		"value": 6.0,
+		"no_diminish": true,
+		"max_picks": 3,
+		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_006.png"
+	},
+	{
+		"id": "heal",
+		"name": "Repair Nanites",
+		"description": "Restore 1 heart",
+		"value": 1.0,
+		"no_diminish": true,
+		"needs_missing_heart": true,
+		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_008.png"
+	},
+	{
+		"id": "split",
+		"name": "FRACTURE ROUNDS",
+		"description": "SPECIAL: Bullets split into two fragments on hit",
+		"value": 1.0,
+		"is_special": true,
+		"icon": "res://assets/kenney_rune-pack/PNG/Black/Tile (outline)/runeBlack_tileOutline_002.png"
+	},
+	{
+		"id": "chain",
+		"name": "ARC LIGHTNING",
+		"description": "SPECIAL: Hits arc lightning to 3 nearby enemies",
+		"value": 140.0,
+		"is_special": true,
+		"icon": "res://assets/kenney_rune-pack/PNG/Black/Tile (outline)/runeBlack_tileOutline_004.png"
 	}
 ]
 
+# Combos: owning every id in `needs` unlocks a bonus. Effects live in bullet.gd / player_controller.gd.
+const SYNERGIES = [
+	{"id": "storm_front", "name": "STORM FRONT", "needs": ["split", "chain"], "description": "fragments arc lightning too"},
+	{"id": "chain_reaction", "name": "CHAIN REACTION", "needs": ["explosive", "chain"], "description": "explosions arc lightning"},
+	{"id": "hunter_killer", "name": "HUNTER-KILLER", "needs": ["homing", "pierce"], "description": "bullets retarget after each pierce, +1 pierce"},
+	{"id": "plasma_slipstream", "name": "PLASMA SLIPSTREAM", "needs": ["dash_trail", "gravity_well"], "description": "plasma lasts longer and hits 50% harder"},
+]
+
+const BULLET_MODS = ["pierce", "homing", "split", "chain"]
+const SYNERGY_OFFER_WEIGHT = 3.0 # Offers that complete a synergy are this much more likely
+
+var active_synergies: Array = []
 var applied_special_upgrades = []
 var upgrade_counts = {} # Track how many times each upgrade was picked
 var first_upgrade_of_run: bool = true # Track if this is the first level up of the session
@@ -137,6 +201,14 @@ func get_random_upgrades(count: int = 3) -> Array:
 		if upgrade["id"] == "explosive" and "prismatic_beam" in applied_special_upgrades:
 			continue
 
+		# Bullet mods do nothing for a circle (it cannot shoot) or the beam
+		if upgrade["id"] in BULLET_MODS and (is_circle or (player and player.prismatic_beam_active)):
+			continue
+		if upgrade.has("max_picks") and upgrade_counts.get(upgrade["id"], 0) >= upgrade["max_picks"]:
+			continue
+		if upgrade.get("needs_missing_heart", false) and player and player.current_hearts >= player.max_hearts:
+			continue
+
 		if is_circle:
 			# Removed 'pierce' from the forbidden list as the upgrade itself is removed
 			if upgrade["id"] in ["damage", "fire_rate", "homing", "bounce", "explosive", "bullet_speed", "rotation_speed"]:
@@ -151,7 +223,9 @@ func get_random_upgrades(count: int = 3) -> Array:
 		var pick_count = upgrade_counts.get(upgrade["id"], 0)
 		var diminished_upgrade = upgrade.duplicate()
 		
-		if pick_count > 0:
+		if pick_count > 0 and upgrade.get("no_diminish", false):
+			diminished_upgrade["name"] += " (Level %d)" % (pick_count + 1)
+		elif pick_count > 0:
 			var multiplier = pow(0.7, pick_count) # 30% reduction per level
 			diminished_upgrade["value"] = upgrade["value"] * multiplier
 			
@@ -168,10 +242,56 @@ func get_random_upgrades(count: int = 3) -> Array:
 				if upgrade["id"] != "max_hearts":
 					diminished_upgrade["description"] += " (Reduced Effectiveness)"
 
+		var synergy = _completed_synergy(upgrade["id"])
+		if not synergy.is_empty():
+			diminished_upgrade["description"] += "\nSYNERGY: " + synergy["name"] + " (" + synergy["description"] + ")"
+			diminished_upgrade["synergy"] = synergy["id"]
+
 		pool.append(diminished_upgrade)
 	
-	pool.shuffle()
-	return pool.slice(0, min(count, pool.size()))
+	return _weighted_sample(pool, count)
+
+## Synergy that picking `upgrade_id` would complete (and is not active yet), or {}.
+func _completed_synergy(upgrade_id: String) -> Dictionary:
+	for syn in SYNERGIES:
+		if syn["id"] in active_synergies or not upgrade_id in syn["needs"]:
+			continue
+		var complete := true
+		for need in syn["needs"]:
+			if need != upgrade_id and upgrade_counts.get(need, 0) == 0:
+				complete = false
+		if complete:
+			return syn
+	return {}
+
+func _weighted_sample(pool: Array, count: int) -> Array:
+	var remaining = pool.duplicate()
+	var picked = []
+	while picked.size() < count and not remaining.is_empty():
+		var total := 0.0
+		for u in remaining:
+			total += SYNERGY_OFFER_WEIGHT if u.has("synergy") else 1.0
+		var roll := randf() * total
+		for i in remaining.size():
+			roll -= SYNERGY_OFFER_WEIGHT if remaining[i].has("synergy") else 1.0
+			if roll <= 0.0 or i == remaining.size() - 1:
+				picked.append(remaining[i])
+				remaining.remove_at(i)
+				break
+	return picked
+
+func _check_synergies(player: Node):
+	for syn in SYNERGIES:
+		if syn["id"] in active_synergies:
+			continue
+		var complete := true
+		for need in syn["needs"]:
+			if upgrade_counts.get(need, 0) == 0:
+				complete = false
+		if complete:
+			active_synergies.append(syn["id"])
+			if player:
+				player.activate_synergy(syn["id"], syn["name"])
 
 func _on_player_level_up():
 	level_up_pending += 1
@@ -183,6 +303,7 @@ func _on_player_level_up():
 func reset_upgrades():
 	applied_special_upgrades.clear()
 	upgrade_counts.clear() # Clear counts for new run
+	active_synergies.clear()
 	first_upgrade_of_run = true
 	level_up_pending = 0
 	is_ui_active = false
@@ -218,6 +339,7 @@ func apply_upgrade(upgrade_data: Dictionary):
 	if player:
 		# Use the diminished value already calculated in get_random_upgrades
 		player.apply_upgrade(upgrade_id, upgrade_data["value"])
+		_check_synergies(player)
 		
 	# Track if this was a special upgrade to prevent repeat appearances
 	if upgrade_data.get("is_special", false):

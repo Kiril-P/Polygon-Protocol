@@ -57,6 +57,16 @@ const COMBO_MAX_TIME: float = 1.4 # Reduced from 1.8 to make it even harder
 var damage_multiplier: float = 1.0
 var bullet_pierce: int = 0
 var dash_trail_damage: float = 0.0
+var bullet_splits: bool = false
+var bullet_chain: bool = false
+var chain_range: float = 100.0
+var synergies: Dictionary = {} # id -> true, see UpgradeManager.SYNERGIES
+var trail_points: Array = [] # [position: Vector2, ttl: float]
+var trail_spawn_timer: float = 0.0
+var trail_tick_timer: float = 0.0
+const TRAIL_TTL: float = 1.2
+const TRAIL_RADIUS: float = 50.0
+const TRAIL_TICK: float = 0.25
 var bullet_bounces: int = 0
 var bullet_homing: float = 0.0
 var bullet_explosive: bool = false
@@ -444,12 +454,86 @@ func _physics_process(delta: float):
 	if prismatic_beam_active:
 		handle_prismatic_beam(delta)
 
+	if dash_trail_damage > 0.0:
+		handle_dash_trail(delta)
+
 	# Shield Regeneration logic
 	if not has_shield and GlobalData.is_upgrade_active("shield_regen"):
 		shield_regen_timer += delta
 		if shield_regen_timer >= SHIELD_REGEN_TIME:
 			spawn_shield()
 			AudioManager.play_sfx("shield_regen")
+
+## Plasma Wake: dashing lays damaging plasma that lingers behind the player.
+func handle_dash_trail(delta: float):
+	var ttl := TRAIL_TTL * (1.5 if synergies.has("plasma_slipstream") else 1.0)
+	if is_dashing:
+		trail_spawn_timer -= delta
+		if trail_spawn_timer <= 0.0:
+			trail_spawn_timer = 0.1
+			trail_points.append([global_position, ttl])
+			_spawn_trail_visual(global_position, ttl)
+	for point in trail_points:
+		point[1] -= delta
+	trail_points = trail_points.filter(func(pt): return pt[1] > 0.0)
+	
+	trail_tick_timer -= delta
+	if trail_tick_timer > 0.0 or trail_points.is_empty():
+		return
+	trail_tick_timer = TRAIL_TICK
+	var dmg := dash_trail_damage * (1.5 if synergies.has("plasma_slipstream") else 1.0)
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if not is_instance_valid(enemy) or enemy.is_in_group("bosses") or not enemy.has_method("take_damage"):
+			continue
+		for point in trail_points:
+			if enemy.global_position.distance_to(point[0]) < TRAIL_RADIUS:
+				enemy.take_damage(dmg)
+				break
+
+func _spawn_trail_visual(pos: Vector2, ttl: float):
+	var blob = Polygon2D.new()
+	var points = PackedVector2Array()
+	for i in range(10):
+		points.append(Vector2(TRAIL_RADIUS * 0.7, 0).rotated(TAU / 10.0 * i))
+	blob.polygon = points
+	blob.color = Color(0.9, 0.2, 1.0, 0.35)
+	blob.z_index = -1
+	get_parent().add_child(blob)
+	blob.global_position = pos
+	var t = blob.create_tween()
+	t.tween_property(blob, "modulate:a", 0.0, ttl)
+	t.parallel().tween_property(blob, "scale", Vector2(0.4, 0.4), ttl)
+	t.tween_callback(blob.queue_free)
+
+## Called by UpgradeManager when two owned upgrades complete a synergy.
+func activate_synergy(id: String, title: String):
+	synergies[id] = true
+	if id == "hunter_killer":
+		bullet_pierce += 1
+	AudioManager.play_sfx("level_up", 4.0)
+	show_banner("SYNERGY: " + title, Color(1.0, 0.8, 0.0))
+
+func show_banner(text: String, color: Color):
+	var layer = CanvasLayer.new()
+	layer.layer = 95
+	layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(layer)
+	var label = Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 48)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color.BLACK)
+	label.add_theme_constant_override("outline_size", 12)
+	label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	label.position.y = 140
+	label.modulate.a = 0.0
+	layer.add_child(label)
+	var t = label.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	t.tween_property(label, "modulate:a", 1.0, 0.25)
+	t.tween_interval(1.6)
+	t.tween_property(label, "modulate:a", 0.0, 0.5)
+	t.tween_callback(layer.queue_free)
 
 func spawn_shield():
 	has_shield = true
@@ -714,6 +798,11 @@ func shoot():
 				bullet.apply_upgrade("homing", bullet_homing)
 			if bullet_explosive:
 				bullet.apply_upgrade("explode", explosion_radius)
+			if bullet_splits:
+				bullet.apply_upgrade("split", 1)
+			if bullet_chain:
+				bullet.apply_upgrade("chain", chain_range)
+			bullet.synergies = synergies
 
 func reset_combo():
 	if combo_count > 10:
@@ -1576,13 +1665,18 @@ func apply_upgrade(upgrade_type: String, value: float):
 		"fire_rate":
 			fire_rate *= (1.0 - value)
 		"dash_trail":
-			dash_trail_damage = value
+			dash_trail_damage += value
 		"heal":
 			heal(1)
 		"bounce":
 			bullet_bounces += int(value)
 		"homing":
-			bullet_homing += value
+			bullet_homing = minf(bullet_homing + value, 2.0)
+		"split":
+			bullet_splits = true
+		"chain":
+			bullet_chain = true
+			chain_range = value
 		"max_hearts":
 			max_hearts += 1
 			current_hearts += 1

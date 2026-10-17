@@ -20,18 +20,19 @@ var chain_range: float = 100.0
 var trail_timer: float = 0.0
 const TRAIL_DELAY: float = 0.05
 var hit_enemies: Array[RID] = [] # NEW: Avoid hitting same enemy multiple times
-var hits_remaining: int
+var hits_remaining: int = -1 # Lazily initialised on first hit: pierce is assigned after add_child()
 var time_alive: float = 0.0
 var nearest_enemy: Node2D = null
 var retarget_timer: float = 0.0
 const RETARGET_INTERVAL: float = 0.1
 var fired_by_enemy: bool = false 
+var synergies: Dictionary = {} # Active upgrade synergies, set by the player
+var generation: int = 0 # 0 = fired by player, 1+ = split children
 
 @onready var sprite: Polygon2D = $BulletSprite
 @onready var collision: CollisionPolygon2D = $CollisionPolygon2D
 
 func _ready():
-	hits_remaining = pierce + 1
 	body_entered.connect(_on_body_entered)
 	setup_bullet_shape()
 	
@@ -179,6 +180,8 @@ func find_nearest_enemy():
 	for enemy in enemies:
 		if not is_instance_valid(enemy):
 			continue
+		if synergies.has("hunter_killer") and enemy.get_rid() in hit_enemies:
+			continue # Hunter-Killer: retarget after each pierce
 		var distance = global_position.distance_to(enemy.global_position)
 		if distance < closest_distance:
 			closest_distance = distance
@@ -202,6 +205,9 @@ func hit_player(player_node: Node):
 		queue_free()
 
 func hit_enemy(enemy: Node):
+	if hits_remaining < 0:
+		hits_remaining = pierce + 1
+	hit_enemies.append(enemy.get_rid())
 	if enemy.has_method("take_damage"):
 		# KINETIC DAMAGE: Bonus damage based on speed (Base speed is ~400)
 		var speed_mult = 1.0 + max(0, (speed - 400.0) / 600.0)
@@ -214,7 +220,7 @@ func hit_enemy(enemy: Node):
 		chain_to_nearby_enemies(enemy)
 	
 	if splits_on_hit:
-		split_bullet()
+		split_bullet.call_deferred() # Cannot add Area2Ds while physics queries flush
 	
 	# BOUNCE OFF ENEMIES
 	if bounces > 0:
@@ -249,6 +255,8 @@ func create_explosion():
 			if enemy.has_method("take_damage"):
 				enemy.take_damage(damage * 0.5)
 	
+	if synergies.has("chain_reaction"):
+		chain_from(global_position, null, 0.5)
 	spawn_explosion_visual()
 
 func spawn_explosion_visual():
@@ -316,21 +324,21 @@ func spawn_explosion_visual():
 		player.add_shake(12.0)
 
 func chain_to_nearby_enemies(source_enemy: Node):
-	var enemies = get_tree().get_nodes_in_group("enemies")
+	chain_from(source_enemy.global_position, source_enemy, 0.7)
+
+## Arcs lightning from `origin` to up to 3 nearby enemies (excluding `source`).
+func chain_from(origin: Vector2, source: Node, damage_fraction: float):
 	var chained = 0
 	var max_chains = 3
-	
-	for enemy in enemies:
-		if not is_instance_valid(enemy) or enemy == source_enemy:
-			continue
+	for enemy in get_tree().get_nodes_in_group("enemies"):
 		if chained >= max_chains:
 			break
-		
-		var distance = source_enemy.global_position.distance_to(enemy.global_position)
-		if distance <= chain_range:
+		if not is_instance_valid(enemy) or enemy == source:
+			continue
+		if origin.distance_to(enemy.global_position) <= chain_range:
 			if enemy.has_method("take_damage"):
-				enemy.take_damage(damage * 0.7)  # Chain does 70% damage
-			spawn_lightning_visual(source_enemy.global_position, enemy.global_position)
+				enemy.take_damage(damage * damage_fraction)
+			spawn_lightning_visual(origin, enemy.global_position)
 			chained += 1
 
 func spawn_lightning_visual(from: Vector2, to: Vector2):
@@ -359,6 +367,13 @@ func split_bullet():
 		new_bullet.speed = speed * 0.8
 		new_bullet.damage = damage * 0.6
 		new_bullet.pierce = max(0, pierce - 1)
+		new_bullet.generation = generation + 1
+		new_bullet.homing_strength = homing_strength
+		new_bullet.synergies = synergies
+		# Storm Front: fractured bullets keep arcing lightning
+		if synergies.has("storm_front"):
+			new_bullet.chain_lightning = chain_lightning
+			new_bullet.chain_range = chain_range
 		
 		# Don't let split bullets split again (prevent infinite bullets)
 		new_bullet.splits_on_hit = false
