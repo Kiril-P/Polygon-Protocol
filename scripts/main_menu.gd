@@ -36,6 +36,7 @@ func _ready():
 	style_all_buttons()
 	animate_splash_text()
 	add_controls_hint()
+	start_button.set_meta("pad_default", true)
 	_play_title_sequence()
 
 ## Opening title, once per launch. The menu buttons fade in as the sequence ends.
@@ -54,7 +55,10 @@ func _play_title_sequence():
 
 func add_controls_hint():
 	var hint = Label.new()
-	hint.text = "CHANGE CONTROLS IN OPTIONS"
+	var set_text := func():
+		hint.text = "A  SELECT      B  BACK" if PadNav.using_pad else "CHANGE CONTROLS IN OPTIONS"
+	set_text.call()
+	PadNav.using_pad_changed.connect(func(_on): set_text.call())
 	hint.add_theme_font_size_override("font_size", 18)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
 	hint.add_theme_constant_override("outline_size", 4)
@@ -191,6 +195,7 @@ func spawn_menu_enemy():
 	var enemy = Button.new() # Use Button to detect clicks easily
 	enemy.flat = true # Hide the default button look
 	enemy.focus_mode = Control.FOCUS_NONE # Remove white selection border
+	enemy.set_meta("no_pad", true) # Decoration only: the controller skips it
 	add_child(enemy)
 	move_child(enemy, 1) # Just above Background
 	
