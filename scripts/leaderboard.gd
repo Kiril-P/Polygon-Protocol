@@ -7,6 +7,8 @@ extends Control
 @onready var stats_panel = $UI/StatsPanel
 
 var is_loading = false
+var show_daily := false
+var board_button: Button
 
 func _ready():
 	var gd = GlobalData
@@ -15,6 +17,17 @@ func _ready():
 
 	back_button.pressed.connect(_on_back_pressed)
 	save_button.pressed.connect(_on_save_pressed)
+	board_button = Button.new()
+	board_button.custom_minimum_size = Vector2(300, 50)
+	board_button.add_theme_font_size_override("font_size", 22)
+	board_button.pressed.connect(_on_board_pressed)
+	$UI/TopBar.add_child(board_button)
+	board_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	board_button.offset_left = -340
+	board_button.offset_right = -40
+	board_button.offset_top = 45
+	board_button.offset_bottom = 100
+	_update_board_button()
 	
 	style_all_buttons()
 	setup_animations()
@@ -36,7 +49,7 @@ func _decorate():
 	$UI/NameEntry/Label.add_theme_constant_override("shadow_outline_size", 8)
 
 func style_all_buttons():
-	for btn in [back_button, save_button]:
+	for btn in [back_button, save_button, board_button]:
 		style_menu_button(btn)
 
 func style_menu_button(btn: Button):
@@ -67,6 +80,16 @@ func setup_animations():
 		btn.button_up.connect(func():
 			btn.scale = Vector2(1.1, 1.1)
 		)
+
+func _update_board_button():
+	board_button.text = "VIEW: ALL-TIME" if not show_daily else "VIEW: DAILY " + Protocols.daily_key().substr(5)
+
+func _on_board_pressed():
+	if is_loading:
+		return
+	show_daily = not show_daily
+	_update_board_button()
+	refresh_leaderboard()
 
 func refresh_leaderboard():
 	if is_loading: return
@@ -114,7 +137,8 @@ func refresh_leaderboard():
 
 	# Fetch from SilentWolf
 	if has_node("/root/SilentWolf"):
-		var sw_result = await get_node("/root/SilentWolf").Scores.get_scores(10).sw_get_scores_complete
+		var board := "daily_" + Protocols.daily_key() if show_daily else "main"
+		var sw_result = await get_node("/root/SilentWolf").Scores.get_scores(10, board).sw_get_scores_complete
 		load_label.queue_free()
 		
 		if sw_result.success:
@@ -128,8 +152,8 @@ func refresh_leaderboard():
 				var rank = 1
 				for score_entry in scores:
 					var meta = score_entry.get("metadata", {})
-					var e_kills = str(meta.get("kills", "0"))
-					var e_level = str(meta.get("level", "0"))
+					var e_kills = str(int(float(meta.get("kills", 0))))
+					var e_level = str(int(float(meta.get("level", 0))))
 					var e_time_raw = float(meta.get("time", 0.0))
 					var e_time_str = "%d:%02d" % [int(e_time_raw / 60), int(e_time_raw) % 60]
 					
@@ -158,6 +182,10 @@ func refresh_leaderboard():
 	is_loading = false
 
 func show_local_leaderboard(gd):
+	if show_daily:
+		if gd.daily_best_key == Protocols.daily_key() and gd.daily_best_score > 0:
+			create_entry("-", gd.player_name, str(gd.daily_best_score), "-", "-", "-", false, true)
+		return
 	var entries = gd.leaderboard.duplicate()
 	entries.sort_custom(func(a, b): return a["score"] > b["score"])
 	var rank = 1

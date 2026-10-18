@@ -74,6 +74,14 @@ var bullet_homing: float = 0.0
 var bullet_explosive: bool = false
 var explosion_radius: float = 50.0
 var dash_lifesteal_chance: float = 0.0
+# Counters to the newer enemy types (see UpgradeManager.upgrade_pool)
+var bullet_breaker: bool = false # vs Aegis
+var bullet_corrupt: bool = false # vs Healer
+var deflector_active: bool = false # vs Sniper (and everything else that shoots)
+var nova_level: int = 0 # vs Splitter swarms
+var _nova_depth: int = 0
+var _deflector_ring: Line2D = null
+const DEFLECT_RADIUS := 54.0
 var gravity_well_level: int = 0
 var prismatic_beam_active: bool = false
 var prismatic_beam_level: int = 0
@@ -140,6 +148,8 @@ func _ready():
 	# Apply Dash Mastery
 	if GlobalData.is_upgrade_active("dash_mastery"):
 		energy_consumption *= 0.75 # 25% reduction
+	
+	_apply_protocols()
 	
 	# Intro Particle Burst
 	spawn_intro_particles()
@@ -359,6 +369,9 @@ func _physics_process(delta: float):
 	else:
 		camera.offset = Vector2.ZERO
 	
+	if deflector_active:
+		_deflect_bullets()
+	
 	# Constant contact damage check
 	if iframe_timer <= 0:
 		var vulnerable = true
@@ -517,6 +530,68 @@ func _spawn_trail_visual(pos: Vector2, ttl: float):
 	t.tween_property(blob, "modulate:a", 0.0, ttl)
 	t.parallel().tween_property(blob, "scale", Vector2(0.4, 0.4), ttl)
 	t.tween_callback(blob.queue_free)
+
+## Deflector: hostile bullets that reach the ring turn around and fight for you.
+func _deflect_bullets():
+	for b in get_tree().get_nodes_in_group("enemy_bullets"):
+		if not is_instance_valid(b) or b.global_position.distance_to(global_position) > DEFLECT_RADIUS:
+			continue
+		var sniper: bool = b.has_meta("sniper")
+		b.remove_from_group("enemy_bullets")
+		b.fired_by_enemy = false
+		b.direction = -b.direction
+		b.damage = maxf(b.damage, 10.0) * damage_multiplier * (4.0 if sniper else 1.5)
+		b.speed = maxf(b.speed, 600.0)
+		b.pierce = 1 if sniper else 0
+		b.hits_remaining = -1
+		b.time_alive = 0.0
+		b.synergies = synergies
+		if synergies.has("return_to_sender"):
+			b.homing_strength = 1.5
+		b.collision_mask = 0
+		b.set_collision_mask_value(1, true)
+		b.set_collision_mask_value(3, true)
+		if b.has_node("BulletSprite"):
+			b.get_node("BulletSprite").color = Color(0.5, 1.0, 1.0)
+		VFX.shockwave(b.global_position, 0.12, Color(0.5, 1.0, 1.0), 60.0)
+		AudioManager.play_sfx("bullet_bounce", -2.0, 1.5, 1.9)
+
+func _build_deflector_ring():
+	if is_instance_valid(_deflector_ring):
+		return
+	_deflector_ring = Line2D.new()
+	_deflector_ring.closed = true
+	_deflector_ring.width = 2.0
+	_deflector_ring.default_color = Color(0.5, 1.0, 1.0, 0.28)
+	_deflector_ring.material = Neon.additive_material()
+	var pts := PackedVector2Array()
+	for i in 48:
+		pts.append(Vector2(DEFLECT_RADIUS, 0).rotated(TAU / 48.0 * i))
+	_deflector_ring.points = pts
+	_deflector_ring.z_index = -1
+	add_child(_deflector_ring)
+
+## Shockwave Kills: every kill releases a pulse; pulse kills can chain a few times.
+func on_enemy_killed(pos: Vector2):
+	if nova_level <= 0 or _nova_depth >= 3:
+		return
+	_nova.call_deferred(pos, _nova_depth + 1)
+
+func _nova(pos: Vector2, depth: int):
+	var cascade := synergies.has("cascade")
+	var radius := (95.0 + 35.0 * (nova_level - 1)) * (1.6 if cascade else 1.0)
+	var dmg := maxf(bullet_damage * damage_multiplier, 10.0) * (0.7 + 0.2 * (nova_level - 1)) * (1.5 if cascade else 1.0)
+	VFX.shockwave(pos, 0.2, Color(1.0, 0.55, 0.15), radius * 1.3)
+	AudioManager.play_sfx("bullet_explosion", -16.0, 1.2, 1.5)
+	_nova_depth = depth
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if not is_instance_valid(e) or e.is_in_group("bosses") or not e.has_method("take_damage"):
+			continue
+		if e.get("is_dying") == true:
+			continue
+		if e.global_position.distance_to(pos) <= radius:
+			e.take_damage(dmg)
+	_nova_depth = 0
 
 ## Called by UpgradeManager when two owned upgrades complete a synergy.
 func activate_synergy(id: String, title: String):
@@ -816,6 +891,8 @@ func shoot():
 				bullet.apply_upgrade("split", 1)
 			if bullet_chain:
 				bullet.apply_upgrade("chain", chain_range)
+			bullet.breaker = bullet_breaker
+			bullet.corrupts = bullet_corrupt
 			bullet.synergies = synergies
 
 func reset_combo():
@@ -1617,6 +1694,20 @@ func update_health_visuals():
 	if current_hearts > 1:
 		sprite.modulate.a = 1.0
 
+## Run modifiers chosen on the pre-run screen (see Protocols).
+func _apply_protocols():
+	var gd = GlobalData
+	if gd.protocol_active("glass"):
+		max_hearts = 2
+		current_hearts = 2
+		damage_multiplier += 0.5
+		health_changed.emit(current_hearts, max_hearts)
+		update_health_visuals()
+	if gd.protocol_active("low_power"):
+		max_energy *= 0.6
+		current_energy = max_energy
+		energy_changed.emit(current_energy, max_energy)
+
 func die():
 	if is_dead: return
 	is_dead = true
@@ -1637,6 +1728,7 @@ func die():
 	gd.run_time = spawner.time_passed if spawner else 0.0
 	if gd.has_upgrade("shard_multiplier"):
 		shards_earned = int(shards_earned * 1.5)
+	shards_earned = int(shards_earned * gd.protocol_multiplier())
 		
 	gd.add_shards(shards_earned)
 	if gd.run_score > gd.high_score_points:
@@ -1645,6 +1737,9 @@ func die():
 		gd.best_level = gd.run_level
 		gd.high_score = time_survived
 	gd.save_game()
+	var daily: Dictionary = gd.record_daily_result(gd.run_score)
+	if gd.run_mode == "daily":
+		gd.submit_daily_score(gd.run_score, gd.run_kills, gd.run_level, time_survived)
 
 	# Play SFX
 	AudioManager.set_low_health(false)
@@ -1658,7 +1753,8 @@ func die():
 		"level": level,
 		"shards": shards_earned,
 		"highest_combo": highest_combo_run,
-		"time": spawner.time_passed if spawner else 0.0
+		"time": spawner.time_passed if spawner else 0.0,
+		"daily": daily
 	})
 	
 	# Pause the game instead of reloading
@@ -1716,6 +1812,15 @@ func apply_upgrade(upgrade_type: String, value: float):
 			else:
 				explosion_radius += 25.0
 				damage_multiplier += 0.2 # Scaling explosion impact
+		"breaker":
+			bullet_breaker = true
+		"corrupt":
+			bullet_corrupt = true
+		"deflector":
+			deflector_active = true
+			_build_deflector_ring()
+		"nova":
+			nova_level += 1
 		"dash_lifesteal":
 			dash_lifesteal_chance += value
 		"gravity_well":

@@ -26,8 +26,16 @@ var play_hit_sfx: bool = true
 var neon_color: Color = Color.WHITE
 var neon_outline: Line2D = null
 
+# Roles for the newer enemy types (empty for the classics)
+var enemy_id: String = ""
+var max_health: float = -1.0 # Captured after the subclass finished _ready(); caps healing
+var heal_block: float = 0.0 # Seconds during which healing is disrupted (Corrupt Rounds)
+
 func _ready():
 	add_to_group("enemies")
+	_capture_max_health.call_deferred()
+	if enemy_id != "":
+		UpgradeManager.note_enemy_seen(enemy_id)
 	_apply_neon.call_deferred() # After the subclass _ready() has set colours and polygon
 	player = get_tree().get_first_node_in_group("player")
 	set_collision_mask_value(2, false)
@@ -35,6 +43,34 @@ func _ready():
 
 func setup_visuals():
 	pass
+
+func _capture_max_health():
+	if max_health < 0.0:
+		max_health = maxf(health, 1.0)
+
+func _process(delta: float):
+	if heal_block > 0.0:
+		heal_block = maxf(heal_block - delta, 0.0)
+
+## Restores up to `amount` health (never above max). Returns what was actually healed.
+func heal(amount: float) -> float:
+	if is_dying or heal_block > 0.0 or max_health <= 0.0 or health >= max_health:
+		return 0.0
+	var gained := minf(amount, max_health - health)
+	health += gained
+	return gained
+
+## Marks the enemy as corrupted: it cannot be healed for a while.
+func corrupt(seconds: float = 3.0):
+	heal_block = maxf(heal_block, seconds)
+	if is_instance_valid(neon_outline):
+		neon_outline.default_color = Color(0.85, 0.3, 1.0)
+
+## Called by player bullets instead of take_damage so enemies can react to the angle
+## of the shot. Returns true when the bullet was absorbed (it is then consumed).
+func hit_by_bullet(amount: float, _bullet: Node) -> bool:
+	take_damage(amount)
+	return false
 
 ## Re-styles the Polygon2D as a glowing neon outline with a dark fill.
 func _apply_neon():
@@ -62,6 +98,8 @@ func take_damage(_amount: float):
 	if play_hit_sfx:
 		AudioManager.play_sfx("enemy_hit")
 	flash_white()
+	if max_health < 0.0:
+		max_health = maxf(health + _amount, 1.0)
 	if health <= 0:
 		die()
 
@@ -82,6 +120,8 @@ func die():
 		player.add_shake(death_shake)
 	if player and player.has_method("add_xp"):
 		player.add_xp(xp_value)
+	if player and player.has_method("on_enemy_killed"):
+		player.on_enemy_killed(global_position)
 	GlobalData.total_kills += 1
 	GlobalData.run_kills += 1
 	GlobalData.add_score(xp_value * 10, player.combo_count if player else 0)

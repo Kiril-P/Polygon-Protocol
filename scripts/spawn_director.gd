@@ -11,6 +11,8 @@ var spawns: Array = []
 var events: Array = []
 var cfg: Dictionary = {}
 
+## Own generator so the daily run rolls the same enemy order for everyone.
+var rng := RandomNumberGenerator.new()
 var intensity: float = 1.0
 var _next_event_time: Dictionary = {} # event id -> next trigger time
 var _kill_times: Array[float] = []
@@ -34,6 +36,20 @@ func load_data(path: String = DATA_PATH) -> bool:
 		_next_event_time[ev["id"]] = float(ev.get("first", 0.0))
 	return not spawns.is_empty()
 
+func _init():
+	rng.randomize()
+
+## Applies a run's protocols: seeded daily rolls and faster elite events.
+func apply_run(mode: String, protocols: Array, daily_seed: int):
+	if mode == "daily":
+		rng.seed = daily_seed
+	if "elite_tide" in protocols:
+		for ev in events:
+			if ev.get("type", "") == "elite":
+				ev["every"] = float(ev.get("every", 0.0)) * 0.5
+				ev["first"] = float(ev.get("first", 0.0)) * 0.6
+				_next_event_time[ev["id"]] = float(ev["first"])
+
 ## Weighted random enemy name for run time `t`.
 func pick_enemy(t: float) -> String:
 	var total := 0.0
@@ -42,7 +58,7 @@ func pick_enemy(t: float) -> String:
 			total += float(s["weight"])
 	if total <= 0.0:
 		return "chaser"
-	var roll := randf() * total
+	var roll := rng.randf() * total
 	for s in spawns:
 		if not _active(s, t):
 			continue

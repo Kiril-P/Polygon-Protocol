@@ -39,6 +39,74 @@ var leaderboard: Array = [] # Array of dictionaries: {name, score, kills, level,
 var player_name: String = "Player"
 var player_id: String = "" # Unique ID to identify the local player's entry
 
+var seen_intel: Array = [] # Enemy types whose intro card was shown (never shown twice)
+# --- Run setup (protocols / daily). run_* is per run, the rest is saved.
+var run_mode: String = "standard" # "standard" or "daily"
+var run_protocols: Array = []
+var run_daily_key: String = ""
+var last_protocols: Array = [] # Protocols ticked in the pre-run screen last time
+var daily_best_key: String = "" # Date of the stored daily best
+var daily_best_score: int = 0
+var daily_streak: int = 0
+var daily_last_played: String = ""
+signal daily_submit_finished(success: bool)
+## Tests flip this off so automated runs never post to the live leaderboard.
+var online_submit_enabled := true
+var _daily_submit_open := false
+
+func protocol_active(id: String) -> bool:
+	return id in run_protocols
+
+func protocol_multiplier() -> float:
+	return Protocols.multiplier(run_protocols)
+
+func set_run(mode: String, protocols: Array):
+	run_mode = mode
+	run_protocols = protocols.duplicate()
+	run_daily_key = Protocols.daily_key() if mode == "daily" else ""
+	if mode == "standard":
+		last_protocols = run_protocols.duplicate()
+		save_game()
+
+## Called when a run ends. Returns {daily_best: bool, streak: int} (empty for standard runs).
+func record_daily_result(score: int) -> Dictionary:
+	if run_mode != "daily":
+		return {}
+	var key := run_daily_key
+	var is_best := false
+	if daily_best_key != key or score > daily_best_score:
+		is_best = true
+		daily_best_key = key
+		daily_best_score = score
+	if daily_last_played != key:
+		var yesterday := Protocols.daily_key(Time.get_unix_time_from_system() - 86400.0)
+		daily_streak = daily_streak + 1 if daily_last_played == yesterday else 1
+		daily_last_played = key
+	save_game()
+	return {"daily_best": is_best, "streak": daily_streak}
+
+## Posts a daily score to SilentWolf board "daily_<date>". Emits daily_submit_finished once,
+## also when offline (a timeout stops the run-end screen waiting forever).
+func submit_daily_score(score: int, kills: int, level: int, time: float):
+	if run_mode != "daily" or _daily_submit_open:
+		return
+	_daily_submit_open = true
+	var key := run_daily_key
+	var sw := get_node_or_null("/root/SilentWolf")
+	if sw == null or not online_submit_enabled:
+		_finish_daily_submit(false)
+		return
+	get_tree().create_timer(8.0, true, false, true).timeout.connect(func(): _finish_daily_submit(false))
+	var meta := {"kills": kills, "level": level, "time": time, "player_id": player_id, "protocols": ",".join(run_protocols)}
+	var res = await sw.Scores.save_score(player_name, score, "daily_" + key, meta).sw_save_score_complete
+	_finish_daily_submit(res.get("success", false))
+
+func _finish_daily_submit(success: bool):
+	if not _daily_submit_open:
+		return
+	_daily_submit_open = false
+	daily_submit_finished.emit(success)
+
 var deactivated_upgrades = [] # IDs of upgrades the player turned off
 
 func is_upgrade_active(id: String) -> bool:
@@ -92,7 +160,7 @@ func add_shards(amount: int):
 
 func add_score(base_points: int, combo: int):
 	var multiplier = 1.0 + (combo * 0.1)
-	run_score += int(base_points * multiplier)
+	run_score += int(base_points * multiplier * protocol_multiplier())
 
 func update_leaderboard(p_name: String, score: int, kills: int, level: int, time: float):
 	player_name = p_name
@@ -144,6 +212,12 @@ func save_game():
 			"total_kills": total_kills,
 			"permanent_upgrades": permanent_upgrades,
 			"deactivated_upgrades": deactivated_upgrades,
+			"seen_intel": seen_intel,
+			"last_protocols": last_protocols,
+			"daily_best_key": daily_best_key,
+			"daily_best_score": daily_best_score,
+			"daily_streak": daily_streak,
+			"daily_last_played": daily_last_played,
 			"use_mouse_controls": use_mouse_controls,
 			"show_tutorial": show_tutorial,
 			"difficulty_level": difficulty_level,
@@ -178,6 +252,12 @@ func load_game():
 				total_kills = data.get("total_kills", 0)
 				permanent_upgrades = data.get("permanent_upgrades", permanent_upgrades)
 				deactivated_upgrades = data.get("deactivated_upgrades", [])
+				seen_intel = data.get("seen_intel", [])
+				last_protocols = data.get("last_protocols", [])
+				daily_best_key = data.get("daily_best_key", "")
+				daily_best_score = data.get("daily_best_score", 0)
+				daily_streak = data.get("daily_streak", 0)
+				daily_last_played = data.get("daily_last_played", "")
 				use_mouse_controls = data.get("use_mouse_controls", false)
 				show_tutorial = data.get("show_tutorial", true)
 				difficulty_level = data.get("difficulty_level", 2)

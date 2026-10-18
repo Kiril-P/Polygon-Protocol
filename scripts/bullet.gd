@@ -28,6 +28,8 @@ const RETARGET_INTERVAL: float = 0.1
 var fired_by_enemy: bool = false 
 var synergies: Dictionary = {} # Active upgrade synergies, set by the player
 var generation: int = 0 # 0 = fired by player, 1+ = split children
+var breaker: bool = false # Cracks Aegis shields instead of being absorbed
+var corrupts: bool = false # Hits disrupt enemy healing
 
 @onready var sprite: Polygon2D = $BulletSprite
 @onready var collision: CollisionPolygon2D = $CollisionPolygon2D
@@ -217,10 +219,15 @@ func hit_enemy(enemy: Node):
 	if hits_remaining < 0:
 		hits_remaining = pierce + 1
 	hit_enemies.append(enemy.get_rid())
-	if enemy.has_method("take_damage"):
-		# KINETIC DAMAGE: Bonus damage based on speed (Base speed is ~400)
-		var speed_mult = 1.0 + max(0, (speed - 400.0) / 600.0)
+	var blocked := false
+	# KINETIC DAMAGE: Bonus damage based on speed (Base speed is ~400)
+	var speed_mult = 1.0 + max(0, (speed - 400.0) / 600.0)
+	if enemy.has_method("hit_by_bullet"):
+		blocked = enemy.hit_by_bullet(damage * speed_mult, self)
+	elif enemy.has_method("take_damage"):
 		enemy.take_damage(damage * speed_mult)
+	if corrupts and not blocked and enemy.has_method("corrupt"):
+		enemy.corrupt(3.0)
 	
 	if explodes_on_hit:
 		create_explosion()
@@ -242,6 +249,8 @@ func hit_enemy(enemy: Node):
 		global_position += direction * 5.0
 		return # Don't process pierce if we bounced
 	
+	if blocked:
+		hits_remaining = 1 # Absorbed by a shield: the bullet is spent whatever its pierce
 	hits_remaining -= 1
 	if hits_remaining <= 0:
 		queue_free()
@@ -349,6 +358,8 @@ func chain_from(origin: Vector2, source: Node, damage_fraction: float):
 		if origin.distance_to(enemy.global_position) <= chain_range:
 			if enemy.has_method("take_damage"):
 				enemy.take_damage(damage * damage_fraction)
+			if synergies.has("plague_arc") and enemy.has_method("corrupt"):
+				enemy.corrupt(3.0)
 			spawn_lightning_visual(origin, enemy.global_position)
 			chained += 1
 

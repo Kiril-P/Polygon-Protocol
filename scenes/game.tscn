@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3 uid="uid://f2ddmfkkhhru"]
+[gd_scene load_steps=19 format=3 uid="uid://f2ddmfkkhhru"]
 
 [ext_resource type="PackedScene" uid="uid://dwdeo41t4c7xe" path="res://scenes/background.tscn" id="1_kvpfn"]
 [ext_resource type="PackedScene" uid="uid://b6b5cvp68bng7" path="res://scenes/player.tscn" id="1_uwrxv"]
@@ -13,6 +13,10 @@
 [ext_resource type="PackedScene" uid="uid://di3xivgn03e8r" path="res://scenes/death_screen.tscn" id="6_u5sy4"]
 [ext_resource type="PackedScene" uid="uid://5jpyddyo4ed6" path="res://scenes/enemy_tank.tscn" id="6_vtaks"]
 [ext_resource type="PackedScene" uid="uid://c5xk3p7r8q5u" path="res://scenes/enemy_kamikaze.tscn" id="7_kamikaze"]
+[ext_resource type="PackedScene" path="res://scenes/enemy_aegis.tscn" id="8_aegis"]
+[ext_resource type="PackedScene" path="res://scenes/enemy_splitter.tscn" id="9_splitter"]
+[ext_resource type="PackedScene" path="res://scenes/enemy_sniper.tscn" id="10_sniper"]
+[ext_resource type="PackedScene" path="res://scenes/enemy_healer.tscn" id="11_healer"]
 
 [sub_resource type="Environment" id="Environment_mwb40"]
 background_mode = 3
@@ -33,7 +37,7 @@ iframe_duration = 1.0
 
 [node name="Spawner" type="Node2D" parent="."]
 script = ExtResource("2_lnu2h")
-enemy_types = Array[PackedScene]([ExtResource("2_yqjtg"), ExtResource("5_gee14"), ExtResource("4_p57ef"), ExtResource("5_0tnpc"), ExtResource("6_vtaks"), ExtResource("5_kvpfn"), ExtResource("7_kamikaze")])
+enemy_types = Array[PackedScene]([ExtResource("2_yqjtg"), ExtResource("5_gee14"), ExtResource("4_p57ef"), ExtResource("5_0tnpc"), ExtResource("6_vtaks"), ExtResource("5_kvpfn"), ExtResource("7_kamikaze"), ExtResource("8_aegis"), ExtResource("9_splitter"), ExtResource("10_sniper"), ExtResource("11_healer")])
 
 [node name="HUD" parent="." instance=ExtResource("5_iywne")]
 
