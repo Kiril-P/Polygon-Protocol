@@ -23,8 +23,7 @@ func _init():
 func _ready():
 	super()
 	scale = Vector2(0.8, 0.8)
-	sprite.color = Color(1.0, 0.4, 0.0) # Vibrant orange
-	sprite.modulate = Color(2.5, 1.2, 0.0, 1.0) # Bright glow
+	sprite.color = Color(1.0, 0.4, 0.0) # Vibrant orange (restyled to neon by EnemyBase)
 	apply_difficulty([0.0, 0.8, 1.0, 1.1, 1.2, 1.4], [0.0, 0.7, 1.0, 1.3, 1.6, 2.0])
 
 func _physics_process(delta: float):
@@ -38,8 +37,9 @@ func _physics_process(delta: float):
 		velocity = charge_direction * speed * charge_speed_mult
 		rotation += 15.0 * delta # Spin wildly
 		var pulse = (sin(Time.get_ticks_msec() * 0.02) + 1.0) * 0.5
-		sprite.color = Color(1.0, 0.4, 0.0).lerp(Color(1.0, 0.0, 0.0), pulse)
-		sprite.modulate = Color(2.0, 1.0, 1.0).lerp(Color(5.0, 1.0, 1.0), pulse)
+		if neon_outline:
+			neon_outline.default_color = Color(1.0, 0.7, 0.2).lerp(Color(1.0, 0.1, 0.1), pulse) * Color(1.6, 1.6, 1.6, 1.0)
+		sprite.modulate = Color(1.0, 1.0, 1.0).lerp(Color(2.5, 0.8, 0.8), pulse)
 	else:
 		velocity = (player.global_position - global_position).normalized() * speed
 		rotation += 5.0 * delta
@@ -62,7 +62,7 @@ func start_charge():
 func flash_white():
 	var t = create_tween()
 	sprite.modulate = Color(10, 10, 10, 1)
-	t.tween_property(sprite, "modulate", Color(2.0, 1.5, 0.0, 1.0), 0.1)
+	t.tween_property(sprite, "modulate", Color.WHITE, 0.1)
 
 func explode():
 	if is_dying: return
@@ -73,6 +73,7 @@ func explode():
 	
 	AudioManager.play_sfx("bullet_explosion", -5.0)
 	spawn_death_particles()
+	VFX.shockwave(global_position, 1.3, Color(1.0, 0.5, 0.1), 160.0)
 	if player and player.has_method("add_shake"):
 		player.add_shake(20.0)
 	queue_free()

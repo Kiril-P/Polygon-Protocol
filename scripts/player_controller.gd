@@ -56,6 +56,7 @@ const COMBO_MAX_TIME: float = 1.4 # Reduced from 1.8 to make it even harder
 # Upgrades
 var damage_multiplier: float = 1.0
 var bullet_pierce: int = 0
+const PLAYER_COLOR := Color(0.0, 0.8, 1.0) # Neon cyan
 var dash_trail_damage: float = 0.0
 var bullet_splits: bool = false
 var bullet_chain: bool = false
@@ -117,7 +118,9 @@ func _ready():
 	update_shape_visuals()
 	
 	# Set Player Palette
-	sprite.color = Color(0.0, 0.8, 1.0) # Neon Cyan
+	sprite.color = PLAYER_COLOR # Neon Cyan
+	_setup_aura()
+	update_health_visuals()
 	
 	# Reset Run Stats
 	var _gd = GlobalData
@@ -367,6 +370,7 @@ func _physics_process(delta: float):
 			modulate = Color(1.2, 1.8, 2.0, 1.0) # Cyber Cyan
 			
 			# DASH IMPACT POLISH
+			VFX.shockwave(global_position, 0.45, PLAYER_COLOR, 110.0)
 			var hud = get_tree().get_first_node_in_group("hud")
 			if hud and hud.has_method("trigger_dash_effect"):
 				hud.trigger_dash_effect(0.2)
@@ -573,8 +577,9 @@ func spawn_ghost():
 	ghost.scale = scale
 	
 	# Match color but make it transparent
-	ghost.color = sprite.color
-	ghost.modulate.a = 0.5
+	ghost.color = PLAYER_COLOR
+	ghost.material = Neon.additive_material()
+	ghost.modulate = Color(1.2, 1.2, 1.2, 0.45)
 	
 	# Fade out and delete
 	var tween = create_tween()
@@ -903,6 +908,8 @@ func trigger_evolution_visual():
 	add_shake(20.0)
 
 func trigger_level_up_blast():
+	VFX.shockwave(global_position, 2.2, Color(0.6, 0.9, 1.0), 700.0)
+	PostFX.kick(0.006)
 	# 1. Hit Stop & Flash
 	Engine.time_scale = 0.05
 	# Force reset after real-time delay
@@ -972,6 +979,16 @@ func trigger_level_up_blast():
 
 func add_shake(intensity: float):
 	shake_intensity = intensity
+	if intensity >= 6.0:
+		PostFX.kick(intensity * 0.0001)
+
+## Soft pulsing halo behind the player.
+func _setup_aura():
+	var aura := Neon.add_glow(self, PLAYER_COLOR, 150.0, 0.18)
+	aura.name = "Aura"
+	var t := aura.create_tween().set_loops()
+	t.tween_property(aura, "scale", aura.scale * 1.18, 0.9).set_trans(Tween.TRANS_SINE)
+	t.tween_property(aura, "scale", aura.scale, 0.9).set_trans(Tween.TRANS_SINE)
 
 func toggle_pause():
 	# NEVER allow pausing or unpausing if the player is dead
@@ -1401,6 +1418,7 @@ func update_shape_visuals():
 	
 	sprite.polygon = points
 	collision.polygon = points
+	update_health_visuals()
 
 func spawn_player_death_particles():
 	var particles = CPUParticles2D.new()
@@ -1416,7 +1434,7 @@ func spawn_player_death_particles():
 	particles.initial_velocity_max = 400.0
 	particles.scale_amount_min = 5.0
 	particles.scale_amount_max = 10.0
-	particles.color = sprite.color
+	particles.color = PLAYER_COLOR
 	
 	particles.emitting = true
 	
@@ -1564,6 +1582,8 @@ func trigger_emergency_overdrive():
 
 func trigger_hit_impact():
 	# 1. Hit-stop: Set time scale to slow
+	PostFX.kick(0.008)
+	VFX.shockwave(global_position, 1.5, Color(1.0, 0.2, 0.3), 260.0)
 	if Engine.time_scale < 1.0: return # Prevent overlapping hitstop
 	Engine.time_scale = 0.05
 	
@@ -1591,7 +1611,7 @@ func update_health_visuals():
 	var health_percent = float(current_hearts) / float(max_hearts)
 	var base_col = Color(0.0, 0.8, 1.0)
 	var dimmed_col = base_col.lerp(Color(0.2, 0.2, 0.2), 1.0 - health_percent)
-	sprite.color = dimmed_col
+	Neon.apply(sprite, dimmed_col, 0.22, 3.0)
 	
 	# Reset alpha if not at 1 heart
 	if current_hearts > 1:

@@ -17,8 +17,8 @@ var chain_lightning: bool = false
 var chain_range: float = 100.0
 
 # Internal
-var trail_timer: float = 0.0
-const TRAIL_DELAY: float = 0.05
+var trail: Line2D = null
+const TRAIL_POINTS: int = 12
 var hit_enemies: Array[RID] = [] # NEW: Avoid hitting same enemy multiple times
 var hits_remaining: int = -1 # Lazily initialised on first hit: pierce is assigned after add_child()
 var time_alive: float = 0.0
@@ -75,32 +75,41 @@ func _physics_process(delta: float):
 	global_position += direction * speed * delta
 	rotation = direction.angle()
 	
-	# Spawn Trail particles
-	trail_timer += delta
-	if trail_timer >= TRAIL_DELAY:
-		spawn_trail_ghost()
-		trail_timer = 0.0
+	_update_trail()
 
-func spawn_trail_ghost():
-	var ghost = Polygon2D.new()
-	# Add to parent to ensure trail stays even if bullet is deleted
-	var parent = get_parent()
-	if not parent: return
-	
-	parent.add_child(ghost)
-	ghost.polygon = sprite.polygon
-	ghost.global_position = global_position
-	ghost.rotation = rotation
-	ghost.scale = scale * 0.8
-	ghost.color = sprite.color
-	ghost.modulate.a = 0.4
-	
-	# Use ghost's own tween or tree tween to ensure it finishes even if bullet dies
-	var t = ghost.create_tween().set_parallel(true)
-	t.tween_property(ghost, "modulate:a", 0.0, 0.2)
-	t.tween_property(ghost, "scale", Vector2.ZERO, 0.2)
-	t.set_parallel(false)
-	t.tween_callback(ghost.queue_free)
+## Comet trail: one Line2D per bullet instead of a ghost polygon every 50ms.
+func _update_trail():
+	if not trail:
+		_setup_glow()
+	trail.add_point(global_position)
+	while trail.get_point_count() > TRAIL_POINTS:
+		trail.remove_point(0)
+
+func _setup_glow():
+	var color: Color = sprite.color
+	Neon.add_glow(self, color, 40.0 if not fired_by_enemy else 56.0, 0.4)
+	sprite.color = color.lerp(Color.WHITE, 0.45)
+	trail = Line2D.new()
+	trail.top_level = true # Points are world-space; outlives the bullet for a fade-out
+	trail.material = Neon.additive_material()
+	trail.width = 7.0 * scale.x
+	trail.joint_mode = Line2D.LINE_JOINT_ROUND
+	trail.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	var curve := Curve.new()
+	curve.add_point(Vector2(0.0, 0.0))
+	curve.add_point(Vector2(1.0, 1.0))
+	trail.width_curve = curve
+	var grad := Gradient.new()
+	grad.colors = PackedColorArray([Color(color.r, color.g, color.b, 0.0), Color(color.r * 1.6, color.g * 1.6, color.b * 1.6, 0.85)])
+	trail.gradient = grad
+	trail.z_index = -1
+	get_parent().add_child(trail)
+
+func _exit_tree():
+	if is_instance_valid(trail) and trail.is_inside_tree():
+		var t := trail.create_tween()
+		t.tween_property(trail, "modulate:a", 0.0, 0.2)
+		t.tween_callback(trail.queue_free)
 
 func handle_screen_bounce():
 	var camera = get_viewport().get_camera_2d()
@@ -262,6 +271,8 @@ func create_explosion():
 func spawn_explosion_visual():
 	# Parent to main scene so it survives if bullet/parent is deleted
 	var main = get_tree().current_scene
+	
+	VFX.shockwave(global_position, 0.7, Color(1.0, 0.55, 0.15), explosion_radius * 2.2)
 	
 	# 1. THE CORE FLASH (Cyan/White)
 	var flash = Polygon2D.new()

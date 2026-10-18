@@ -23,6 +23,8 @@ boot_splash/use_filter=false
 UpgradeManager="*res://scripts/upgrade_manager.gd"
 GlobalData="*res://scripts/global_data.gd"
 AudioManager="*res://scripts/audio_manager.gd"
+VFX="*res://scripts/vfx.gd"
+PostFX="*res://scripts/post_fx.gd"
 SilentWolf="*res://addons/silent_wolf/SilentWolf.gd"
 
 [display]

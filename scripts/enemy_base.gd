@@ -23,14 +23,28 @@ var death_particle_color: Color = Color(0, 0, 0, 0) # alpha 0 = use Polygon2D co
 var death_shake: float = 0.0
 var play_hit_sfx: bool = true
 
+var neon_color: Color = Color.WHITE
+var neon_outline: Line2D = null
+
 func _ready():
 	add_to_group("enemies")
+	_apply_neon.call_deferred() # After the subclass _ready() has set colours and polygon
 	player = get_tree().get_first_node_in_group("player")
 	set_collision_mask_value(2, false)
 	set_collision_layer_value(3, true)
 
 func setup_visuals():
 	pass
+
+## Re-styles the Polygon2D as a glowing neon outline with a dark fill.
+func _apply_neon():
+	if is_dying or not has_node("Polygon2D"):
+		return
+	var poly: Polygon2D = $Polygon2D
+	neon_color = poly.color
+	poly.modulate = Color.WHITE
+	neon_outline = Neon.apply(poly, neon_color, 0.28, 3.5)
+	Neon.add_glow(poly, neon_color, 140.0, 0.14)
 
 ## Scales speed/health by the chosen difficulty. Arrays are indexed by level (1-5).
 func apply_difficulty(speed_mults: Array, health_mults: Array):
@@ -62,6 +76,8 @@ func die():
 	is_dying = true
 	AudioManager.play_sfx("enemy_death", 0.0, 0.9, 1.1, 0.3) # Cut off after 0.3s
 	spawn_death_particles()
+	if death_shake >= 8.0:
+		VFX.hit_stop(0.05) # Heavy enemies land a freeze-frame
 	if player and death_shake > 0.0 and player.has_method("add_shake"):
 		player.add_shake(death_shake)
 	if player and player.has_method("add_xp"):
@@ -72,26 +88,13 @@ func die():
 	queue_free()
 
 func spawn_death_particles():
-	var particles = CPUParticles2D.new()
-	get_tree().current_scene.add_child(particles)
-	particles.global_position = global_position
-	particles.amount = death_particle_amount
-	particles.one_shot = true
-	particles.explosiveness = 1.0
-	particles.spread = 180.0
-	particles.gravity = Vector2.ZERO
-	particles.initial_velocity_min = death_particle_velocity.x
-	particles.initial_velocity_max = death_particle_velocity.y
-	particles.scale_amount_min = death_particle_size.x
-	particles.scale_amount_max = death_particle_size.y
-	if death_particle_color.a > 0.0:
-		particles.color = death_particle_color
-	elif has_node("Polygon2D"):
-		particles.color = $Polygon2D.color
-	else:
-		particles.color = Color.RED
-	particles.emitting = true
-	get_tree().create_timer(death_particle_lifetime).timeout.connect(particles.queue_free)
+	var color := death_particle_color
+	if color.a <= 0.0:
+		color = neon_color if neon_color != Color.WHITE else (
+			$Polygon2D.color if has_node("Polygon2D") else Color.RED)
+	var size := clampf(death_particle_amount / 30.0, 0.5, 2.5)
+	VFX.death_burst(global_position, color, size)
+	VFX.shockwave(global_position, 0.25 + 0.3 * size, color, 60.0 + 70.0 * size)
 
 ## Spawns a hostile bullet travelling along `dir`.
 func fire_bullet(dir: Vector2, bullet_speed: float, bullet_damage: float, color: Color, bullet_scale: float = 1.0, spawn_offset: float = 0.0):
