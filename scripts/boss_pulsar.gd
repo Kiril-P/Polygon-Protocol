@@ -427,7 +427,7 @@ func remove_one_platform():
 		for v in visuals:
 			if v is Polygon2D:
 				t.parallel().tween_property(v, "color", Color(1, 0, 0, 0.8), 0.5)
-				t.parallel().tween_property(v, "modulate", Color(5, 2, 2), 0.5)
+				t.parallel().tween_property(v, "modulate", GameSettings.flash(Color(5, 2, 2)), 0.5)
 		
 		t.tween_interval(0.5) # Hold the warning
 		
@@ -450,7 +450,7 @@ func take_damage(amount: float):
 	
 	# Visual Flash
 	var t = create_tween()
-	poly.modulate = Color(5, 5, 5, 1)
+	poly.modulate = GameSettings.flash(Color(5, 5, 5, 1))
 	var target_col = Color.WHITE
 	t.tween_property(poly, "modulate", target_col, 0.1)
 	

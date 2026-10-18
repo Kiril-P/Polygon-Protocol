@@ -88,7 +88,31 @@ func _ready():
 	$Control.move_child(frame, 0)
 	
 	setup_dash_overlay()
+	GameSettings.changed.connect(apply_hud_scale)
+	apply_hud_scale()
 	trigger_intro_fade()
+
+## Applies the HUD-size setting to every element that is not the vitals plate.
+func apply_hud_scale():
+	var s := GameSettings.hud_scale()
+	var combo := $Control.get_node_or_null("ComboBox") as Control
+	if combo:
+		combo.pivot_offset = combo.size
+		combo.scale = Vector2.ONE * s
+		if not combo.resized.is_connected(apply_hud_scale):
+			combo.resized.connect(apply_hud_scale)
+	var boss_box := $Control.get_node_or_null("BossBarsContainer") as Control
+	if boss_box:
+		boss_box.pivot_offset = Vector2(boss_box.size.x / 2.0, 0)
+		boss_box.scale = Vector2.ONE * s
+		if not boss_box.resized.is_connected(apply_hud_scale):
+			boss_box.resized.connect(apply_hud_scale)
+	if xp_bar:
+		xp_bar.offset_bottom = 7.0 * s
+	if level_label:
+		level_label.add_theme_font_size_override("font_size", int(round(20 * s)))
+		level_label.offset_right = 160 + 80 * (s - 1.0)
+		level_label.offset_bottom = 46 + 12 * (s - 1.0)
 
 ## Hearts + dash stamina: a single dark plate at the bottom centre.
 func setup_vitals():
@@ -380,7 +404,7 @@ func trigger_intro_fade():
 	var fade = ColorRect.new()
 	add_child(fade)
 	fade.set_anchors_preset(Control.PRESET_FULL_RECT)
-	fade.color = Color.WHITE
+	fade.color = GameSettings.screen_flash_color()
 	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	
 	# Fade out from white to transparent
@@ -484,7 +508,7 @@ func _on_player_combo_changed(combo: int, progress: float):
 	if combo_label_node.text != old_text:
 		AudioManager.play_sfx("combo_tick", 0.0, 1.0 + minf(combo, 40) * 0.015)
 		combo_label_node.scale = Vector2(1.5, 1.5)
-		combo_label_node.modulate = Color(2, 2, 2, 1) # Bright flash
+		combo_label_node.modulate = GameSettings.flash(Color(2, 2, 2, 1)) # Bright flash
 		var tween = create_tween().set_parallel(true)
 		tween.tween_property(combo_label_node, "scale", Vector2(1, 1), 0.2).set_trans(Tween.TRANS_BACK)
 		tween.tween_property(combo_label_node, "modulate", Color.WHITE, 0.2)

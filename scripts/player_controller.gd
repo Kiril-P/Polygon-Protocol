@@ -250,7 +250,7 @@ func show_full_tutorial():
 	canvas.add_child(skip_label)
 	
 	var lines = [
-		"USE MOUSE TO MOVE" if use_mouse else "USE WASD TO MOVE",
+		"USE MOUSE TO MOVE" if use_mouse else "USE %s TO MOVE" % _move_keys_text(),
 		"DASH INTO ENEMIES TO KILL",
 		"EVOLVE BEFORE YOU ARE OVERWHELMED"
 	]
@@ -332,7 +332,7 @@ func finish_tutorial():
 func _physics_process(delta: float):
 	# Pause Input (Always check this first)
 	if Input.is_action_just_pressed("ui_cancel"):
-		if not is_unpausing:
+		if not is_unpausing and GameSettings.modal_open == 0:
 			toggle_pause()
 		return # Stop processing this frame to avoid double-triggers
 	
@@ -907,7 +907,7 @@ func trigger_evolution_visual():
 	shine.polygon = sprite.polygon
 	shine.global_position = global_position
 	shine.scale = Vector2(1, 1)
-	shine.color = Color(2, 2, 2, 1) # Super bright
+	shine.color = GameSettings.flash(Color(2, 2, 2, 1)) # Super bright
 	
 	var tween = create_tween()
 	tween.tween_property(shine, "scale", Vector2(5, 5), 0.4).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
@@ -986,8 +986,19 @@ func trigger_level_up_blast():
 			b_tween.tween_property(b, "scale", Vector2.ZERO, 0.2)
 			b_tween.tween_callback(b.queue_free)
 
+## "WASD" for the default bindings, otherwise the actual keys (up/left/down/right).
+func _move_keys_text() -> String:
+	var names: Array[String] = []
+	for a in ["move_up", "move_left", "move_down", "move_right"]:
+		names.append(GameSettings.key_name(a))
+	var all_single := true
+	for n in names:
+		if n.length() != 1:
+			all_single = false
+	return "".join(names) if all_single else " / ".join(names)
+
 func add_shake(intensity: float):
-	shake_intensity = intensity
+	shake_intensity = intensity * GameSettings.shake
 	if intensity >= 6.0:
 		PostFX.kick(intensity * 0.0001)
 
@@ -1282,6 +1293,13 @@ func pause_game_fractured():
 		)
 		options_ui.add_child(tut_btn)
 
+		# Accessibility & key bindings overlay
+		var access_btn = Button.new()
+		access_btn.text = "ACCESSIBILITY & KEYS"
+		setup_btn.call(access_btn, 18, canvas)
+		access_btn.pressed.connect(func(): AccessibilityMenu.open(self))
+		options_ui.add_child(access_btn)
+
 		# Difficulty Selector
 		var diff_title = Label.new()
 		diff_title.text = "DIFFICULTY (DURING RUN)"
@@ -1485,7 +1503,7 @@ func take_damage(_amount: float):
 
 	# Extreme Overdriven Red flash effect
 	var tween = create_tween()
-	tween.tween_property(self, "modulate", Color(10, 0, 0, 1), 0.1) 
+	tween.tween_property(self, "modulate", GameSettings.flash(Color(10, 0, 0, 1)), 0.1) 
 	tween.tween_property(self, "modulate", Color.WHITE, 0.1)
 	
 	# EMERGENCY OVERDRIVE
@@ -1549,7 +1567,7 @@ func trigger_emergency_overdrive():
 	
 	# Glow effect
 	var t = create_tween().set_parallel(true)
-	t.tween_property(sprite, "modulate", Color(5, 2, 5, 1), 0.5) # Neon Purple/Pink glow
+	t.tween_property(sprite, "modulate", GameSettings.flash(Color(5, 2, 5, 1)), 0.5) # Neon Purple/Pink glow
 	
 	# Duration
 	await get_tree().create_timer(5.0).timeout
@@ -1571,7 +1589,7 @@ func trigger_hit_impact():
 	
 	# 2. Impact Frame: White flash on HUD
 	var flash = ColorRect.new()
-	flash.color = Color.WHITE
+	flash.color = GameSettings.screen_flash_color()
 	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
 	# Add to HUD or a global layer
 	var hud = get_tree().get_first_node_in_group("hud")

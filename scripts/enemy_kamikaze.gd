@@ -61,7 +61,7 @@ func start_charge():
 
 func flash_white():
 	var t = create_tween()
-	sprite.modulate = Color(10, 10, 10, 1)
+	sprite.modulate = GameSettings.flash(Color(10, 10, 10, 1))
 	t.tween_property(sprite, "modulate", Color.WHITE, 0.1)
 
 func explode():

@@ -50,7 +50,9 @@ static func add_glow(parent: Node2D, color: Color, size: float, alpha: float = 0
 	glow.name = "NeonGlow"
 	glow.texture = glow_texture()
 	glow.material = additive_material()
-	glow.modulate = Color(color.r, color.g, color.b, alpha)
+	glow.modulate = Color(color.r, color.g, color.b, alpha * float(Engine.get_main_loop().root.get_node("GameSettings").glow))
+	glow.set_meta("base_alpha", alpha)
+	glow.add_to_group("neon_glow")
 	glow.scale = Vector2.ONE * size / 128.0
 	glow.z_index = -1
 	parent.add_child(glow)

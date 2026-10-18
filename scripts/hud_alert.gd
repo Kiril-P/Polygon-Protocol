@@ -12,7 +12,7 @@ func _ready():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 func flash_hit():
-	_hit = 1.0
+	_hit = 0.5 if get_node("/root/GameSettings").reduced_flash else 1.0
 
 func _process(delta: float):
 	_time += delta
@@ -27,8 +27,9 @@ func _draw():
 		return
 	var s := size
 	var depth := 150.0
-	var c0 := Color(1.0, 0.1, 0.2, strength)
-	var c1 := Color(1.0, 0.1, 0.2, 0.0)
+	var base := HudVitals.pc("alert")
+	var c0 := Color(base.r, base.g, base.b, strength)
+	var c1 := Color(base.r, base.g, base.b, 0.0)
 	for e in 4:
 		var pts := PackedVector2Array()
 		var cols := PackedColorArray()

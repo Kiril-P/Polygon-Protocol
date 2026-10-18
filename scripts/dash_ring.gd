@@ -43,11 +43,11 @@ func _process(delta: float):
 
 func _draw():
 	var frac := clampf(_energy / maxf(_max, 1.0), 0.0, 1.0)
-	var col := HudVitals.DASH
+	var col := HudVitals.pc("dash")
 	if _depleted:
-		col = HudVitals.DASH_EMPTY
+		col = HudVitals.pc("dash_empty")
 	elif frac < 0.3:
-		col = HudVitals.DASH_LOW
+		col = HudVitals.pc("dash_low")
 	var a := _alpha
 	# Track
 	draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 64, Color(0, 0, 0, 0.45 * a), 7.0, true)

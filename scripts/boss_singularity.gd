@@ -397,7 +397,7 @@ func take_damage(amount: float):
 		_enter_phase(3)
 
 	var t := create_tween()
-	poly.modulate = Color(5, 5, 5, 1)
+	poly.modulate = GameSettings.flash(Color(5, 5, 5, 1))
 	t.tween_property(poly, "modulate", Color.WHITE, 0.1)
 
 	if health <= 0.0:
@@ -464,7 +464,7 @@ func start_death_sequence():
 			VFX.death_burst(global_position + offset, COLOR if randf() < 0.5 else HOT, 1.2)
 			VFX.shockwave(global_position + offset, 0.8, HOT, 200.0)
 			if player: player.add_shake(8.0)
-			poly.modulate = Color(10, 10, 10, 1))
+			poly.modulate = GameSettings.flash(Color(10, 10, 10, 1)))
 		t.tween_interval(0.1)
 		t.tween_property(poly, "modulate", Color.WHITE, 0.05)
 	t.tween_callback(die)

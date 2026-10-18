@@ -74,7 +74,7 @@ func die(hit_by_player: bool):
 		# Visual feedback on boss (redundant with take_damage but for extra impact)
 		if boss.has_node("Polygon2D"):
 			var t = create_tween()
-			boss.get_node("Polygon2D").modulate = Color(10, 10, 10, 1)
+			boss.get_node("Polygon2D").modulate = GameSettings.flash(Color(10, 10, 10, 1))
 			t.tween_property(boss.get_node("Polygon2D"), "modulate", Color(2.0, 0.2, 0.2, 1.0), 0.2)
 	
 	# Explosion effect

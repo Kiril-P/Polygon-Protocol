@@ -11,8 +11,10 @@ extends Control
 var is_setting_up: bool = true
 var difficulty_buttons: Array[Button] = []
 var close_callback: Callable
+var access_btn: Button
 
 func _ready():
+	_add_accessibility_button()
 	setup_initial_values()
 	setup_difficulty_selector()
 	setup_button_animations()
@@ -26,6 +28,18 @@ func _ready():
 	
 	is_setting_up = false
 
+func _add_accessibility_button():
+	access_btn = Button.new()
+	access_btn.custom_minimum_size = Vector2(0, 60)
+	access_btn.add_theme_font_size_override("font_size", 24)
+	access_btn.text = "ACCESSIBILITY & KEYS"
+	var parent := back_button.get_parent()
+	parent.add_child(access_btn)
+	parent.move_child(access_btn, back_button.get_index())
+	access_btn.pressed.connect(func():
+		play_menu_sfx("click")
+		AccessibilityMenu.open(self))
+
 func _decorate():
 	var panel := $CenterContainer/PanelContainer as PanelContainer
 	panel.add_theme_stylebox_override("panel", NeonUI.panel_style(NeonUI.CYAN, 0.82, 2, 24, 8))
@@ -38,7 +52,7 @@ func _decorate():
 			l.add_theme_color_override("font_color", Color(0.75, 0.92, 1.0))
 
 func style_all_buttons():
-	var btns = [mouse_controls_btn, tutorial_btn, back_button]
+	var btns = [mouse_controls_btn, tutorial_btn, access_btn, back_button]
 	for btn in btns:
 		if not btn: continue
 		style_menu_button(btn)
@@ -164,7 +178,7 @@ func update_button_texts():
 	if tutorial_btn: tutorial_btn.text = "TUTORIAL: ON" if gd.show_tutorial else "TUTORIAL: OFF"
 
 func setup_button_animations():
-	var btns = [mouse_controls_btn, tutorial_btn, back_button]
+	var btns = [mouse_controls_btn, tutorial_btn, access_btn, back_button]
 	for btn in btns:
 		if not btn: continue
 		btn.focus_mode = Control.FOCUS_NONE

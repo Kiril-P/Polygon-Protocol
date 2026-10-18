@@ -6,6 +6,8 @@ var _rect: ColorRect
 var _mat: ShaderMaterial
 var _kick: float = 0.0
 var _danger: float = 0.0
+var _glow: float = 1.0
+var _reduced_flash: bool = false
 
 const BASE_ABERRATION := 0.0012
 
@@ -19,10 +21,20 @@ func _ready():
 	_mat.shader = load("res://shaders/post_fx.gdshader")
 	_rect.material = _mat
 	add_child(_rect)
+	set_glow(GameSettings.glow, GameSettings.reduced_flash)
 
-## Adds a short-lived burst of chromatic aberration.
+## Adds a short-lived burst of chromatic aberration (scaled by the shake setting, off with reduced flash).
 func kick(amount: float):
-	_kick = minf(_kick + amount, 0.012)
+	if _reduced_flash:
+		return
+	_kick = minf(_kick + amount * GameSettings.shake, 0.012)
+
+## Bloom strength follows the glow setting; reduced-flash caps it too.
+func set_glow(glow: float, reduced_flash: bool):
+	_glow = glow
+	_reduced_flash = reduced_flash
+	if _mat:
+		_mat.set_shader_parameter("bloom_strength", 0.26 * glow * (0.6 if reduced_flash else 1.0))
 
 func _process(delta: float):
 	_kick = lerpf(_kick, 0.0, 1.0 - exp(-9.0 * delta))
@@ -37,4 +49,5 @@ func _process(delta: float):
 	_danger = lerpf(_danger, danger_target, 1.0 - exp(-8.0 * delta))
 	_mat.set_shader_parameter("aberration", BASE_ABERRATION + _kick + dash_boost)
 	_mat.set_shader_parameter("danger", _danger)
+	_mat.set_shader_parameter("danger_color", GameSettings.pal()["alert"])
 	_mat.set_shader_parameter("time", Time.get_ticks_msec() / 1000.0)

@@ -158,7 +158,7 @@ func _on_bounced():
 	AudioManager.play_sfx("bullet_bounce", -5.0)
 
 	var tween = create_tween()
-	sprite.modulate = Color(5, 5, 5, 1)
+	sprite.modulate = GameSettings.flash(Color(5, 5, 5, 1))
 	tween.tween_property(sprite, "modulate", Color(1, 1, 1, 1), 0.1)
 
 func setup_bullet_shape():

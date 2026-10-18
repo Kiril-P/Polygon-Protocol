@@ -324,7 +324,7 @@ func take_damage(amount: float):
 
 	# Visual Flash
 	var t = create_tween()
-	poly.modulate = Color(5, 5, 5, 1)
+	poly.modulate = GameSettings.flash(Color(5, 5, 5, 1))
 	t.tween_property(poly, "modulate", Color.WHITE, 0.1)
 	
 	if health <= 0:
@@ -365,7 +365,7 @@ func start_death_sequence():
 		hectic_tween.tween_callback(func(): 
 			spawn_small_explosion(global_position + pos_offset)
 			if player: player.add_shake(8.0)
-			poly.modulate = Color(10, 10, 10, 1) # Pure white flash
+			poly.modulate = GameSettings.flash(Color(10, 10, 10, 1)) # Pure white flash
 		)
 		hectic_tween.tween_interval(0.1)
 		hectic_tween.tween_property(poly, "modulate", Color.WHITE, 0.05)

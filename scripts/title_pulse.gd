@@ -44,7 +44,7 @@ func _process(delta: float):
 		position = base_pos + Vector2(randf_range(-15, 15), randf_range(-5, 5))
 		# Random text corruption feel (using scale)
 		scale.x = base_scale.x * randf_range(0.8, 1.4)
-		modulate = Color(2, 2, 2, 1) # Flash white
+		modulate = GameSettings.flash(Color(2, 2, 2, 1)) # Flash white
 		
 		# Occasional "split" feel
 		if randf() < 0.5:
