@@ -317,7 +317,7 @@ func _start_game(is_quick: bool):
 	var flash = ColorRect.new()
 	add_child(flash)
 	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
-	flash.color = Color.WHITE
+	flash.color = GameSettings.screen_flash_color()
 	flash.modulate.a = 0
 	tween.tween_property(flash, "modulate:a", 1.0, duration).set_delay(duration * 0.4)
 	
@@ -365,7 +365,7 @@ func _on_leaderboard_pressed():
 	var flash = ColorRect.new()
 	add_child(flash)
 	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
-	flash.color = Color.WHITE
+	flash.color = GameSettings.screen_flash_color()
 	flash.modulate.a = 0
 	tween.tween_property(flash, "modulate:a", 1.0, duration).set_delay(duration * 0.4)
 	

@@ -67,7 +67,7 @@ func take_damage(_amount: float):
 
 func flash_white():
 	var tween = create_tween()
-	tween.tween_property($Polygon2D, "modulate", Color(3, 3, 3, 1), 0.05)
+	tween.tween_property($Polygon2D, "modulate", get_node("/root/GameSettings").flash(Color(3, 3, 3, 1)), 0.05)
 	tween.tween_property($Polygon2D, "modulate", Color(1, 1, 1, 1), 0.05)
 
 func die():

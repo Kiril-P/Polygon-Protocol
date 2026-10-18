@@ -10,11 +10,6 @@ const HEX_R := 21.0
 const BAR_W := 340.0
 const BAR_H := 22.0
 
-const HEART := Color(1.0, 0.22, 0.34)
-const HEART_DARK := Color(0.28, 0.05, 0.1)
-const DASH := Color(0.1, 0.9, 1.0)
-const DASH_LOW := Color(1.0, 0.72, 0.15)
-const DASH_EMPTY := Color(1.0, 0.25, 0.3)
 const PLATE := Color(0.02, 0.03, 0.07, 0.9)
 
 var hearts: int = 0
@@ -30,6 +25,11 @@ var _heal_flash: float = 0.0
 var _lost_index: int = -1
 var _time: float = 0.0
 var _font: Font
+var ui_scale: float = 1.0   # HUD size setting
+var _pop: float = 1.0       # transient hit pop
+
+static func pc(key: String) -> Color:
+	return Engine.get_main_loop().root.get_node("GameSettings").pal()[key]
 
 func _init():
 	custom_minimum_size = PANEL_SIZE
@@ -38,13 +38,20 @@ func _init():
 
 func _ready():
 	_font = get_theme_default_font()
-	pivot_offset = PANEL_SIZE / 2.0
+	pivot_offset = Vector2(PANEL_SIZE.x / 2.0, PANEL_SIZE.y)   # grow upward from the bottom centre
+	get_node("/root/GameSettings").changed.connect(_apply_settings)
+	_apply_settings()
+
+func _apply_settings():
+	ui_scale = get_node("/root/GameSettings").hud_scale()
+	scale = Vector2.ONE * ui_scale * _pop
+	queue_redraw()
 
 func set_hearts(current: int, maximum: int):
 	if hearts > current and max_hearts > 0:
 		_hit_flash = 1.0
 		_lost_index = current
-		scale = Vector2(1.06, 1.06)
+		_pop = 1.06
 	elif current > hearts and max_hearts > 0:
 		_heal_flash = 1.0
 	hearts = current
@@ -60,7 +67,7 @@ func set_energy(current: float, maximum: float):
 	elif _depleted and frac >= 0.3:
 		_depleted = false
 		_ready_flash = 1.0
-		AudioManager.play_sfx("dash_ready")
+		get_node("/root/AudioManager").play_sfx("dash_ready")
 	queue_redraw()
 
 func _process(delta: float):
@@ -69,15 +76,16 @@ func _process(delta: float):
 	_hit_flash = maxf(_hit_flash - delta * 2.2, 0.0)
 	_heal_flash = maxf(_heal_flash - delta * 2.0, 0.0)
 	_ready_flash = maxf(_ready_flash - delta * 1.6, 0.0)
-	scale = scale.lerp(Vector2.ONE, clampf(delta * 10.0, 0.0, 1.0))
+	_pop = lerpf(_pop, 1.0, clampf(delta * 10.0, 0.0, 1.0))
+	scale = Vector2.ONE * ui_scale * _pop
 	queue_redraw()
 
 func _dash_color(frac: float) -> Color:
 	if _depleted:
-		return DASH_EMPTY
+		return pc("dash_empty")
 	if frac < 0.3:
-		return DASH_LOW
-	return DASH
+		return pc("dash_low")
+	return pc("dash")
 
 func _hex(center: Vector2, r: float) -> PackedVector2Array:
 	var pts := PackedVector2Array()
@@ -101,6 +109,8 @@ func _draw():
 	plate.bg_color = PLATE
 	plate.set_corner_radius_all(10)
 	plate.set_border_width_all(2)
+	var HEART := pc("heart")
+	var HEART_DARK := pc("heart_dark")
 	var border := Color(0.35, 0.5, 0.65, 0.5)
 	if low_hp:
 		border = HEART.lerp(Color.WHITE, 0.1 * urgent)
@@ -158,7 +168,13 @@ func _draw():
 	# Depleted: pulsing warning stripes over the track
 	if _depleted:
 		var a := 0.4 + 0.25 * sin(_time * 8.0)
-		draw_rect(Rect2(bx, by, BAR_W, BAR_H), Color(DASH_EMPTY.r, DASH_EMPTY.g, DASH_EMPTY.b, a))
+		var ec := pc("dash_empty")
+		draw_rect(Rect2(bx, by, BAR_W, BAR_H), Color(ec.r, ec.g, ec.b, a))
+		# Diagonal hatching so "empty" never relies on colour alone
+		var x_ := 0.0
+		while x_ < BAR_W:
+			draw_line(Vector2(bx + x_, by + BAR_H), Vector2(bx + minf(x_ + BAR_H, BAR_W), by + maxf(BAR_H - (BAR_W - x_), 0.0)), Color(1, 1, 1, 0.35), 2.0)
+			x_ += 14.0
 	# Tick marks (quarters) and unlock threshold
 	for q in [0.25, 0.5, 0.75]:
 		draw_line(Vector2(bx + BAR_W * q, by), Vector2(bx + BAR_W * q, by + BAR_H), Color(0, 0, 0, 0.55), 2.0)
@@ -170,6 +186,8 @@ func _draw():
 	var scol := col
 	if _depleted:
 		status = "RECHARGE"
+	elif frac < 0.3:
+		status = "LOW"
 	elif _ready_flash > 0.0:
 		status = "READY"
 		scol = Color(0.7, 1.0, 1.0)
