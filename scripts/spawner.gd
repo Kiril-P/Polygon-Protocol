@@ -16,11 +16,12 @@ var boss_active: bool = false
 var bosses_spawned: Array[int] = [] # Track which milestones were hit
 var corruption_warning_shown: bool = false
 var choice_active: bool = false
+var endless_chosen: bool = false # Declined the 6:00 boss fight, so no third boss either
 var choice_made_360: bool = false
 
 # Index of each enemy in the `enemy_types` array (matches scenes/game.tscn)
 const ENEMY_INDEX := {"chaser": 0, "fairy": 1, "shooter": 2, "spinner": 3, "tank": 4, "zigzagger": 5, "kamikaze": 6}
-const BOSS_MILESTONES := [80, 180, 360]
+const BOSS_MILESTONES := [80, 180, 360, 600]
 
 var director := SpawnDirector.new()
 
@@ -37,9 +38,11 @@ func _process(delta: float):
 	if not tutorial_finished:
 		return
 		
-	# BOSS MILESTONES: Pause timer at 80s (1:20), 180s (3:00), and 360s (6:00)
-	var milestone_times = [80, 180, 360]
+	# BOSS MILESTONES: Pause timer at 80s (1:20), 180s (3:00), 360s (6:00) and 600s (10:00)
+	var milestone_times = BOSS_MILESTONES
 	for m in milestone_times:
+		if m == 600 and endless_chosen:
+			continue
 		# Show warning 10 seconds before (Trigger only once)
 		if int(time_passed) == m - 10 and not bosses_spawned.has(m):
 			var hud = get_tree().get_first_node_in_group("hud")
@@ -295,6 +298,8 @@ func spawn_major_boss(milestone: int, forced_pos: Vector2 = Vector2.ZERO):
 	
 	if milestone == 180:
 		boss.set_script(load("res://scripts/boss_pulsar.gd"))
+	elif milestone == 600:
+		boss.set_script(load("res://scripts/boss_singularity.gd"))
 	else:
 		boss.set_script(load("res://scripts/boss_fortress.gd"))
 	
@@ -389,6 +394,7 @@ func _on_choice_endless_selected():
 	get_tree().paused = false
 	choice_active = false
 	choice_made_360 = true
+	endless_chosen = true
 	bosses_spawned.append(360) # Mark as "spawned" so it doesn't trigger again
 	
 	AudioManager.set_muffled(false)

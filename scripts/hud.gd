@@ -237,6 +237,27 @@ func setup_warning_label():
 	warn.visible = false
 	$Control.add_child(warn)
 
+## Big callout when a boss changes phase (own label so it never fights the warning tweens).
+func show_boss_phase(text: String):
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	NeonUI.style_title(label, Color(0.85, 0.35, 1.0), 56)
+	label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE)
+	label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	label.position.y = 230
+	label.pivot_offset = Vector2(label.size.x / 2.0, 30)
+	label.modulate = Color(1.6, 1.0, 1.8, 0.0)
+	label.scale = Vector2(1.6, 1.6)
+	$Control.add_child(label)
+	var t := label.create_tween().set_parallel(true)
+	t.tween_property(label, "modulate:a", 1.0, 0.25)
+	t.tween_property(label, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK)
+	t.set_parallel(false)
+	t.tween_interval(1.6)
+	t.tween_property(label, "modulate:a", 0.0, 0.4)
+	t.tween_callback(label.queue_free)
+
 func show_boss_warning(seconds: int = 0):
 	var warn = $Control.get_node_or_null("BossWarning")
 	if warn:
@@ -344,6 +365,8 @@ func _process(_delta):
 					boss_display_name = "FORTRESS PROTOCOL"
 				elif boss_node_ref.get_script().resource_path.contains("boss_pulsar"):
 					boss_display_name = "PULSAR PROTOCOL"
+				elif boss_node_ref.get_script().resource_path.contains("boss_singularity"):
+					boss_display_name = "SINGULARITY PROTOCOL"
 				
 				active_label.text = boss_display_name
 		

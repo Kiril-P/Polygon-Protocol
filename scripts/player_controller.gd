@@ -24,6 +24,7 @@ signal combo_changed(combo: int, time_left: float)
 var current_energy: float = 100.0
 var regen_delay_timer: float = 0.0 # NEW: Delay after running out
 var is_dashing: bool = false
+var external_pull: Vector2 = Vector2.ZERO # Set each frame by bosses with gravity (consumed in handle_movement)
 var dash_direction: Vector2 = Vector2.ZERO
 
 # Boss Nerf state
@@ -296,6 +297,11 @@ func _input(event):
 			if spawner:
 				spawner.spawn_major_boss(180)
 				print("DEBUG: Boss 2 (Pulsar) Spawned")
+		if event.keycode == KEY_L:
+			var spawner = get_tree().get_first_node_in_group("spawner")
+			if spawner:
+				spawner.spawn_major_boss(600)
+				print("DEBUG: Boss 3 (Singularity) Spawned")
 		if event.keycode == KEY_H:
 			var spawner = get_tree().get_first_node_in_group("spawner")
 			if spawner:
@@ -747,6 +753,8 @@ func handle_movement(delta: float):
 	else:
 		# Faster deceleration for snappier stop
 		velocity = velocity.move_toward(Vector2.ZERO, speed * 15 * delta)
+	velocity += external_pull
+	external_pull = Vector2.ZERO
 
 func handle_rotation(delta: float):
 	# Auto-rotate the shape
