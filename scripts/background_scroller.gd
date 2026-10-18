@@ -9,6 +9,7 @@ var chaos_grid_color: Color = Color(1.0, 0.1, 0.1, 0.2) # Ending Red (more visib
 
 func _process(delta: float):
 	current_offset += auto_scroll * delta
+	_feed_shader()
 	
 	# Handle Dynamic Difficulty Tinting
 	update_difficulty_tint()
@@ -37,3 +38,12 @@ func update_difficulty_tint():
 	
 	var current_color = base_grid_color.lerp(chaos_grid_color, curve_factor)
 	material.set_shader_parameter("line_color", current_color)
+
+## Pushes time, view size and live shockwaves to the neon grid shader.
+func _feed_shader():
+	if not material is ShaderMaterial:
+		return
+	var viewport := get_viewport()
+	material.set_shader_parameter("time", Time.get_ticks_msec() / 1000.0)
+	material.set_shader_parameter("view_size", viewport.get_visible_rect().size)
+	material.set_shader_parameter("waves", VFX.wave_uniform(viewport.get_canvas_transform()))

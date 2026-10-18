@@ -32,7 +32,7 @@ func _ready():
 
 	# Decide where to go
 	if has_node("/root/GlobalData"):
-		var gd = get_node("/root/GlobalData")
+		var gd = GlobalData
 		# If this is the VERY first time (never even got a first upgrade)
 		# we go straight to the game. Otherwise, we go to main menu.
 		if gd.is_first_run and gd.next_scene_path.is_empty():
@@ -45,6 +45,9 @@ func _ready():
 		target_scene_path = "res://scenes/main_menu.tscn"
 	
 	# Cyberpunk Styling
+	NeonUI.style_title($CenterContainer/VBoxContainer/Title, NeonUI.CYAN)
+	NeonUI.pulse($CenterContainer/VBoxContainer/Title, 0.2, 1.6)
+	NeonUI.style_bar(progress_bar, NeonUI.CYAN)
 	status_label.add_theme_color_override("font_color", Color(0, 1, 1)) # Cyan
 	tip_label.add_theme_color_override("font_color", Color(1, 0, 1)) # Magenta
 	
@@ -105,7 +108,6 @@ func trigger_glitch_out():
 	
 	t.tween_property(self, "modulate:a", 0.0, 0.2)
 	t.tween_callback(func():
-		if has_node("/root/GlobalData"):
-			get_node("/root/GlobalData").next_scene_path = ""
+		GlobalData.next_scene_path = ""
 		get_tree().change_scene_to_packed(ResourceLoader.load_threaded_get(target_scene_path))
 	)

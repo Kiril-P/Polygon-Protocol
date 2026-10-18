@@ -10,10 +10,9 @@ var options_scene = preload("res://scenes/options_menu.tscn")
 
 func _ready():
 	# Set music to menu mode
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").set_music_menu_mode(true)
-		get_node("/root/AudioManager").set_muffled(false)
-		
+	AudioManager.set_music_menu_mode(true)
+	AudioManager.set_muffled(false)
+	
 	# Leaderboard Button
 	var lb_button = Button.new()
 	lb_button.text = "LEADERBOARD"
@@ -31,6 +30,7 @@ func _ready():
 		else:
 			quit_button.text = "QUIT"
 			
+	setup_neon_background()
 	create_menu_juice()
 	setup_button_animations()
 	style_all_buttons()
@@ -71,37 +71,7 @@ func style_all_buttons():
 		style_menu_button(btn)
 
 func style_menu_button(btn: Button):
-	# Normal Style
-	var normal = StyleBoxFlat.new()
-	normal.bg_color = Color(0.1, 0.1, 0.2, 0.4)
-	normal.border_width_left = 4
-	normal.border_color = Color(0.0, 0.8, 1.0, 0.6) # Cyan edge
-	normal.corner_radius_top_left = 2
-	normal.corner_radius_bottom_right = 15
-	normal.content_margin_left = 20
-	
-	# Hover Style
-	var hover = normal.duplicate()
-	hover.bg_color = Color(0.2, 0.2, 0.4, 0.6)
-	hover.border_color = Color(0.0, 1.0, 1.0, 1.0) # Bright Cyan
-	hover.shadow_color = Color(0.0, 1.0, 1.0, 0.3)
-	hover.shadow_size = 10
-	
-	# Pressed Style
-	var style_pressed = hover.duplicate()
-	style_pressed.bg_color = Color(0.3, 0.1, 0.4, 0.8)
-	style_pressed.border_color = Color(1.0, 0.0, 1.0, 1.0) # Magenta flash
-	
-	btn.add_theme_stylebox_override("normal", normal)
-	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", style_pressed)
-	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	
-	# Text styling
-	btn.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
-	btn.add_theme_color_override("font_hover_color", Color.WHITE)
-	btn.add_theme_constant_override("outline_size", 4)
-	btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
+	NeonUI.style_button(btn)
 
 func setup_button_animations():
 	var buttons = [start_button, upgrade_button, options_button, quit_button]
@@ -117,8 +87,7 @@ func setup_button_animations():
 		btn.focus_mode = Control.FOCUS_NONE # Remove the white selection border
 		
 		btn.mouse_entered.connect(func():
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_sfx("hover")
+			AudioManager.play_sfx("hover")
 			var tween = create_tween().set_parallel(true)
 			tween.tween_property(btn, "scale", Vector2(1.1, 1.1), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 			tween.tween_property(btn, "modulate", Color(1.5, 1.5, 2.0), 0.2)
@@ -131,14 +100,30 @@ func setup_button_animations():
 		)
 		
 		btn.button_down.connect(func():
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_sfx("click")
+			AudioManager.play_sfx("click")
 			btn.scale = Vector2(0.95, 0.95)
 		)
 		
 		btn.button_up.connect(func():
 			btn.scale = Vector2(1.1, 1.1)
 		)
+
+## Swap the flat menu backdrop for the same living neon grid used in-game.
+func setup_neon_background():
+	$Background.visible = false
+	var bg = load("res://scenes/background.tscn").instantiate()
+	add_child(bg)
+	var grid = bg.get_node("Grid")
+	grid.auto_scroll = Vector2(22, 12)
+	# Occasional ripples keep the grid alive behind the title
+	var timer := Timer.new()
+	timer.wait_time = 2.4
+	timer.autostart = true
+	timer.timeout.connect(func():
+		var size := get_viewport_rect().size
+		var xform := get_viewport().get_canvas_transform().affine_inverse()
+		VFX.shockwave(xform * Vector2(randf() * size.x, randf() * size.y), 1.1, Color(0.3, 0.8, 1.0), 260.0))
+	add_child(timer)
 
 func create_menu_juice():
 	# Background elements: Mix of shapes and "Enemies"
@@ -162,10 +147,10 @@ func spawn_menu_shape():
 	
 	poly.polygon = pts
 	# Palette: Neon Cyan, Neon Magenta, Neon Purple
-	var colors = [Color(0.0, 0.8, 1.0, 0.1), Color(1.0, 0.0, 1.0, 0.1), Color(0.7, 0.2, 1.0, 0.1)]
+	var colors = [Color(0.0, 0.8, 1.0), Color(1.0, 0.0, 1.0), Color(0.7, 0.2, 1.0)]
 	poly.color = colors[randi() % colors.size()]
-	# Add Glow to background shapes
-	poly.modulate = Color(1.5, 1.5, 1.5, 1.0)
+	Neon.apply(poly, poly.color, 0.08, 2.0)
+	poly.modulate = Color(1, 1, 1, 0.55)
 	
 	var screen_size = get_viewport_rect().size
 	poly.position = Vector2(randf_range(0, screen_size.x), randf_range(0, screen_size.y))
@@ -206,9 +191,10 @@ func spawn_menu_enemy():
 		pts.append(Vector2(e_size, 0).rotated(TAU/sides * s))
 	
 	poly.polygon = pts
-	poly.color = Color(1, 0.2, 0.2, 0.3) if not is_tank else Color(0.2, 0.8, 0.2, 0.3)
-	# Add Glow to menu enemies
-	poly.modulate = Color(2.0, 1.5, 1.5, 1.0) if not is_tank else Color(1.5, 2.0, 1.5, 1.0)
+	var base_color := Color(1.0, 0.15, 0.4) if not is_tank else Color(0.2, 1.0, 0.45)
+	poly.color = base_color
+	Neon.apply(poly, base_color, 0.25, 3.0)
+	Neon.add_glow(poly, base_color, 110.0, 0.18)
 	
 	var screen_size = get_viewport_rect().size
 	enemy.position = Vector2(randf_range(0, screen_size.x), randf_range(0, screen_size.y))
@@ -217,9 +203,8 @@ func spawn_menu_enemy():
 	
 	# Detect Click
 	enemy.pressed.connect(func():
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("enemy_death", 0.0, 0.9, 1.1, 0.3)
-		spawn_menu_death_particles(enemy.position + poly.position, poly.color)
+		AudioManager.play_sfx("enemy_death", 0.0, 0.9, 1.1, 0.3)
+		spawn_menu_death_particles(enemy.position + poly.position, base_color)
 		enemy.queue_free()
 		# Respawn another after a delay to keep the menu busy
 		get_tree().create_timer(0.5).timeout.connect(spawn_menu_enemy)
@@ -233,7 +218,7 @@ func spawn_menu_enemy():
 	fire_timer.wait_time = randf_range(0.5, 1.5)
 	fire_timer.timeout.connect(func(): 
 		if not is_instance_valid(enemy): return
-		spawn_menu_bullet(enemy.position + poly.position, poly.rotation, poly.color)
+		spawn_menu_bullet(enemy.position + poly.position, poly.rotation, base_color)
 	)
 	fire_timer.start()
 
@@ -278,8 +263,9 @@ func spawn_menu_bullet(pos: Vector2, rot: float, col: Color):
 	
 	var pts = PackedVector2Array([Vector2(8,0), Vector2(-4,4), Vector2(-4,-4)])
 	bullet.polygon = pts
-	bullet.color = col
-	bullet.modulate.a = 0.6
+	bullet.color = col.lerp(Color.WHITE, 0.4)
+	bullet.material = Neon.additive_material()
+	bullet.modulate = Color(1.6, 1.6, 1.6, 0.8)
 	bullet.position = pos
 	bullet.rotation = rot
 	
@@ -306,7 +292,7 @@ func _start_game(is_quick: bool):
 	
 	# Display High Score before warping (If not quick)
 	if not is_quick:
-		var gd = get_node("/root/GlobalData")
+		var gd = GlobalData
 		if gd and gd.high_score > 0:
 			var hs_label = Label.new()
 			hs_label.text = "BEST TIME: %d:%02d" % [int(gd.high_score / 60), int(gd.high_score) % 60]
@@ -337,10 +323,8 @@ func _start_game(is_quick: bool):
 	
 	tween.set_parallel(false)
 	tween.tween_callback(func():
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").set_music_menu_mode(false)
-		if has_node("/root/GlobalData"):
-			get_node("/root/GlobalData").next_scene_path = "res://scenes/game.tscn"
+		AudioManager.set_music_menu_mode(false)
+		GlobalData.next_scene_path = "res://scenes/game.tscn"
 		get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
 	)
 
@@ -351,15 +335,13 @@ func _on_upgrade_button_pressed():
 	t.tween_property($VBoxContainer, "position:x", -500, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	t.set_parallel(false)
 	t.tween_callback(func():
-		if has_node("/root/GlobalData"):
-			get_node("/root/GlobalData").next_scene_path = "res://scenes/evolution_vault.tscn"
+		GlobalData.next_scene_path = "res://scenes/evolution_vault.tscn"
 		get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
 	)
 
 func _on_leaderboard_pressed():
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("click")
-	
+	AudioManager.play_sfx("click")
+
 	# Cool "Warp" Animation like Evolution Vault
 	start_button.disabled = true
 	upgrade_button.disabled = true
@@ -389,15 +371,13 @@ func _on_leaderboard_pressed():
 	
 	tween.set_parallel(false)
 	tween.tween_callback(func():
-		if has_node("/root/GlobalData"):
-			get_node("/root/GlobalData").next_scene_path = "res://scenes/leaderboard.tscn"
+		GlobalData.next_scene_path = "res://scenes/leaderboard.tscn"
 		get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
 	)
 
 func _on_options_button_pressed():
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("click")
-	
+	AudioManager.play_sfx("click")
+
 	var options = options_scene.instantiate()
 	add_child(options)
 	

@@ -26,19 +26,10 @@ func setup_visuals():
 	])
 	poly.polygon = pts
 	poly.color = heart_color
-	# Calculate a glow version of the color
-	var glow_color = heart_color * 2.5
-	glow_color.a = 1.0
-	poly.modulate = glow_color
 	add_child(poly)
-	
-	# Add an outline to make it pop even more
-	var outline = Line2D.new()
-	outline.points = pts
-	outline.add_point(pts[0]) # Close the loop
-	outline.width = 2.0
-	outline.default_color = Color.BLACK
-	poly.add_child(outline)
+	# Hot neon rim and halo so the weak points read instantly
+	Neon.apply(poly, heart_color, 0.35, 2.5)
+	Neon.add_glow(self, heart_color, 90.0, 0.25)
 	
 	# Add a collision shape
 	var shape = CollisionShape2D.new()
@@ -74,9 +65,8 @@ func die(hit_by_player: bool):
 		boss.take_damage(boss.max_health * damage_percent) 
 		
 		# Feedback sound and screen shake
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("enemy_death", 0.0, 1.2, 1.5)
-			
+		AudioManager.play_sfx("pillar_hit")
+		
 		var player = get_tree().get_first_node_in_group("player")
 		if player and player.has_method("add_shake"):
 			player.add_shake(15.0)

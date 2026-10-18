@@ -16,28 +16,39 @@ var boss_active: bool = false
 var bosses_spawned: Array[int] = [] # Track which milestones were hit
 var corruption_warning_shown: bool = false
 var choice_active: bool = false
+var endless_chosen: bool = false # Declined the 6:00 boss fight, so no third boss either
 var choice_made_360: bool = false
+
+# Index of each enemy in the `enemy_types` array (matches scenes/game.tscn)
+const ENEMY_INDEX := {"chaser": 0, "fairy": 1, "shooter": 2, "spinner": 3, "tank": 4, "zigzagger": 5, "kamikaze": 6}
+const BOSS_MILESTONES := [80, 180, 360, 600]
+
+var director := SpawnDirector.new()
 
 func _ready():
 	add_to_group("spawner")
+	director.load_data()
 	player = get_tree().get_first_node_in_group("player")
 	
 	# Check if tutorial is disabled to start spawning immediately
-	if has_node("/root/GlobalData") and not get_node("/root/GlobalData").show_tutorial:
+	if not GlobalData.show_tutorial:
 		tutorial_finished = true
 
 func _process(delta: float):
 	if not tutorial_finished:
 		return
 		
-	# BOSS MILESTONES: Pause timer at 80s (1:20), 180s (3:00), and 360s (6:00)
-	var milestone_times = [80, 180, 360]
+	# BOSS MILESTONES: Pause timer at 80s (1:20), 180s (3:00), 360s (6:00) and 600s (10:00)
+	var milestone_times = BOSS_MILESTONES
 	for m in milestone_times:
+		if m == 600 and endless_chosen:
+			continue
 		# Show warning 10 seconds before (Trigger only once)
 		if int(time_passed) == m - 10 and not bosses_spawned.has(m):
 			var hud = get_tree().get_first_node_in_group("hud")
 			if hud and hud.has_method("show_boss_warning"):
 				hud.show_boss_warning(10)
+				AudioManager.play_sfx("boss_warning")
 		
 		if int(time_passed) == m and not bosses_spawned.has(m):
 			if m == 360 and not choice_made_360:
@@ -66,7 +77,7 @@ func _process(delta: float):
 	
 	# Reduced safety window after tutorial/start
 	var current_delay = spawn_delay
-	if has_node("/root/GlobalData") and get_node("/root/GlobalData").is_first_run:
+	if GlobalData.is_first_run:
 		current_delay = 0.5 # Start almost immediately
 	elif tutorial_finished:
 		current_delay = 0.2 # Start spawning almost immediately after tutorial/start
@@ -84,19 +95,28 @@ func _process(delta: float):
 		scaling += pow(post_60_time, 1.4) * 1.2 
 		
 	var difficulty_mult = 1.0
-	if has_node("/root/GlobalData"):
-		var level = get_node("/root/GlobalData").difficulty_level
-		# 1: 0.7x, 2: 1.0x, 3: 1.5x, 4: 2.0x, 5: 3.0x
-		var multipliers = [0.0, 0.7, 1.0, 1.5, 2.0, 3.0]
-		difficulty_mult = multipliers[level]
-		
-	var current_spawn_rate = spawn_rate * difficulty_mult * scaling
+	var level = GlobalData.difficulty_level
+	# 1: 0.7x, 2: 1.0x, 3: 1.5x, 4: 2.0x, 5: 3.0x
+	var multipliers = [0.0, 0.7, 1.0, 1.5, 2.0, 3.0]
+	difficulty_mult = multipliers[level]
+	
+	var base_spawn_rate = spawn_rate * difficulty_mult * scaling
+	var hearts_ratio = 1.0
+	if player and is_instance_valid(player):
+		hearts_ratio = float(player.current_hearts) / maxf(1.0, float(player.max_hearts))
+	director.update(delta, time_passed, hearts_ratio, GlobalData.run_kills, base_spawn_rate)
+	var current_spawn_rate = base_spawn_rate * director.rate_multiplier()
 	
 	if not boss_active:
 		spawn_timer += delta
 		if spawn_timer >= 1.0 / current_spawn_rate:
-			spawn_enemy()
 			spawn_timer = 0.0
+			if director.spawn_allowed(get_tree().get_nodes_in_group("enemies").size()):
+				spawn_enemy()
+		
+		for ev in director.due_events(time_passed):
+			if not _near_boss_milestone():
+				_spawn_event(ev)
 
 	if not boss_active:
 		# Hazard Spawning
@@ -110,15 +130,14 @@ func spawn_hazard():
 	
 	# Show warning on first hazard if tutorial is on
 	if not corruption_warning_shown:
-		if has_node("/root/GlobalData") and get_node("/root/GlobalData").show_tutorial:
+		if GlobalData.show_tutorial:
 			var hud = get_tree().get_first_node_in_group("hud")
 			if hud and hud.has_method("show_corruption_warning"):
 				hud.show_corruption_warning()
 		corruption_warning_shown = true
 
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("glitch", 5.0, 0.5, 0.8) # Increased volume from -5.0 to 5.0
-	
+	AudioManager.play_sfx("glitch", 5.0, 0.5, 0.8) # Increased volume from -5.0 to 5.0
+
 	# Spawn hazard somewhere nearby but not right on top of player
 	var angle = randf() * TAU
 	var dist = randf_range(200, 500)
@@ -150,6 +169,22 @@ func spawn_hazard():
 	hazard.monitorable = true
 	hazard.monitoring = true
 
+## True shortly before a boss milestone, so formations never stack on the boss warning.
+func _near_boss_milestone() -> bool:
+	var buffer := float(director.cfg.get("event_boss_buffer_seconds", 12.0))
+	for m in BOSS_MILESTONES:
+		if not bosses_spawned.has(m) and time_passed >= m - buffer and time_passed < m + 1.0:
+			return true
+	return false
+
+## Distance from the player at which enemies appear (just off-screen, camera-zoom aware).
+func _current_spawn_radius() -> float:
+	if player and player.has_node("Camera2D"):
+		var zoom = player.get_node("Camera2D").zoom.x
+		# Zoom 1.0 -> 700; zoomed out to 0.5 -> 1400. Small buffer keeps them off-screen.
+		return (spawn_radius / zoom) + 100.0
+	return spawn_radius
+
 func spawn_enemy():
 	if enemy_types.is_empty():
 		return
@@ -158,83 +193,79 @@ func spawn_enemy():
 		player = get_tree().get_first_node_in_group("player")
 		if not player:
 			return
-
-	var available_indices = []
 	
-	# 0: Chaser, 1: Fairy, 2: Shooter, 3: Spinner, 4: Tank, 5: Zigzagger, 6: Kamikaze
-	if time_passed < 80: # Phase 1: Early Game Stagger (Extended to 80s)
-		available_indices.append_array([0, 0, 0, 1, 1, 6]) # Triple weight for chasers
-		if time_passed >= 50:
-			available_indices.append(5) # Zigzaggers at 50s
-			
-	elif time_passed < 180: # Phase 2: Mid Game Stagger (Extended to 180s)
-		# Fodder base
-		available_indices.append_array([0, 0, 0, 0, 1, 1, 1, 6, 6, 6]) 
-		available_indices.append(5) # Zigzaggers
-		
-		# Heavies (Much rarer)
-		if time_passed >= 90:
-			available_indices.append(2) # Spinners
-		if time_passed >= 110:
-			# Reduced tanks further
-			pass 
-		if time_passed >= 140:
-			available_indices.append(3) # Shooters
-	else: # Phase 3: Total Chaos (180s+)
-		# Heavy weight on fodder to prevent tank overcrowding
-		# 0: Chaser(x5), 1: Fairy(x4), 6: Kamikaze(x4), 5: Zigzagger(x2), 2: Shooter(x1), 3: Spinner(x1), 4: Tank(x0.5)
-		available_indices = [0, 0, 0, 0, 0, 1, 1, 1, 1, 6, 6, 6, 6, 5, 5, 2, 3, 4]
-	
-	var index = available_indices[randi() % available_indices.size()]
-	
-	# MINI-BOSS SPAWN: Every 2 minutes (120s), spawn a giant tank
-	if int(time_passed) % 120 == 0 and int(time_passed) > 0:
-		# Just spawn an extra tank for now but make it bigger
-		index = 4 
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("boss_spawn")
-	
-	# Safety check for array size
-	index = clamp(index, 0, enemy_types.size() - 1)
-	
-	var enemy_scene = enemy_types[index]
-	if not enemy_scene: return
-
-	# Calculate dynamic spawn radius based on camera zoom
-	var current_radius = spawn_radius
-	if player and player.has_node("Camera2D"):
-		var zoom = player.get_node("Camera2D").zoom.x
-		# If zoom is 1.0, radius is 700. If zoom is 0.5 (zoomed out), radius is 1400.
-		# Add a small buffer to ensure they always spawn off-screen
-		current_radius = (spawn_radius / zoom) + 100.0
-	
+	var index: int = ENEMY_INDEX.get(director.pick_enemy(time_passed), 0)
 	var angle = randf() * TAU
 	
 	# ANTI-KITING: 30% chance to spawn specifically in front of the player's movement
 	if player.velocity.length() > 10.0 and randf() < 0.3:
-		var move_dir = player.velocity.normalized()
 		# Cone of 90 degrees in front
-		angle = move_dir.angle() + randf_range(-PI/4, PI/4)
+		angle = player.velocity.normalized().angle() + randf_range(-PI/4, PI/4)
 	
-	var spawn_pos = player.global_position + Vector2(current_radius, 0).rotated(angle)
+	_spawn_enemy_at(index, player.global_position + Vector2(_current_spawn_radius(), 0).rotated(angle))
+
+## Instantiates enemy `index` at `pos`. `mods` may hold health_mult, xp_mult, scale_mult.
+func _spawn_enemy_at(index: int, pos: Vector2, mods: Dictionary = {}) -> Node:
+	index = clamp(index, 0, enemy_types.size() - 1)
+	var enemy_scene = enemy_types[index]
+	if not enemy_scene:
+		return null
 	
 	var enemy = enemy_scene.instantiate()
 	# SET POSITION BEFORE ADD_CHILD
-	enemy.global_position = spawn_pos
-	
-	# BOSS SCALING: If this is a mini-boss (giant tank), scale it up
-	if int(time_passed) % 120 == 0 and int(time_passed) > 0 and enemy.is_in_group("enemies"):
-		enemy.scale = Vector2(4.0, 4.0)
-		if "health" in enemy: enemy.health *= 10.0
-		if "xp_value" in enemy: enemy.xp_value *= 50
+	enemy.global_position = pos
 	
 	# Scale XP based on time passed
 	var base_xp = enemy.xp_value if "xp_value" in enemy else 10
-	var scaled_xp = base_xp * (1.0 + (time_passed / 60.0)) # Increase XP over time
+	var scaled_xp = base_xp * (1.0 + (time_passed / 60.0)) * mods.get("xp_mult", 1.0)
 	if enemy.has_method("set_xp_value"):
 		enemy.set_xp_value(int(scaled_xp))
-		
+	if "health" in enemy:
+		enemy.health *= mods.get("health_mult", 1.0)
+	
 	get_parent().add_child(enemy)
+	# Enemy scripts set their own scale in _ready(), so apply size changes afterwards
+	if mods.has("scale_mult"):
+		enemy.scale *= mods["scale_mult"]
+	return enemy
+
+## Runs a scheduled event from spawn_waves.json (elite / ring / wall / pincer).
+func _spawn_event(ev: Dictionary):
+	if not player or not is_instance_valid(player) or enemy_types.is_empty():
+		return
+	var index: int = ENEMY_INDEX.get(ev.get("enemy", "chaser"), 0)
+	var count: int = director.event_count(ev, time_passed)
+	var radius = _current_spawn_radius()
+	var origin = player.global_position
+	var base_angle = randf() * TAU
+	if player.velocity.length() > 10.0:
+		base_angle = player.velocity.angle() # Cut the player off
+	
+	match ev.get("type", ""):
+		"elite":
+			AudioManager.play_sfx("elite_spawn")
+			_spawn_enemy_at(index, origin + Vector2(radius, 0).rotated(base_angle), {
+				"scale_mult": ev.get("scale_mult", 1.0),
+				"health_mult": ev.get("health_mult", 1.0),
+				"xp_mult": ev.get("xp_mult", 1.0),
+			})
+		"ring":
+			AudioManager.play_sfx("glitch", -3.0, 0.9, 1.1)
+			for i in count:
+				_spawn_enemy_at(index, origin + Vector2(radius, 0).rotated(base_angle + TAU * i / count))
+		"wall":
+			AudioManager.play_sfx("glitch", -3.0, 0.9, 1.1)
+			var spacing: float = ev.get("spacing", 90.0)
+			var center = origin + Vector2(radius, 0).rotated(base_angle)
+			var along = Vector2.RIGHT.rotated(base_angle + PI / 2.0)
+			for i in count:
+				_spawn_enemy_at(index, center + along * spacing * (i - (count - 1) / 2.0))
+		"pincer":
+			AudioManager.play_sfx("glitch", -3.0, 0.9, 1.1)
+			for side in [0.0, PI]:
+				for i in count:
+					var a = base_angle + side + (i - (count - 1) / 2.0) * 0.18
+					_spawn_enemy_at(index, origin + Vector2(radius, 0).rotated(a))
 
 func spawn_major_boss(milestone: int, forced_pos: Vector2 = Vector2.ZERO):
 	var boss = CharacterBody2D.new()
@@ -245,8 +276,8 @@ func spawn_major_boss(milestone: int, forced_pos: Vector2 = Vector2.ZERO):
 	var existing_enemies = get_tree().get_nodes_in_group("enemies")
 	
 	# Play a single "Sweep" sound if we had a lot of enemies
-	if existing_enemies.size() > 5 and has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("glitch", -5.0, 0.8, 1.2)
+	if existing_enemies.size() > 5:
+		AudioManager.play_sfx("glitch", -5.0, 0.8, 1.2)
 
 	for enemy in existing_enemies:
 		if is_instance_valid(enemy) and enemy != boss and not enemy.is_in_group("bosses"):
@@ -268,6 +299,8 @@ func spawn_major_boss(milestone: int, forced_pos: Vector2 = Vector2.ZERO):
 	
 	if milestone == 180:
 		boss.set_script(load("res://scripts/boss_pulsar.gd"))
+	elif milestone == 600:
+		boss.set_script(load("res://scripts/boss_singularity.gd"))
 	else:
 		boss.set_script(load("res://scripts/boss_fortress.gd"))
 	
@@ -298,10 +331,9 @@ func spawn_major_boss(milestone: int, forced_pos: Vector2 = Vector2.ZERO):
 	boss.set_collision_mask_value(1, true) # World
 	boss.set_collision_mask_value(2, true) # Player (to avoid overlapping too much if desired)
 	
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("boss_spawn", 4.0) 
-		get_node("/root/AudioManager").set_boss_music_mode(true, 1) 
-		
+	AudioManager.play_sfx("boss_spawn")
+	AudioManager.set_boss_music_mode(true, 1, AudioManager.boss_id_from_node(boss))
+	
 	get_parent().add_child(boss)
 	
 	# Clear bullets
@@ -325,10 +357,9 @@ func spawn_6min_choice():
 	# Pause the game for the choice
 	get_tree().paused = true
 	
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("boss_spawn", 2.0)
-		get_node("/root/AudioManager").set_muffled(true)
-	
+	AudioManager.play_sfx("boss_phase")
+	AudioManager.set_muffled(true)
+
 	# Spawn Choice 1: Boss Fight
 	var choice_boss = _create_choice_node("CHALLENGE BOSS", true)
 	choice_boss.global_position = player.global_position + Vector2(-300, 0)
@@ -355,9 +386,8 @@ func _on_choice_boss_selected():
 	choice_active = false
 	choice_made_360 = true
 	
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").set_muffled(false)
-		
+	AudioManager.set_muffled(false)
+	
 	# The milestone logic in _process will now trigger the boss spawn on next frame
 	_cleanup_choices()
 
@@ -365,16 +395,15 @@ func _on_choice_endless_selected():
 	get_tree().paused = false
 	choice_active = false
 	choice_made_360 = true
+	endless_chosen = true
 	bosses_spawned.append(360) # Mark as "spawned" so it doesn't trigger again
 	
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").set_muffled(false)
-		
+	AudioManager.set_muffled(false)
+	
 	_cleanup_choices()
 	
 	# Visual feedback for endless
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("level_up", 2.0)
+	AudioManager.play_sfx("level_up")
 
 func _cleanup_choices():
 	for node in get_tree().get_nodes_in_group("choice_nodes"):
@@ -401,7 +430,7 @@ func _on_boss_tree_exited():
 	var active_bosses = get_tree().get_nodes_in_group("bosses")
 	if active_bosses.size() == 0:
 		boss_active = false
+		director.start_breather()
 		if player:
 			player.dash_nerf_active = false
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").set_boss_music_mode(false, 1)
+		AudioManager.set_boss_music_mode(false, 1)

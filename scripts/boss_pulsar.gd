@@ -57,8 +57,11 @@ func setup_visuals():
 		var angle = (TAU / 32.0) * i
 		pts.append(Vector2(100, 0).rotated(angle))
 	poly.polygon = pts
-	poly.color = Color(0.05, 0.05, 0.1) # Dark Void
-	poly.modulate = Color(0, 1.5, 2.0) # Neon Cyan Glow
+	poly.color = Color(0.0, 0.9, 1.0)
+	poly.modulate = Color.WHITE
+	Neon.apply(poly, Color(0.0, 0.9, 1.0), 0.08, 7.0) # Dark void, cyan outline
+	Neon.add_glow(self, Color(0.0, 0.9, 1.0), 500.0, 0.1)
+	VFX.shockwave(global_position, 2.0, Color(0.0, 0.9, 1.0), 560.0)
 	
 	# Pupils/Inner Core
 	var inner = Polygon2D.new()
@@ -66,8 +69,9 @@ func setup_visuals():
 	for i in range(16):
 		in_pts.append(Vector2(40, 0).rotated((TAU / 16.0) * i))
 	inner.polygon = in_pts
-	inner.color = Color(1, 1, 1)
+	inner.color = Color(0.7, 1.0, 1.0)
 	poly.add_child(inner)
+	Neon.apply(inner, Color(0.7, 1.0, 1.0), 0.9, 3.0)
 
 func setup_arena_border():
 	# If another boss already has an arena, don't create a second one
@@ -84,6 +88,13 @@ func setup_arena_border():
 	border.points = pts
 	border.width = 15.0
 	border.default_color = Color(0, 1, 1, 0.6)
+	border.material = Neon.additive_material()
+	var rim := Line2D.new()
+	rim.points = pts
+	rim.width = 3.0
+	rim.default_color = border.default_color.lerp(Color.WHITE, 0.7)
+	rim.material = Neon.additive_material()
+	border.add_child(rim)
 	add_child(border)
 	
 	var static_body = StaticBody2D.new()
@@ -124,6 +135,7 @@ func setup_lasers():
 		var laser = Line2D.new()
 		laser.width = 4.0 
 		laser.default_color = Color(0, 1, 1, 0.2) # Transparent Cyan warning
+		laser.material = Neon.additive_material()
 		laser.points = PackedVector2Array([Vector2.ZERO, Vector2(border_radius, 0)])
 		add_child(laser)
 		laser_nodes.append(laser)
@@ -133,6 +145,7 @@ func setup_lasers():
 		core.name = "Core"
 		core.width = 1.0
 		core.default_color = Color(1, 1, 1, 0.1)
+		core.material = Neon.additive_material()
 		core.points = laser.points
 		laser.add_child(core)
 		
@@ -171,8 +184,7 @@ func setup_lasers():
 			pulse.tween_property(laser, "width", 18.0, 0.08).set_trans(Tween.TRANS_SINE)
 			pulse.tween_property(laser, "width", 12.0, 0.08).set_trans(Tween.TRANS_SINE)
 			
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("glitch", 5.0, 1.2, 1.5)
+		AudioManager.play_sfx("glitch", 5.0, 1.2, 1.5)
 	)
 
 func setup_platforms():
@@ -200,8 +212,9 @@ func setup_platforms():
 			Vector2(-width/2, thickness/2)
 		])
 		platform_poly.color = Color(0.0, 1.0, 0.5, 0.4) # Slightly more opaque
-		platform_poly.modulate = Color(1.2, 2.0, 1.5) # Neon Glow
 		platform.add_child(platform_poly)
+		Neon.apply(platform_poly, Color(0.1, 1.0, 0.55), 0.22, 3.0)
+		Neon.add_glow(platform, Color(0.1, 1.0, 0.55), 260.0, 0.2)
 		
 		# Inner "Battery" Core Visual
 		var core = Polygon2D.new()
@@ -211,7 +224,8 @@ func setup_platforms():
 			Vector2(width/2 - 15, 10),
 			Vector2(-width/2 + 15, 10)
 		])
-		core.color = Color(1, 1, 1, 0.8)
+		core.color = Color(0.7, 1.0, 0.85, 0.8)
+		core.material = Neon.additive_material()
 		platform.add_child(core)
 		
 		# Collision for the Area2D (Refueling/Shelter Detection)
@@ -427,8 +441,7 @@ func remove_one_platform():
 		
 		t.tween_callback(p.queue_free)
 		
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("glitch", 2.0, 0.8, 1.2)
+		AudioManager.play_sfx("glitch", 2.0, 0.8, 1.2)
 
 func take_damage(amount: float):
 	if is_dying: return
@@ -438,7 +451,7 @@ func take_damage(amount: float):
 	# Visual Flash
 	var t = create_tween()
 	poly.modulate = Color(5, 5, 5, 1)
-	var target_col = Color(0, 1.5, 2.0, 1.0) if phase < 3 else Color(2.0, 0.0, 5.0, 1.0)
+	var target_col = Color.WHITE
 	t.tween_property(poly, "modulate", target_col, 0.1)
 	
 	# Phase Transitions based on health (each set of 3 hearts is 1/3 of max health)
@@ -454,20 +467,20 @@ func take_damage(amount: float):
 		laser_speed *= 1.2
 		setup_lasers()
 		remove_one_platform() # First platform gone
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("boss_spawn", 1.2)
-			get_node("/root/AudioManager").set_boss_music_mode(true, 2)
-			
+		AudioManager.play_sfx("boss_phase")
+		AudioManager.set_boss_music_mode(true, 2)
+		
 	elif health_percent < 0.34 and phase == 2:
 		phase = 3
 		laser_speed *= 1.2
-		poly.color = Color(0.1, 0.0, 0.2) # Deep Purple Void
+		Neon.apply(poly, Color(0.85, 0.2, 1.0), 0.08, 7.0) # Deep purple void
+		VFX.shockwave(global_position, 2.6, Color(0.85, 0.2, 1.0), 700.0)
+		PostFX.kick(0.01)
 		setup_lasers()
 		remove_one_platform() # Second platform gone
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("boss_spawn", 1.5)
-			get_node("/root/AudioManager").set_boss_music_mode(true, 3)
-	
+		AudioManager.play_sfx("boss_phase", 0.0, 1.05, 1.1)
+		AudioManager.set_boss_music_mode(true, 3)
+
 	if health <= 0:
 		start_death_sequence()
 
@@ -497,10 +510,10 @@ func start_death_sequence():
 			b.queue_free()
 			
 	# 3. Dramatic visual sequence
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").set_muffled(true)
-		get_node("/root/AudioManager").play_sfx("boss_spawn", 2.0, 0.4) # Very deep boom
-	
+	AudioManager.set_muffled(true)
+	AudioManager.play_sfx("boss_death")
+	AudioManager.duck_music(10.0, 3.0, 1.5)
+
 	var death_tween = create_tween()
 	# Series of violent shakes and flashes (More intense for Pulsar)
 	for i in range(16):
@@ -511,7 +524,7 @@ func start_death_sequence():
 			poly.modulate = Color(15, 15, 15, 1) # Super white flash
 		)
 		death_tween.tween_interval(0.08)
-		death_tween.tween_property(poly, "modulate", Color(0, 1.5, 2.0, 1.0), 0.04)
+		death_tween.tween_property(poly, "modulate", Color.WHITE, 0.04)
 	
 	# 4. Final massive explosion and reward
 	death_tween.tween_callback(die)
@@ -533,21 +546,23 @@ func spawn_small_explosion(pos: Vector2):
 	p.emitting = true
 	get_tree().create_timer(1.0).timeout.connect(p.queue_free)
 	
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("enemy_death", -2.0, 1.2, 1.8)
+	AudioManager.play_sfx("enemy_death", -2.0, 1.2, 1.8)
 
 func die():
 	# Final cleanup and rewards
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").set_muffled(false)
-		get_node("/root/AudioManager").play_sfx("enemy_death", 15.0, 0.2, 0.5)
-	
+	AudioManager.set_muffled(false)
+	AudioManager.play_sfx("enemy_death_big", 0.0, 0.5, 0.6)
+
 	# Screen shake
 	if player and player.has_method("add_shake"):
 		player.add_shake(45.0)
 	
 	# Big explosion particles
 	spawn_death_particles()
+	VFX.death_burst(global_position, Color(0.0, 0.9, 1.0), 3.0)
+	VFX.shockwave(global_position, 3.0, Color(0.3, 1.0, 1.0), 1000.0)
+	VFX.hit_stop(0.15)
+	PostFX.kick(0.014)
 	
 	# Rewards
 	if player:
@@ -555,14 +570,13 @@ func die():
 		if player.has_method("add_xp"):
 			player.add_xp(xp_value)
 	
-	if has_node("/root/GlobalData"):
-		var gd = get_node("/root/GlobalData")
-		gd.total_kills += 1
-		gd.run_kills += 1
-		gd.add_score(xp_value * 30, player.combo_count if player else 0)
-		gd.add_shards(shard_reward) # AWARD SHARDS
-		gd.save_game()
-	
+	var gd = GlobalData
+	gd.total_kills += 1
+	gd.run_kills += 1
+	gd.add_score(xp_value * 30, player.combo_count if player else 0)
+	gd.add_shards(shard_reward) # AWARD SHARDS
+	gd.save_game()
+
 	# REMOVE ARENA BARRIER AND HEARTS ONLY IF LAST BOSS
 	var other_bosses = get_tree().get_nodes_in_group("bosses")
 	if other_bosses.size() <= 1: # We are the last one

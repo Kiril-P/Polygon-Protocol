@@ -34,6 +34,50 @@ func _ready():
 	
 	style_all_buttons()
 	setup_button_animations()
+	_decorate()
+
+## Neon red "system failure" look: dim wash, glowing panel, glitch-split title.
+func _decorate():
+	bg.color = Color(0.06, 0.0, 0.02, 0.84)
+	var panel := Panel.new()
+	panel.name = "NeonPanel"
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_theme_stylebox_override("panel", NeonUI.panel_style(NeonUI.RED, 0.78, 2, 22, 6))
+	control.add_child(panel)
+	control.move_child(panel, 1)
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.offset_left = -330
+	panel.offset_right = 330
+	panel.offset_top = -345
+	panel.offset_bottom = 345
+	
+	var title: Label = $Control/VBoxContainer/TitleLabel
+	NeonUI.style_title(title, NeonUI.RED, 64)
+	# Chromatic split copies behind the title for a glitchy look
+	for spec in [[Vector2(-4, 0), Color(0.0, 1.0, 1.0, 0.45)], [Vector2(4, 0), Color(1.0, 0.0, 0.5, 0.45)]]:
+		var ghost := Label.new()
+		ghost.text = title.text
+		ghost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		ghost.add_theme_font_size_override("font_size", 64)
+		ghost.add_theme_color_override("font_color", spec[1])
+		ghost.material = Neon.additive_material()
+		ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ghost.show_behind_parent = true
+		title.add_child(ghost)
+		ghost.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		ghost.position = spec[0]
+		var t := ghost.create_tween().set_loops()
+		t.tween_interval(randf_range(0.6, 1.4))
+		t.tween_property(ghost, "position", spec[0] * 3.0 + Vector2(0, randf_range(-3, 3)), 0.05)
+		t.tween_property(ghost, "position", spec[0], 0.07)
+	
+	stats_label.add_theme_font_size_override("font_size", 26)
+	stats_label.add_theme_color_override("font_color", Color(0.85, 0.95, 1.0))
+	stats_label.add_theme_constant_override("line_spacing", 8)
+	total_shards_label.add_theme_color_override("font_color", NeonUI.GOLD.lerp(Color.WHITE, 0.4))
+	NeonUI.style_title(total_shards_label, NeonUI.GOLD, 20)
+	total_shards_label.add_theme_constant_override("outline_size", 3)
+	total_shards_label.add_theme_constant_override("shadow_outline_size", 8)
 
 func style_all_buttons():
 	var buttons = [restart_btn, menu_btn]
@@ -43,35 +87,11 @@ func style_all_buttons():
 	for btn in buttons:
 		if not btn: continue
 		style_menu_button(btn)
+	if restart_btn:
+		NeonUI.style_button(restart_btn, NeonUI.GREEN)
 
 func style_menu_button(btn: Button):
-	var normal = StyleBoxFlat.new()
-	normal.bg_color = Color(0.1, 0.1, 0.2, 0.6)
-	normal.border_width_left = 4
-	normal.border_color = Color(0.0, 0.8, 1.0, 0.6)
-	normal.corner_radius_top_left = 2
-	normal.corner_radius_bottom_right = 15
-	normal.content_margin_left = 20
-	
-	var hover = normal.duplicate()
-	hover.bg_color = Color(0.2, 0.2, 0.4, 0.8)
-	hover.border_color = Color(0.0, 1.0, 1.0, 1.0)
-	hover.shadow_color = Color(0.0, 1.0, 1.0, 0.3)
-	hover.shadow_size = 10
-	
-	var style_pressed = hover.duplicate()
-	style_pressed.bg_color = Color(0.3, 0.1, 0.4, 0.9)
-	style_pressed.border_color = Color(1.0, 0.0, 1.0, 1.0)
-	
-	btn.add_theme_stylebox_override("normal", normal)
-	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", style_pressed)
-	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	
-	btn.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
-	btn.add_theme_color_override("font_hover_color", Color.WHITE)
-	btn.add_theme_constant_override("outline_size", 4)
-	btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
+	NeonUI.style_button(btn)
 
 func setup_button_animations():
 	var buttons = [restart_btn, menu_btn]
@@ -84,8 +104,7 @@ func setup_button_animations():
 		btn.focus_mode = Control.FOCUS_NONE # Remove selection border
 		
 		btn.mouse_entered.connect(func():
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_sfx("hover")
+			AudioManager.play_sfx("hover")
 			var t = create_tween().set_parallel(true)
 			t.tween_property(btn, "scale", Vector2(1.1, 1.1), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 			t.tween_property(btn, "modulate", Color(1.5, 1.5, 2.0), 0.2)
@@ -97,8 +116,7 @@ func setup_button_animations():
 		)
 		
 		btn.button_down.connect(func():
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_sfx("click")
+			AudioManager.play_sfx("click")
 			btn.scale = Vector2(0.95, 0.95)
 		)
 		
@@ -113,11 +131,10 @@ func _show_death_screen(stats: Dictionary):
 	visible = true
 	var time_val = stats.get("time", 0.0)
 	var time_str = "%d:%02d" % [int(time_val / 60), int(time_val) % 60]
-	stats_label.text = "LEVEL REACHED: " + str(stats["level"]) + "\nSCORE: " + str(get_node("/root/GlobalData").run_score if has_node("/root/GlobalData") else 0) + "\nTIME SURVIVED: " + time_str + "\nSHARDS EARNED: " + str(stats["shards"]) + "\nHIGHEST COMBO: " + str(stats.get("highest_combo", 0))
+	stats_label.text = "LEVEL REACHED: " + str(stats["level"]) + "\nSCORE: " + str(GlobalData.run_score) + "\nTIME SURVIVED: " + time_str + "\nSHARDS EARNED: " + str(stats["shards"]) + "\nHIGHEST COMBO: " + str(stats.get("highest_combo", 0))
 	
-	if has_node("/root/GlobalData"):
-		total_shards_label.text = "TOTAL SHARDS: " + str(get_node("/root/GlobalData").total_shards)
-	
+	total_shards_label.text = "TOTAL SHARDS: " + str(GlobalData.total_shards)
+
 	# Stylish Fade In
 	var tween = create_tween()
 	tween.tween_property(control, "modulate:a", 1.0, 0.5).set_trans(Tween.TRANS_SINE)
@@ -129,15 +146,15 @@ func _show_death_screen(stats: Dictionary):
 	t2.tween_property(title, "scale", Vector2(1.0, 1.0), 0.1)
 	
 	add_vault_splash()
+	VFX.shockwave(get_viewport().get_canvas_transform().affine_inverse() * (get_viewport().get_visible_rect().size / 2.0), 2.0, NeonUI.RED, 500.0)
 
 func add_vault_splash():
 	var splash = Label.new()
 	splash.text = "SPEND SHARDS IN EVOLUTION VAULT"
 	splash.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	splash.add_theme_font_size_override("font_size", 22)
-	splash.add_theme_color_override("font_color", Color(0.0, 1.0, 0.8)) # Teal/Neon
-	splash.add_theme_constant_override("outline_size", 6)
-	splash.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
+	NeonUI.style_title(splash, NeonUI.GOLD, 22)
+	splash.add_theme_constant_override("outline_size", 4)
 	
 	control.add_child(splash)
 	splash.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
@@ -164,8 +181,7 @@ func _on_restart_pressed():
 
 func _on_leaderboard_pressed():
 	get_tree().paused = false
-	if has_node("/root/GlobalData"):
-		get_node("/root/GlobalData").next_scene_path = "res://scenes/leaderboard.tscn"
+	GlobalData.next_scene_path = "res://scenes/leaderboard.tscn"
 	get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
 
 func _on_main_menu_pressed():

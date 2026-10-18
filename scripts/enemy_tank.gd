@@ -1,145 +1,55 @@
-extends CharacterBody2D
+extends EnemyBase
+## Heavy square that chases relentlessly and fires a 5-bullet shotgun wall.
 
-@export var speed: float = 80.0
-@export var health: float = 120.0
-@export var damage: float = 20.0 # High contact damage
-@export var xp_value: int = 50
 @export var fire_rate: float = 3.0
-@export var bullet_scene: PackedScene
 
-var player: Node2D = null
 var fire_timer: float = 0.0
-var is_dying: bool = false
+
+func _init():
+	speed = 80.0
+	health = 120.0
+	damage = 20.0 # High contact damage
+	xp_value = 50
+	death_particle_amount = 80
+	death_particle_velocity = Vector2(150.0, 450.0)
+	death_particle_size = Vector2(5.0, 12.0)
+	death_particle_color = Color(1.0, 0.1, 0.4)
+	death_particle_lifetime = 1.5
+	death_shake = 8.0
+	play_hit_sfx = false
 
 func _ready():
-	add_to_group("enemies")
-	player = get_tree().get_first_node_in_group("player")
-	
-	# Make it bigger
+	super()
 	scale = Vector2(1.2, 1.2)
-	
-	# Collision setup
-	set_collision_mask_value(2, false)
-	set_collision_layer_value(3, true)
-	
 	setup_visuals()
 
 func setup_visuals():
-	# Large Square
+	# Large square
 	if has_node("Polygon2D"):
 		var poly = $Polygon2D
 		poly.color = Color(1.0, 0.1, 0.4) # Neon Pink
 		poly.modulate = Color(1.8, 1.2, 1.5, 1.0) # Glow
-		var points = PackedVector2Array([
+		poly.polygon = PackedVector2Array([
 			Vector2(40, 40),
 			Vector2(-40, 40),
 			Vector2(-40, -40),
 			Vector2(40, -40)
 		])
-		poly.polygon = points
 
 func _physics_process(delta: float):
-	# Slow heavy rotation
-	rotation += 0.5 * delta
-	
+	rotation += 0.5 * delta # Slow heavy rotation
 	if not player or not is_instance_valid(player):
 		return
-		
-	# Movement: Direct relentless chase
-	var direction = (player.global_position - global_position).normalized()
-	velocity = direction * speed
+	
+	velocity = (player.global_position - global_position).normalized() * speed
 	move_and_slide()
 	
-	# Shooting: Heavy Shotgun Wall
 	fire_timer -= delta
 	if fire_timer <= 0:
 		fire_wall()
 		fire_timer = fire_rate
 
 func fire_wall():
-	if not bullet_scene: return
-	
 	var base_dir = (player.global_position - global_position).normalized()
-	
-	# Fire 5 bullets in a wide spread
 	for i in range(-2, 3):
-		var angle = i * 0.2
-		var dir = base_dir.rotated(angle)
-		spawn_bullet(dir)
-
-func spawn_bullet(dir: Vector2):
-	var bullet = bullet_scene.instantiate()
-	bullet.global_position = global_position + dir * 45.0 # Reduced from 60 to prevent shooting through platforms
-	get_parent().add_child(bullet)
-	
-	bullet.fired_by_enemy = true # Safety flag
-	bullet.direction = dir
-	bullet.speed = 300.0 
-	bullet.damage = 10.0
-	bullet.add_to_group("enemy_bullets")
-	
-	# Collide with player (Layer 2) and Platforms (Layer 1)
-	bullet.collision_mask = 0
-	bullet.set_collision_mask_value(1, true)
-	bullet.set_collision_mask_value(2, true)
-	
-	# Make it very large
-	bullet.scale = Vector2(4.0, 4.0)
-	
-	if bullet.has_node("BulletSprite"):
-		bullet.get_node("BulletSprite").color = Color(0.4, 1.0, 0.4) # Bright Green
-
-func take_damage(amount: float):
-	if is_dying: return
-	health -= amount
-	
-	# Visual feedback: Flash white
-	var tween = create_tween()
-	tween.tween_property($Polygon2D, "modulate", Color(5, 5, 5, 1), 0.05)
-	tween.tween_property($Polygon2D, "modulate", Color(1, 1, 1, 1), 0.05)
-	
-	if health <= 0:
-		die()
-
-func die():
-	if is_dying: return
-	is_dying = true
-	
-	# Play SFX
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("enemy_death", 0.0, 0.9, 1.1, 0.3)
-	
-	spawn_death_particles()
-	
-	if player and player.has_method("add_shake"):
-		player.add_shake(8.0) # More shake for tank
-	
-	# Give XP directly to player
-	if player and player.has_method("add_xp"):
-		player.add_xp(xp_value)
-		
-	if has_node("/root/GlobalData"):
-		var gd = get_node("/root/GlobalData")
-		gd.total_kills += 1
-		gd.run_kills += 1
-		gd.add_score(xp_value * 10, player.combo_count if player else 0)
-		
-	queue_free()
-
-func spawn_death_particles():
-	var particles = CPUParticles2D.new()
-	get_tree().current_scene.add_child(particles)
-	particles.global_position = global_position
-	particles.amount = 80 # LOTS of particles for tank
-	particles.one_shot = true
-	particles.explosiveness = 1.0
-	particles.spread = 180.0
-	particles.gravity = Vector2.ZERO
-	particles.initial_velocity_min = 150.0
-	particles.initial_velocity_max = 450.0
-	particles.scale_amount_min = 5.0
-	particles.scale_amount_max = 12.0
-	particles.color = Color(1.0, 0.1, 0.4)
-	particles.emitting = true
-	var timer = get_tree().create_timer(1.5)
-	timer.timeout.connect(particles.queue_free)
+		fire_bullet(base_dir.rotated(i * 0.2), 300.0, 10.0, Color(0.4, 1.0, 0.4), 4.0, 45.0)

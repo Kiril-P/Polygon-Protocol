@@ -26,6 +26,13 @@ func _ready():
 	modulate.a = 0
 	create_tween().tween_property(self, "modulate:a", 1.0, 0.5)
 	style_back_button()
+	style_header()
+
+func style_header():
+	NeonUI.style_title($UI/TitleLabel, NeonUI.CYAN)
+	NeonUI.style_title(shard_label, NeonUI.GOLD, -1)
+	shard_label.add_theme_constant_override("shadow_outline_size", 12)
+	NeonUI.pulse($UI/TitleLabel, 0.15, 2.4)
 
 func style_back_button():
 	var back_btn = $UI/TopBar/BackButton # Assuming this is the path
@@ -34,41 +41,14 @@ func style_back_button():
 	setup_button_animations(back_btn)
 
 func style_menu_button(btn: Button):
-	var normal = StyleBoxFlat.new()
-	normal.bg_color = Color(0.1, 0.1, 0.2, 0.6)
-	normal.border_width_left = 4
-	normal.border_color = Color(0.0, 0.8, 1.0, 0.6)
-	normal.corner_radius_top_left = 2
-	normal.corner_radius_bottom_right = 15
-	normal.content_margin_left = 20
-	
-	var hover = normal.duplicate()
-	hover.bg_color = Color(0.2, 0.2, 0.4, 0.8)
-	hover.border_color = Color(0.0, 1.0, 1.0, 1.0)
-	hover.shadow_color = Color(0.0, 1.0, 1.0, 0.3)
-	hover.shadow_size = 10
-	
-	var style_pressed = hover.duplicate()
-	style_pressed.bg_color = Color(0.3, 0.1, 0.4, 0.9)
-	style_pressed.border_color = Color(1.0, 0.0, 1.0, 1.0)
-	
-	btn.add_theme_stylebox_override("normal", normal)
-	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", style_pressed)
-	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	
-	btn.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
-	btn.add_theme_color_override("font_hover_color", Color.WHITE)
-	btn.add_theme_constant_override("outline_size", 4)
-	btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
+	NeonUI.style_button(btn)
 
 func setup_button_animations(btn: Button):
 	btn.pivot_offset = btn.size / 2
 	btn.focus_mode = Control.FOCUS_NONE
 	
 	btn.mouse_entered.connect(func():
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("hover")
+		AudioManager.play_sfx("hover")
 		var t = create_tween().set_parallel(true)
 		t.tween_property(btn, "scale", Vector2(1.1, 1.1), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		t.tween_property(btn, "modulate", Color(1.5, 1.5, 2.0), 0.2)
@@ -80,8 +60,7 @@ func setup_button_animations(btn: Button):
 	)
 	
 	btn.button_down.connect(func():
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("click")
+		AudioManager.play_sfx("click")
 		btn.scale = Vector2(0.95, 0.95)
 	)
 	
@@ -90,32 +69,10 @@ func setup_button_animations(btn: Button):
 	)
 
 func setup_background():
-	# Create a techy/grid background
-	var bg_rect = ColorRect.new()
-	bg_rect.color = Color(0.05, 0.05, 0.1) # Deep space blue
-	bg_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-	background.add_child(bg_rect)
-	
-	var screen_size = get_viewport_rect().size
-	
-	# Add some "floating" particles for vibe
-	var particles = CPUParticles2D.new()
-	background.add_child(particles)
-	particles.position = screen_size / 2
-	particles.amount = 50
-	particles.lifetime = 10.0
-	particles.preprocess = 5.0
-	particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	particles.emission_rect_extents = screen_size / 2
-	particles.gravity = Vector2.ZERO
-	particles.initial_velocity_min = 5.0
-	particles.initial_velocity_max = 15.0
-	particles.scale_amount_min = 1.0
-	particles.scale_amount_max = 3.0
-	particles.color = Color(0.0, 0.8, 1.0, 0.2) # Dim Cyan dots
+	NeonUI.living_background(self, background)
 
 func update_ui():
-	var total = get_node("/root/GlobalData").total_shards
+	var total = GlobalData.total_shards
 	shard_label.text = "QUANTUM SHARDS: " + str(total)
 
 func create_upgrade_cards():
@@ -123,7 +80,7 @@ func create_upgrade_cards():
 	for child in grid.get_children():
 		child.queue_free()
 	
-	var gd = get_node("/root/GlobalData")
+	var gd = GlobalData
 	
 	for upg in vault_upgrades:
 		var card = create_card(upg, gd)
@@ -133,18 +90,14 @@ func create_card(data, gd):
 	var panel = PanelContainer.new()
 	panel.custom_minimum_size = Vector2(250, 300)
 	
-	# Style the card
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.1, 0.15, 0.8)
-	style.border_width_left = 2
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 2
-	style.border_color = Color(0.2, 0.6, 1.0, 0.5)
-	style.corner_radius_top_left = 10
-	style.corner_radius_top_right = 10
-	style.corner_radius_bottom_left = 10
-	style.corner_radius_bottom_right = 10
+	# Style the card: colour reflects state (owned/active, disabled, affordable, too expensive)
+	var owned_now: bool = gd.has_upgrade(data["id"])
+	var card_color := NeonUI.CYAN
+	if owned_now:
+		card_color = NeonUI.GREEN if gd.is_upgrade_active(data["id"]) else NeonUI.RED
+	elif gd.total_shards >= data["cost"]:
+		card_color = NeonUI.GOLD
+	var style := NeonUI.panel_style(card_color, 0.78, 2, 12, 6)
 	panel.add_theme_stylebox_override("panel", style)
 	
 	var v = VBoxContainer.new()
@@ -152,19 +105,21 @@ func create_card(data, gd):
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	panel.add_child(v)
 	
-	# Icon
-	var icon = TextureRect.new()
-	icon.texture = load(data["icon"])
-	icon.custom_minimum_size = Vector2(64, 64)
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.modulate = Color(0.0, 0.8, 1.0)
+	# Icon (vector, tinted by card state)
+	var icon := UpgradeIcon.new()
+	icon.custom_minimum_size = Vector2(96, 96)
+	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	v.add_child(icon)
+	icon.set_icon(data["id"], card_color)
 	
 	# Title
 	var title = Label.new()
 	title.text = data["name"]
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 20)
+	NeonUI.style_title(title, card_color)
+	title.add_theme_constant_override("outline_size", 3)
+	title.add_theme_constant_override("shadow_outline_size", 0)
 	v.add_child(title)
 	
 	# Desc
@@ -185,10 +140,8 @@ func create_card(data, gd):
 	if owned:
 		if active:
 			btn.text = "ACTIVE"
-			style.border_color = Color(0.0, 1.0, 0.5, 0.8) # Green glow for active
 		else:
 			btn.text = "DISABLED"
-			style.border_color = Color(1.0, 0.2, 0.2, 0.8) # Red glow for disabled
 			panel.modulate.a = 0.7
 	elif data["id"] == "shield_regen" and not gd.has_upgrade("energy_shield"):
 		btn.text = "LOCKED"
@@ -198,18 +151,16 @@ func create_card(data, gd):
 		btn.text = str(data["cost"]) + " SHARDS"
 		btn.disabled = not can_afford
 	
-	style_menu_button(btn)
+	NeonUI.style_button(btn, card_color)
 	setup_button_animations(btn)
 	
 	btn.pressed.connect(func():
 		if owned:
 			gd.toggle_upgrade(data["id"])
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_sfx("click")
+			AudioManager.play_sfx("click")
 			create_upgrade_cards() # Refresh UI
 		elif gd.total_shards >= data["cost"]:
-			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_sfx("click")
+			AudioManager.play_sfx("click")
 			gd.total_shards -= data["cost"]
 			gd.permanent_upgrades[data["id"]] = 1
 			gd.save_game()
@@ -226,8 +177,7 @@ func create_card(data, gd):
 	
 	# Hover animation
 	panel.mouse_entered.connect(func():
-		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_sfx("hover")
+		AudioManager.play_sfx("hover")
 		var t = create_tween().set_parallel(true)
 		t.tween_property(panel, "scale", Vector2(1.05, 1.05), 0.2)
 		t.tween_property(panel, "modulate", Color(1.2, 1.2, 1.5), 0.2)
@@ -241,13 +191,11 @@ func create_card(data, gd):
 	return panel
 
 func _on_back_pressed():
-	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_sfx("click")
-	
+	AudioManager.play_sfx("click")
+
 	var t = create_tween()
 	t.tween_property(self, "modulate:a", 0.0, 0.3)
 	t.tween_callback(func():
-		if has_node("/root/GlobalData"):
-			get_node("/root/GlobalData").next_scene_path = "res://scenes/main_menu.tscn"
+		GlobalData.next_scene_path = "res://scenes/main_menu.tscn"
 		get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
 	)
