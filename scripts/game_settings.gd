@@ -142,7 +142,9 @@ func key_name(action: String) -> String:
 	return keycode_name(key_for(action))
 
 static func keycode_name(physical: int) -> String:
-	var label := OS.get_keycode_string(DisplayServer.keyboard_get_keycode_from_physical(physical))
+	var label := ""
+	if not OS.has_feature("web"): # the web display server cannot map physical keys to layout keys
+		label = OS.get_keycode_string(DisplayServer.keyboard_get_keycode_from_physical(physical))
 	if label == "":
 		label = OS.get_keycode_string(physical)
 	return label.to_upper() if label != "" else "?"
