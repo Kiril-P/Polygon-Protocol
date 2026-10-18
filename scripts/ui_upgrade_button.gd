@@ -7,6 +7,7 @@ const CATEGORY_COLORS := {
 	"defense": Color(0.2, 1.0, 0.55),
 	"mobility": Color(0.0, 0.85, 1.0),
 	"special": Color(1.0, 0.8, 0.1),
+	"counter": Color(0.72, 0.5, 1.0),
 }
 const CATEGORY_BY_ID := {
 	"damage": "offense", "fire_rate": "offense", "bullet_speed": "offense", "rotation_speed": "offense",
@@ -23,7 +24,10 @@ var is_special: bool = false
 func setup(upgrade_data: Dictionary):
 	is_special = upgrade_data.get("is_special", false)
 	var id: String = upgrade_data.get("id", "")
+	var counters: String = upgrade_data.get("counters", "")
 	var category: String = "special" if is_special else CATEGORY_BY_ID.get(id, "mobility")
+	if counters != "":
+		category = "counter"
 	accent = CATEGORY_COLORS[category]
 	
 	# Split the manager's decorated strings back into name / level / synergy
@@ -65,7 +69,10 @@ func setup(upgrade_data: Dictionary):
 	box.add_theme_constant_override("separation", 10)
 	margin.add_child(box)
 	
-	var tag := _label(("SPECIAL" if is_special else category.to_upper()), 13, Color(accent.r, accent.g, accent.b, 0.85))
+	var tag_text := "SPECIAL" if is_special else category.to_upper()
+	if counters != "":
+		tag_text = "COUNTER · " + String(UpgradeManager.INTEL[counters]["name"])
+	var tag := _label(tag_text, 13, Color(accent.r, accent.g, accent.b, 0.85))
 	box.add_child(tag)
 	
 	var icon := UpgradeIcon.new()

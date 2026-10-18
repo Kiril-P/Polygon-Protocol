@@ -138,6 +138,43 @@ var upgrade_pool = [
 		"icon": "res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_008.png"
 	},
 	{
+		"id": "breaker",
+		"name": "BREAKER ROUNDS",
+		"description": "Bullets crack Aegis shields (60% damage) instead of being absorbed",
+		"value": 1.0,
+		"max_picks": 1,
+		"counters": "aegis",
+		"icon": ""
+	},
+	{
+		"id": "nova",
+		"name": "SHOCKWAVE KILLS",
+		"description": "Kills release a shockwave that hurts nearby enemies",
+		"value": 1.0,
+		"no_diminish": true,
+		"max_picks": 3,
+		"counters": "splitter",
+		"icon": ""
+	},
+	{
+		"id": "deflector",
+		"name": "DEFLECTOR",
+		"description": "Enemy bullets that reach you are reflected back - snipers' shots hit 4x",
+		"value": 1.0,
+		"max_picks": 1,
+		"counters": "sniper",
+		"icon": ""
+	},
+	{
+		"id": "corrupt",
+		"name": "CORRUPT ROUNDS",
+		"description": "Hits disrupt healing for 3s, so Menders can't pulse or be healed",
+		"value": 1.0,
+		"max_picks": 1,
+		"counters": "healer",
+		"icon": ""
+	},
+	{
 		"id": "split",
 		"name": "FRACTURE ROUNDS",
 		"description": "SPECIAL: Bullets split into two fragments on hit",
@@ -160,10 +197,24 @@ const SYNERGIES = [
 	{"id": "storm_front", "name": "STORM FRONT", "needs": ["split", "chain"], "description": "fragments arc lightning too"},
 	{"id": "chain_reaction", "name": "CHAIN REACTION", "needs": ["explosive", "chain"], "description": "explosions arc lightning"},
 	{"id": "hunter_killer", "name": "HUNTER-KILLER", "needs": ["homing", "pierce"], "description": "bullets retarget after each pierce, +1 pierce"},
+	{"id": "siege_breaker", "name": "SIEGE BREAKER", "needs": ["breaker", "pierce"], "description": "rounds punch through Aegis shields at full damage"},
+	{"id": "cascade", "name": "CASCADE", "needs": ["nova", "explosive"], "description": "shockwaves are 60% wider and 50% stronger"},
+	{"id": "return_to_sender", "name": "RETURN TO SENDER", "needs": ["deflector", "homing"], "description": "reflected bullets home in on enemies"},
+	{"id": "plague_arc", "name": "PLAGUE ARC", "needs": ["corrupt", "chain"], "description": "lightning arcs spread corruption"},
 	{"id": "plasma_slipstream", "name": "PLASMA SLIPSTREAM", "needs": ["dash_trail", "gravity_well"], "description": "plasma lasts longer and hits 50% harder"},
 ]
 
-const BULLET_MODS = ["pierce", "homing", "split", "chain"]
+const BULLET_MODS = ["pierce", "homing", "split", "chain", "breaker", "corrupt"]
+const COUNTER_OFFER_WEIGHT = 2.5 # A counter to a threat you have met is this much more likely
+
+## One-time intel card shown the first time each new enemy type ever appears.
+const INTEL = {
+	"aegis": {"name": "AEGIS", "title": "NEW THREAT: AEGIS", "text": "The shield absorbs shots from the front. Flank it, dash through it, or use blasts and arcs.", "color": Color(0.3, 0.85, 1.0)},
+	"splitter": {"name": "SPLITTER", "title": "NEW THREAT: SPLITTER", "text": "Bursts into fast shards when killed. Clear them with area damage.", "color": Color(1.0, 0.6, 0.15)},
+	"sniper": {"name": "SNIPER", "title": "NEW THREAT: SNIPER", "text": "Its aim locks when the beam flashes white. Move, dash, or reflect the shot.", "color": Color(0.9, 0.4, 1.0)},
+	"healer": {"name": "MENDER", "title": "NEW THREAT: MENDER", "text": "Pulses healing into nearby enemies. Kill it first.", "color": Color(0.35, 1.0, 0.7)},
+}
+var seen_enemies: Array = [] # Enemy ids met this run: unlocks their counter upgrades
 const SYNERGY_OFFER_WEIGHT = 3.0 # Offers that complete a synergy are this much more likely
 
 var active_synergies: Array = []
@@ -205,6 +256,8 @@ func get_random_upgrades(count: int = 3) -> Array:
 		if upgrade["id"] in BULLET_MODS and (is_circle or (player and player.prismatic_beam_active)):
 			continue
 		if upgrade.has("max_picks") and upgrade_counts.get(upgrade["id"], 0) >= upgrade["max_picks"]:
+			continue
+		if upgrade.has("counters") and not upgrade["counters"] in seen_enemies:
 			continue
 		if upgrade.get("needs_missing_heart", false) and player and player.current_hearts >= player.max_hearts:
 			continue
@@ -264,16 +317,35 @@ func _completed_synergy(upgrade_id: String) -> Dictionary:
 			return syn
 	return {}
 
+func _offer_weight(u: Dictionary) -> float:
+	var w := 1.0
+	if u.has("synergy"):
+		w = SYNERGY_OFFER_WEIGHT
+	if u.has("counters"):
+		w = maxf(w, COUNTER_OFFER_WEIGHT)
+	return w
+
+func note_enemy_seen(id: String):
+	if id in seen_enemies:
+		return
+	seen_enemies.append(id)
+	if INTEL.has(id) and not id in GlobalData.seen_intel:
+		GlobalData.seen_intel.append(id)
+		GlobalData.save_game()
+		var hud = get_tree().get_first_node_in_group("hud")
+		if hud and hud.has_method("show_intel"):
+			hud.show_intel(INTEL[id]["title"], INTEL[id]["text"], INTEL[id]["color"])
+
 func _weighted_sample(pool: Array, count: int) -> Array:
 	var remaining = pool.duplicate()
 	var picked = []
 	while picked.size() < count and not remaining.is_empty():
 		var total := 0.0
 		for u in remaining:
-			total += SYNERGY_OFFER_WEIGHT if u.has("synergy") else 1.0
+			total += _offer_weight(u)
 		var roll := randf() * total
 		for i in remaining.size():
-			roll -= SYNERGY_OFFER_WEIGHT if remaining[i].has("synergy") else 1.0
+			roll -= _offer_weight(remaining[i])
 			if roll <= 0.0 or i == remaining.size() - 1:
 				picked.append(remaining[i])
 				remaining.remove_at(i)
@@ -304,6 +376,7 @@ func reset_upgrades():
 	applied_special_upgrades.clear()
 	upgrade_counts.clear() # Clear counts for new run
 	active_synergies.clear()
+	seen_enemies.clear()
 	first_upgrade_of_run = true
 	level_up_pending = 0
 	is_ui_active = false

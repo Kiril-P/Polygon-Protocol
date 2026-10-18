@@ -20,7 +20,7 @@ var endless_chosen: bool = false # Declined the 6:00 boss fight, so no third bos
 var choice_made_360: bool = false
 
 # Index of each enemy in the `enemy_types` array (matches scenes/game.tscn)
-const ENEMY_INDEX := {"chaser": 0, "fairy": 1, "shooter": 2, "spinner": 3, "tank": 4, "zigzagger": 5, "kamikaze": 6}
+const ENEMY_INDEX := {"chaser": 0, "fairy": 1, "shooter": 2, "spinner": 3, "tank": 4, "zigzagger": 5, "kamikaze": 6, "aegis": 7, "splitter": 8, "sniper": 9, "healer": 10}
 const BOSS_MILESTONES := [80, 180, 360, 600]
 
 var director := SpawnDirector.new()
@@ -260,6 +260,14 @@ func _spawn_event(ev: Dictionary):
 			var along = Vector2.RIGHT.rotated(base_angle + PI / 2.0)
 			for i in count:
 				_spawn_enemy_at(index, center + along * spacing * (i - (count - 1) / 2.0))
+		"squad":
+			# A Mender with an escort fanned out around it
+			AudioManager.play_sfx("glitch", -3.0, 0.9, 1.1)
+			var escort: int = ENEMY_INDEX.get(ev.get("escort", "chaser"), 0)
+			var centre = origin + Vector2(radius, 0).rotated(base_angle)
+			_spawn_enemy_at(index, centre)
+			for i in count:
+				_spawn_enemy_at(escort, centre + Vector2(90.0, 0).rotated(TAU * i / maxi(count, 1)))
 		"pincer":
 			AudioManager.play_sfx("glitch", -3.0, 0.9, 1.1)
 			for side in [0.0, PI]:

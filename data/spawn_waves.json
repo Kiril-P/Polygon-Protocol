@@ -1,5 +1,5 @@
 {
-	"_comment": "Edit freely: times are seconds of boss-free run time. Enemy names: chaser, fairy, shooter, spinner, tank, zigzagger, kamikaze.",
+	"_comment": "Edit freely: times are seconds of boss-free run time. Enemy names: chaser, fairy, shooter, spinner, tank, zigzagger, kamikaze, aegis, splitter, sniper, healer.",
 	"spawns": [
 		{"enemy": "chaser",    "weight": 3, "from": 0,   "until": 80},
 		{"enemy": "chaser",    "weight": 4, "from": 80,  "until": 180},
@@ -14,12 +14,20 @@
 		{"enemy": "zigzagger", "weight": 2, "from": 180},
 		{"enemy": "shooter",   "weight": 1, "from": 90},
 		{"enemy": "spinner",   "weight": 1, "from": 140},
-		{"enemy": "tank",      "weight": 1, "from": 180}
+		{"enemy": "tank",      "weight": 1, "from": 180},
+		{"enemy": "splitter",  "weight": 1, "from": 100, "until": 200},
+		{"enemy": "splitter",  "weight": 2, "from": 200},
+		{"enemy": "aegis",     "weight": 1, "from": 125, "until": 220},
+		{"enemy": "aegis",     "weight": 2, "from": 220},
+		{"enemy": "sniper",    "weight": 1, "from": 150, "until": 240},
+		{"enemy": "sniper",    "weight": 2, "from": 240},
+		{"enemy": "healer",    "weight": 1, "from": 190}
 	],
 	"events": [
 		{"id": "giant_tank", "type": "elite",   "enemy": "tank",      "first": 120, "every": 120, "scale_mult": 3.0, "health_mult": 10.0, "xp_mult": 50},
 		{"id": "ring",       "type": "ring",    "enemy": "chaser",    "first": 40,  "every": 55,  "count": 10, "count_per_minute": 2},
 		{"id": "wall",       "type": "wall",    "enemy": "zigzagger", "first": 65,  "every": 70,  "count": 7,  "count_per_minute": 1, "spacing": 90},
+		{"id": "medic_squad","type": "squad",  "enemy": "healer",    "escort": "aegis", "first": 215, "every": 100, "count": 3, "count_per_minute": 0.5},
 		{"id": "pincer",     "type": "pincer",  "enemy": "kamikaze",  "first": 100, "every": 80,  "count": 3,  "count_per_minute": 1}
 	],
 	"director": {

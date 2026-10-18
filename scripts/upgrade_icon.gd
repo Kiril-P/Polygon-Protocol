@@ -242,6 +242,29 @@ static func _build(id: String) -> Array:
 				o.append(_s([Vector2(-0.48, t), Vector2(-0.82, t)], false, 0.0, 0.7))
 				o.append(_s([Vector2(0.48, t), Vector2(0.82, t)], false, 0.0, 0.7))
 			o.append(_s([Vector2(-0.16, -0.22), Vector2(0.14, 0), Vector2(-0.16, 0.22)], false, 0.0, 1.0, 1.1))
+		"breaker":
+			o.append(_s(_shield_pts(0.9), true, 0.14))
+			o.append(_s([Vector2(0.0, -0.8), Vector2(-0.14, -0.3), Vector2(0.12, -0.08), Vector2(-0.1, 0.3), Vector2(0.06, 0.62)], false, 0.0, 1.0, 1.2))
+			o.append(_s([Vector2(-0.98, 0.1), Vector2(-0.4, 0.1)], false, 0.0, 0.6))
+			o.append(_head(Vector2(-0.3, 0.1), Vector2.RIGHT, 0.26))
+		"nova":
+			o.append(_circle(Vector2.ZERO, 0.17, 0.8))
+			for i in 4:
+				var a0 := TAU / 4.0 * i + 0.25
+				o.append(_s(_arc_pts(Vector2.ZERO, 0.52, a0, a0 + 1.05, 10)))
+				var a1 := TAU / 4.0 * i + PI / 4.0 + 0.2
+				o.append(_s(_arc_pts(Vector2.ZERO, 0.9, a1, a1 + 0.9, 10), false, 0.0, 0.6))
+		"deflector":
+			o.append(_s(_arc_pts(Vector2.ZERO, 0.78, -1.05, 1.05, 16), false, 0.0, 1.0, 1.4))
+			o.append(_circle(Vector2(-0.35, 0), 0.2, 0.6))
+			o.append(_s([Vector2(0.98, -0.85), Vector2(0.58, -0.0)], false, 0.0, 0.7))
+			o.append(_s([Vector2(0.58, 0.0), Vector2(0.98, 0.85)]))
+			o.append(_head(Vector2(0.98, 0.85), Vector2(0.4, 0.85), 0.26))
+		"corrupt":
+			o.append(_circle(Vector2.ZERO, 0.88, 0.0, 0.8))
+			o.append(_s([Vector2(0, -0.45), Vector2(0, 0.45)]))
+			o.append(_s([Vector2(-0.45, 0), Vector2(0.45, 0)]))
+			o.append(_s([Vector2(-0.62, -0.62), Vector2(0.62, 0.62)], false, 0.0, 1.0, 1.3))
 		_:
 			# Unknown id: a hexagon so a missing icon is visible but never breaks the card
 			o.append(_s(_star(6, 0.7, 0.7), true, 0.15))

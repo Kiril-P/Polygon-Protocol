@@ -231,6 +231,55 @@ func show_boss_phase(text: String):
 	t.tween_property(label, "modulate:a", 0.0, 0.4)
 	t.tween_callback(label.queue_free)
 
+## One-time intro card for a new enemy type: title plus one line on how to deal with it.
+var _intel_queue: Array = []
+var _intel_busy := false
+
+func show_intel(title: String, text: String, color: Color):
+	_intel_queue.append([title, text, color])
+	if not _intel_busy:
+		_next_intel()
+
+func _next_intel():
+	if _intel_queue.is_empty():
+		_intel_busy = false
+		return
+	_intel_busy = true
+	var item: Array = _intel_queue.pop_front()
+	var title: String = item[0]
+	var text: String = item[1]
+	var color: Color = item[2]
+	var box := VBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 4)
+	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE)
+	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	box.position.y = 250
+	var head := Label.new()
+	head.text = title
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	NeonUI.style_title(head, color, 34)
+	box.add_child(head)
+	var body := Label.new()
+	body.text = text
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.custom_minimum_size = Vector2(620, 0)
+	body.add_theme_font_size_override("font_size", 20)
+	body.add_theme_color_override("font_color", Color(0.85, 0.93, 1.0))
+	body.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	body.add_theme_constant_override("outline_size", 6)
+	box.add_child(body)
+	box.modulate.a = 0.0
+	$Control.add_child(box)
+	var t := box.create_tween()
+	t.tween_property(box, "modulate:a", 1.0, 0.3)
+	t.tween_interval(4.2)
+	t.tween_property(box, "modulate:a", 0.0, 0.6)
+	t.tween_callback(box.queue_free)
+	t.tween_callback(_next_intel)
+
 func show_boss_warning(seconds: int = 0):
 	var warn = $Control.get_node_or_null("BossWarning")
 	if warn:

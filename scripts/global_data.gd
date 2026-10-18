@@ -39,6 +39,7 @@ var leaderboard: Array = [] # Array of dictionaries: {name, score, kills, level,
 var player_name: String = "Player"
 var player_id: String = "" # Unique ID to identify the local player's entry
 
+var seen_intel: Array = [] # Enemy types whose intro card was shown (never shown twice)
 var deactivated_upgrades = [] # IDs of upgrades the player turned off
 
 func is_upgrade_active(id: String) -> bool:
@@ -144,6 +145,7 @@ func save_game():
 			"total_kills": total_kills,
 			"permanent_upgrades": permanent_upgrades,
 			"deactivated_upgrades": deactivated_upgrades,
+			"seen_intel": seen_intel,
 			"use_mouse_controls": use_mouse_controls,
 			"show_tutorial": show_tutorial,
 			"difficulty_level": difficulty_level,
@@ -178,6 +180,7 @@ func load_game():
 				total_kills = data.get("total_kills", 0)
 				permanent_upgrades = data.get("permanent_upgrades", permanent_upgrades)
 				deactivated_upgrades = data.get("deactivated_upgrades", [])
+				seen_intel = data.get("seen_intel", [])
 				use_mouse_controls = data.get("use_mouse_controls", false)
 				show_tutorial = data.get("show_tutorial", true)
 				difficulty_level = data.get("difficulty_level", 2)
