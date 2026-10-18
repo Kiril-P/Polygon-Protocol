@@ -18,8 +18,15 @@ var corruption_warning_shown: bool = false
 var choice_active: bool = false
 var choice_made_360: bool = false
 
+# Index of each enemy in the `enemy_types` array (matches scenes/game.tscn)
+const ENEMY_INDEX := {"chaser": 0, "fairy": 1, "shooter": 2, "spinner": 3, "tank": 4, "zigzagger": 5, "kamikaze": 6}
+const BOSS_MILESTONES := [80, 180, 360]
+
+var director := SpawnDirector.new()
+
 func _ready():
 	add_to_group("spawner")
+	director.load_data()
 	player = get_tree().get_first_node_in_group("player")
 	
 	# Check if tutorial is disabled to start spawning immediately
@@ -89,13 +96,23 @@ func _process(delta: float):
 	var multipliers = [0.0, 0.7, 1.0, 1.5, 2.0, 3.0]
 	difficulty_mult = multipliers[level]
 	
-	var current_spawn_rate = spawn_rate * difficulty_mult * scaling
+	var base_spawn_rate = spawn_rate * difficulty_mult * scaling
+	var hearts_ratio = 1.0
+	if player and is_instance_valid(player):
+		hearts_ratio = float(player.current_hearts) / maxf(1.0, float(player.max_hearts))
+	director.update(delta, time_passed, hearts_ratio, GlobalData.run_kills, base_spawn_rate)
+	var current_spawn_rate = base_spawn_rate * director.rate_multiplier()
 	
 	if not boss_active:
 		spawn_timer += delta
 		if spawn_timer >= 1.0 / current_spawn_rate:
-			spawn_enemy()
 			spawn_timer = 0.0
+			if director.spawn_allowed(get_tree().get_nodes_in_group("enemies").size()):
+				spawn_enemy()
+		
+		for ev in director.due_events(time_passed):
+			if not _near_boss_milestone():
+				_spawn_event(ev)
 
 	if not boss_active:
 		# Hazard Spawning
@@ -148,6 +165,22 @@ func spawn_hazard():
 	hazard.monitorable = true
 	hazard.monitoring = true
 
+## True shortly before a boss milestone, so formations never stack on the boss warning.
+func _near_boss_milestone() -> bool:
+	var buffer := float(director.cfg.get("event_boss_buffer_seconds", 12.0))
+	for m in BOSS_MILESTONES:
+		if not bosses_spawned.has(m) and time_passed >= m - buffer and time_passed < m + 1.0:
+			return true
+	return false
+
+## Distance from the player at which enemies appear (just off-screen, camera-zoom aware).
+func _current_spawn_radius() -> float:
+	if player and player.has_node("Camera2D"):
+		var zoom = player.get_node("Camera2D").zoom.x
+		# Zoom 1.0 -> 700; zoomed out to 0.5 -> 1400. Small buffer keeps them off-screen.
+		return (spawn_radius / zoom) + 100.0
+	return spawn_radius
+
 func spawn_enemy():
 	if enemy_types.is_empty():
 		return
@@ -156,82 +189,79 @@ func spawn_enemy():
 		player = get_tree().get_first_node_in_group("player")
 		if not player:
 			return
-
-	var available_indices = []
 	
-	# 0: Chaser, 1: Fairy, 2: Shooter, 3: Spinner, 4: Tank, 5: Zigzagger, 6: Kamikaze
-	if time_passed < 80: # Phase 1: Early Game Stagger (Extended to 80s)
-		available_indices.append_array([0, 0, 0, 1, 1, 6]) # Triple weight for chasers
-		if time_passed >= 50:
-			available_indices.append(5) # Zigzaggers at 50s
-			
-	elif time_passed < 180: # Phase 2: Mid Game Stagger (Extended to 180s)
-		# Fodder base
-		available_indices.append_array([0, 0, 0, 0, 1, 1, 1, 6, 6, 6]) 
-		available_indices.append(5) # Zigzaggers
-		
-		# Heavies (Much rarer)
-		if time_passed >= 90:
-			available_indices.append(2) # Spinners
-		if time_passed >= 110:
-			# Reduced tanks further
-			pass 
-		if time_passed >= 140:
-			available_indices.append(3) # Shooters
-	else: # Phase 3: Total Chaos (180s+)
-		# Heavy weight on fodder to prevent tank overcrowding
-		# 0: Chaser(x5), 1: Fairy(x4), 6: Kamikaze(x4), 5: Zigzagger(x2), 2: Shooter(x1), 3: Spinner(x1), 4: Tank(x0.5)
-		available_indices = [0, 0, 0, 0, 0, 1, 1, 1, 1, 6, 6, 6, 6, 5, 5, 2, 3, 4]
-	
-	var index = available_indices[randi() % available_indices.size()]
-	
-	# MINI-BOSS SPAWN: Every 2 minutes (120s), spawn a giant tank
-	if int(time_passed) % 120 == 0 and int(time_passed) > 0:
-		# Just spawn an extra tank for now but make it bigger
-		index = 4 
-		AudioManager.play_sfx("boss_spawn")
-
-	# Safety check for array size
-	index = clamp(index, 0, enemy_types.size() - 1)
-	
-	var enemy_scene = enemy_types[index]
-	if not enemy_scene: return
-
-	# Calculate dynamic spawn radius based on camera zoom
-	var current_radius = spawn_radius
-	if player and player.has_node("Camera2D"):
-		var zoom = player.get_node("Camera2D").zoom.x
-		# If zoom is 1.0, radius is 700. If zoom is 0.5 (zoomed out), radius is 1400.
-		# Add a small buffer to ensure they always spawn off-screen
-		current_radius = (spawn_radius / zoom) + 100.0
-	
+	var index: int = ENEMY_INDEX.get(director.pick_enemy(time_passed), 0)
 	var angle = randf() * TAU
 	
 	# ANTI-KITING: 30% chance to spawn specifically in front of the player's movement
 	if player.velocity.length() > 10.0 and randf() < 0.3:
-		var move_dir = player.velocity.normalized()
 		# Cone of 90 degrees in front
-		angle = move_dir.angle() + randf_range(-PI/4, PI/4)
+		angle = player.velocity.normalized().angle() + randf_range(-PI/4, PI/4)
 	
-	var spawn_pos = player.global_position + Vector2(current_radius, 0).rotated(angle)
+	_spawn_enemy_at(index, player.global_position + Vector2(_current_spawn_radius(), 0).rotated(angle))
+
+## Instantiates enemy `index` at `pos`. `mods` may hold health_mult, xp_mult, scale_mult.
+func _spawn_enemy_at(index: int, pos: Vector2, mods: Dictionary = {}) -> Node:
+	index = clamp(index, 0, enemy_types.size() - 1)
+	var enemy_scene = enemy_types[index]
+	if not enemy_scene:
+		return null
 	
 	var enemy = enemy_scene.instantiate()
 	# SET POSITION BEFORE ADD_CHILD
-	enemy.global_position = spawn_pos
-	
-	# BOSS SCALING: If this is a mini-boss (giant tank), scale it up
-	if int(time_passed) % 120 == 0 and int(time_passed) > 0 and enemy.is_in_group("enemies"):
-		enemy.scale = Vector2(4.0, 4.0)
-		if "health" in enemy: enemy.health *= 10.0
-		if "xp_value" in enemy: enemy.xp_value *= 50
+	enemy.global_position = pos
 	
 	# Scale XP based on time passed
 	var base_xp = enemy.xp_value if "xp_value" in enemy else 10
-	var scaled_xp = base_xp * (1.0 + (time_passed / 60.0)) # Increase XP over time
+	var scaled_xp = base_xp * (1.0 + (time_passed / 60.0)) * mods.get("xp_mult", 1.0)
 	if enemy.has_method("set_xp_value"):
 		enemy.set_xp_value(int(scaled_xp))
-		
+	if "health" in enemy:
+		enemy.health *= mods.get("health_mult", 1.0)
+	
 	get_parent().add_child(enemy)
+	# Enemy scripts set their own scale in _ready(), so apply size changes afterwards
+	if mods.has("scale_mult"):
+		enemy.scale *= mods["scale_mult"]
+	return enemy
+
+## Runs a scheduled event from spawn_waves.json (elite / ring / wall / pincer).
+func _spawn_event(ev: Dictionary):
+	if not player or not is_instance_valid(player) or enemy_types.is_empty():
+		return
+	var index: int = ENEMY_INDEX.get(ev.get("enemy", "chaser"), 0)
+	var count: int = director.event_count(ev, time_passed)
+	var radius = _current_spawn_radius()
+	var origin = player.global_position
+	var base_angle = randf() * TAU
+	if player.velocity.length() > 10.0:
+		base_angle = player.velocity.angle() # Cut the player off
+	
+	match ev.get("type", ""):
+		"elite":
+			AudioManager.play_sfx("boss_spawn")
+			_spawn_enemy_at(index, origin + Vector2(radius, 0).rotated(base_angle), {
+				"scale_mult": ev.get("scale_mult", 1.0),
+				"health_mult": ev.get("health_mult", 1.0),
+				"xp_mult": ev.get("xp_mult", 1.0),
+			})
+		"ring":
+			AudioManager.play_sfx("glitch", -3.0, 0.9, 1.1)
+			for i in count:
+				_spawn_enemy_at(index, origin + Vector2(radius, 0).rotated(base_angle + TAU * i / count))
+		"wall":
+			AudioManager.play_sfx("glitch", -3.0, 0.9, 1.1)
+			var spacing: float = ev.get("spacing", 90.0)
+			var center = origin + Vector2(radius, 0).rotated(base_angle)
+			var along = Vector2.RIGHT.rotated(base_angle + PI / 2.0)
+			for i in count:
+				_spawn_enemy_at(index, center + along * spacing * (i - (count - 1) / 2.0))
+		"pincer":
+			AudioManager.play_sfx("glitch", -3.0, 0.9, 1.1)
+			for side in [0.0, PI]:
+				for i in count:
+					var a = base_angle + side + (i - (count - 1) / 2.0) * 0.18
+					_spawn_enemy_at(index, origin + Vector2(radius, 0).rotated(a))
 
 func spawn_major_boss(milestone: int, forced_pos: Vector2 = Vector2.ZERO):
 	var boss = CharacterBody2D.new()
@@ -393,6 +423,7 @@ func _on_boss_tree_exited():
 	var active_bosses = get_tree().get_nodes_in_group("bosses")
 	if active_bosses.size() == 0:
 		boss_active = false
+		director.start_breather()
 		if player:
 			player.dash_nerf_active = false
 		AudioManager.set_boss_music_mode(false, 1)
