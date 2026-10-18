@@ -24,5 +24,5 @@ func _draw():
 	var eased := 1.0 - pow(1.0 - t, 3.0)
 	var r := max_radius * eased
 	var a := 1.0 - t
-	draw_arc(Vector2.ZERO, r, 0.0, TAU, 64, Color(color.r * 1.7, color.g * 1.7, color.b * 1.7, a), thickness * (1.0 - t * 0.7), true)
-	draw_arc(Vector2.ZERO, r * 0.82, 0.0, TAU, 48, Color(color.r, color.g, color.b, a * 0.4), thickness * 2.2 * (1.0 - t), true)
+	draw_arc(Vector2.ZERO, r, 0.0, TAU, 64, Color(color.r * 1.2, color.g * 1.2, color.b * 1.2, a * 0.8), thickness * (1.0 - t * 0.7), true)
+	draw_arc(Vector2.ZERO, r * 0.82, 0.0, TAU, 48, Color(color.r, color.g, color.b, a * 0.2), thickness * 2.0 * (1.0 - t), true)

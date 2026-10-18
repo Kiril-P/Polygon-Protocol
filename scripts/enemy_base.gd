@@ -44,7 +44,7 @@ func _apply_neon():
 	neon_color = poly.color
 	poly.modulate = Color.WHITE
 	neon_outline = Neon.apply(poly, neon_color, 0.28, 3.5)
-	Neon.add_glow(poly, neon_color, 140.0, 0.14)
+	Neon.add_glow(poly, neon_color, 100.0, 0.07)
 
 ## Scales speed/health by the chosen difficulty. Arrays are indexed by level (1-5).
 func apply_difficulty(speed_mults: Array, health_mults: Array):
@@ -67,7 +67,7 @@ func take_damage(_amount: float):
 
 func flash_white():
 	var tween = create_tween()
-	tween.tween_property($Polygon2D, "modulate", Color(5, 5, 5, 1), 0.05)
+	tween.tween_property($Polygon2D, "modulate", Color(3, 3, 3, 1), 0.05)
 	tween.tween_property($Polygon2D, "modulate", Color(1, 1, 1, 1), 0.05)
 
 func die():
@@ -94,7 +94,7 @@ func spawn_death_particles():
 			$Polygon2D.color if has_node("Polygon2D") else Color.RED)
 	var size := clampf(death_particle_amount / 30.0, 0.5, 2.5)
 	VFX.death_burst(global_position, color, size)
-	VFX.shockwave(global_position, 0.25 + 0.3 * size, color, 60.0 + 70.0 * size)
+	VFX.shockwave(global_position, 0.2 + 0.2 * size, color, 50.0 + 50.0 * size)
 
 ## Spawns a hostile bullet travelling along `dir`.
 func fire_bullet(dir: Vector2, bullet_speed: float, bullet_damage: float, color: Color, bullet_scale: float = 1.0, spawn_offset: float = 0.0):

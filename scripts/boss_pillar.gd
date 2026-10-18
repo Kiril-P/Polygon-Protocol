@@ -29,7 +29,7 @@ func setup_visuals():
 	add_child(poly)
 	# Hot neon rim and halo so the weak points read instantly
 	Neon.apply(poly, heart_color, 0.35, 2.5)
-	Neon.add_glow(self, heart_color, 120.0, 0.45)
+	Neon.add_glow(self, heart_color, 90.0, 0.25)
 	
 	# Add a collision shape
 	var shape = CollisionShape2D.new()

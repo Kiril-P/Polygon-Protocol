@@ -79,7 +79,7 @@ func setup_visuals():
 	poly.color = COLOR
 	poly.modulate = Color.WHITE
 	Neon.apply(poly, COLOR, 0.08, 7.0)
-	Neon.add_glow(self, COLOR, 640.0, 0.22)
+	Neon.add_glow(self, COLOR, 500.0, 0.1)
 
 	# Inner singularity: bright dot with a ring
 	var inner := Polygon2D.new()

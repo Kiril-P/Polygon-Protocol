@@ -60,7 +60,7 @@ func setup_visuals():
 	poly.color = Color(0.0, 0.9, 1.0)
 	poly.modulate = Color.WHITE
 	Neon.apply(poly, Color(0.0, 0.9, 1.0), 0.08, 7.0) # Dark void, cyan outline
-	Neon.add_glow(self, Color(0.0, 0.9, 1.0), 640.0, 0.2)
+	Neon.add_glow(self, Color(0.0, 0.9, 1.0), 500.0, 0.1)
 	VFX.shockwave(global_position, 2.0, Color(0.0, 0.9, 1.0), 560.0)
 	
 	# Pupils/Inner Core

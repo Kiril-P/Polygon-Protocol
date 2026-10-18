@@ -15,7 +15,7 @@ var run_kills: int = 0 # Current run kills
 var run_score: int = 0 # Current run score
 var run_level: int = 1 # Current run level
 var run_time: float = 0.0 # Current run survival time
-var use_mouse_controls: bool = true
+var use_mouse_controls: bool = false # WASD by default
 var show_tutorial: bool = true
 var audio_settings = {
 	"master": 0.35,
@@ -178,7 +178,7 @@ func load_game():
 				total_kills = data.get("total_kills", 0)
 				permanent_upgrades = data.get("permanent_upgrades", permanent_upgrades)
 				deactivated_upgrades = data.get("deactivated_upgrades", [])
-				use_mouse_controls = data.get("use_mouse_controls", true)
+				use_mouse_controls = data.get("use_mouse_controls", false)
 				show_tutorial = data.get("show_tutorial", true)
 				difficulty_level = data.get("difficulty_level", 2)
 				audio_settings = data.get("audio_settings", audio_settings)
@@ -215,7 +215,7 @@ func apply_audio_settings():
 
 func _load_settings_only(data: Dictionary):
 	# Helper to keep user preferences while resetting game stats
-	use_mouse_controls = data.get("use_mouse_controls", true)
+	use_mouse_controls = data.get("use_mouse_controls", false)
 	show_tutorial = data.get("show_tutorial", true)
 	audio_settings = data.get("audio_settings", audio_settings)
 	player_name = data.get("player_name", "Player")

@@ -40,7 +40,7 @@ static func apply(poly: Polygon2D, base_color: Color, fill_mult: float = 0.3, wi
 	outline.width = width
 	if outline.points != poly.polygon:
 		outline.points = poly.polygon
-	outline.default_color = base_color.lerp(Color.WHITE, 0.3) * Color(1.5, 1.5, 1.5, 1.0)
+	outline.default_color = base_color.lerp(Color.WHITE, 0.15) * Color(1.1, 1.1, 1.1, 1.0)
 	poly.color = Color(base_color.r * fill_mult, base_color.g * fill_mult, base_color.b * fill_mult, 0.92)
 	return outline
 

@@ -117,7 +117,7 @@ func setup_boss_visuals():
 	poly.color = Color(1.0, 0.15, 0.25)
 	poly.modulate = Color.WHITE
 	Neon.apply(poly, Color(1.0, 0.15, 0.25), 0.12, 6.0) # Dark core, hot red outline
-	Neon.add_glow(self, Color(1.0, 0.2, 0.3), 520.0, 0.22)
+	Neon.add_glow(self, Color(1.0, 0.2, 0.3), 420.0, 0.1)
 	VFX.shockwave(global_position, 2.0, Color(1.0, 0.2, 0.3), 520.0)
 	
 	# Add orbiting shields

@@ -43,7 +43,7 @@ func _draw():
 	# Core flash
 	var flash := maxf(0.0, 1.0 - _age / 0.12)
 	if flash > 0.0:
-		draw_circle(Vector2.ZERO, shard_size * 3.0 * (1.0 + (1.0 - flash)), Color(1, 1, 1, flash * 0.9))
+		draw_circle(Vector2.ZERO, shard_size * 3.0 * (1.0 + (1.0 - flash)), Color(1, 1, 1, flash * 0.5))
 	var hot := color.lerp(Color.WHITE, 0.25 * fade)
 	for i in shard_count:
 		var s := shard_size * _scale[i] * (0.4 + 0.6 * fade)
@@ -54,4 +54,4 @@ func _draw():
 		])
 		for k in 3:
 			pts[k] += _pos[i]
-		draw_colored_polygon(pts, Color(hot.r * 1.25, hot.g * 1.25, hot.b * 1.25, fade))
+		draw_colored_polygon(pts, Color(hot.r, hot.g, hot.b, fade * 0.9))

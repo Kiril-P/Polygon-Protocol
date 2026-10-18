@@ -17,7 +17,7 @@ static func panel_style(color: Color, fill_alpha: float = 0.72, border: int = 2,
 	s.border_color = color.lerp(Color.WHITE, 0.2)
 	s.set_corner_radius_all(radius)
 	s.corner_radius_bottom_right = radius * 3
-	s.shadow_color = Color(color.r, color.g, color.b, 0.35)
+	s.shadow_color = Color(color.r, color.g, color.b, 0.18)
 	s.shadow_size = glow
 	s.content_margin_left = 16
 	s.content_margin_right = 16
@@ -55,13 +55,13 @@ static func style_button(btn: Button, color: Color = CYAN) -> void:
 
 ## Glowing title text: bright core, coloured halo via outline + shadow.
 static func style_title(label: Label, color: Color = CYAN, size: int = -1) -> void:
-	label.add_theme_color_override("font_color", color.lerp(Color.WHITE, 0.7))
-	label.add_theme_color_override("font_outline_color", Color(color.r, color.g, color.b, 0.55))
-	label.add_theme_constant_override("outline_size", 10)
-	label.add_theme_color_override("font_shadow_color", Color(color.r, color.g, color.b, 0.45))
+	label.add_theme_color_override("font_color", color.lerp(Color.WHITE, 0.6))
+	label.add_theme_color_override("font_outline_color", Color(color.r * 0.5, color.g * 0.5, color.b * 0.5, 0.85))
+	label.add_theme_constant_override("outline_size", 5)
+	label.add_theme_color_override("font_shadow_color", Color(color.r, color.g, color.b, 0.28))
 	label.add_theme_constant_override("shadow_offset_x", 0)
 	label.add_theme_constant_override("shadow_offset_y", 0)
-	label.add_theme_constant_override("shadow_outline_size", 22)
+	label.add_theme_constant_override("shadow_outline_size", 12)
 	if size > 0:
 		label.add_theme_font_size_override("font_size", size)
 

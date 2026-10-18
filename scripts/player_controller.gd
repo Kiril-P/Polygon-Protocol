@@ -987,7 +987,7 @@ func add_shake(intensity: float):
 
 ## Soft pulsing halo behind the player.
 func _setup_aura():
-	var aura := Neon.add_glow(self, PLAYER_COLOR, 150.0, 0.18)
+	var aura := Neon.add_glow(self, PLAYER_COLOR, 110.0, 0.09)
 	aura.name = "Aura"
 	var t := aura.create_tween().set_loops()
 	t.tween_property(aura, "scale", aura.scale * 1.18, 0.9).set_trans(Tween.TRANS_SINE)

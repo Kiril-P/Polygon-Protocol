@@ -105,15 +105,12 @@ func create_card(data, gd):
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	panel.add_child(v)
 	
-	# Icon
-	var icon = TextureRect.new()
-	icon.texture = load(data["icon"])
-	icon.custom_minimum_size = Vector2(64, 64)
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.custom_minimum_size = Vector2(72, 72)
-	icon.modulate = card_color * Color(0.7, 0.7, 0.7, 1.0) # Keep below bloom clipping so the rune stays readable
+	# Icon (vector, tinted by card state)
+	var icon := UpgradeIcon.new()
+	icon.custom_minimum_size = Vector2(96, 96)
+	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	v.add_child(icon)
-	NeonUI.add_halo(icon, card_color, 0.5, 38.0)
+	icon.set_icon(data["id"], card_color)
 	
 	# Title
 	var title = Label.new()
@@ -121,8 +118,8 @@ func create_card(data, gd):
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 20)
 	NeonUI.style_title(title, card_color)
-	title.add_theme_constant_override("outline_size", 4)
-	title.add_theme_constant_override("shadow_outline_size", 10)
+	title.add_theme_constant_override("outline_size", 3)
+	title.add_theme_constant_override("shadow_outline_size", 0)
 	v.add_child(title)
 	
 	# Desc

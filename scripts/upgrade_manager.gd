@@ -314,8 +314,14 @@ func show_next_upgrade():
 		get_tree().paused = false
 		return
 		
-	is_ui_active = true
 	var options = get_random_upgrades(3)
+	if options.is_empty():
+		# Nothing eligible (everything capped): fall back to the basic stat upgrades so a level-up never soft-locks
+		for u in upgrade_pool:
+			if u["id"] in ["speed", "damage", "fire_rate", "dash_charge"]:
+				options.append(u.duplicate())
+		options = options.slice(0, 3)
+	is_ui_active = true
 	# Pause the game and show UI
 	get_tree().paused = true
 	request_upgrade_ui.emit(options)
@@ -348,7 +354,7 @@ func apply_upgrade(upgrade_data: Dictionary):
 		if not upgrade_data["id"] in multi_pick_specials:
 			applied_special_upgrades.append(upgrade_data["id"])
 	
-	level_up_pending -= 1
+	level_up_pending = maxi(level_up_pending - 1, 0)
 	if level_up_pending > 0:
 		# Show next upgrade immediately
 		show_next_upgrade()

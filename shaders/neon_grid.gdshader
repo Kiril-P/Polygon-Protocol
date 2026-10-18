@@ -64,11 +64,12 @@ void fragment() {
 			float r = w.z * 850.0;
 			float ring = exp(-pow((dist - r) / 80.0, 2.0));
 			float amp = w.w * exp(-w.z * 1.7);
-			disp += diff / dist * ring * amp * 55.0;
+			disp += diff / dist * ring * amp * 36.0;
 			heat += ring * amp;
 		}
 	}
 
+	heat = min(heat, 0.6);
 	vec2 gp = p - disp + offset;
 	float s = grid_spacing;
 	vec2 q = abs(fract(gp / s - 0.5) - 0.5) * s;
@@ -89,10 +90,10 @@ void fragment() {
 	col += stars(p + offset * 0.25, 90.0, 0.35, 0.0);
 	col += stars(p + offset * 0.45, 140.0, 0.25, 11.0) * 0.8;
 
-	col += lc * (line * 0.12 + glow * 0.07 + major * 0.2) * tint;
-	col += lc * node * 0.55;
-	col += mix(lc, vec3(1.0), 0.35) * heat * (line * 0.8 + glow * 0.35) * 0.8;
-	col += lc * heat * 0.06;
+	col += lc * (line * 0.12 + glow * 0.07 + major * 0.15) * tint;
+	col += lc * node * 0.35;
+	col += mix(lc, vec3(1.0), 0.35) * heat * (line * 0.6 + glow * 0.2) * 0.55;
+	col += lc * heat * 0.03;
 
 	vec2 c = UV - 0.5;
 	col *= 1.0 - dot(c, c) * 1.3;

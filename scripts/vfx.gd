@@ -9,8 +9,14 @@ const RingFX = preload("res://scripts/ring_fx.gd")
 
 var _waves: Array = [] # {pos: Vector2 (world), age: float, strength: float}
 var _hit_stop_token: int = 0
+var _sweep_timer: float = 0.0
+const SWEEP_INTERVAL := 1.5
 
 func _process(delta: float):
+	_sweep_timer += delta
+	if _sweep_timer >= SWEEP_INTERVAL:
+		_sweep_timer = 0.0
+		_sweep_orphans()
 	# Ages use unscaled time so ripples keep moving during hit-stop
 	var real_delta := delta / maxf(Engine.time_scale, 0.05)
 	for w in _waves:
@@ -19,9 +25,10 @@ func _process(delta: float):
 
 ## Shockwave: ripples the background grid and draws an expanding ring.
 func shockwave(world_pos: Vector2, strength: float = 1.0, color: Color = Color(0.3, 0.9, 1.0), radius: float = 200.0):
-	if _waves.size() >= MAX_WAVES:
-		_waves.pop_front()
-	_waves.append({"pos": world_pos, "age": 0.0, "strength": strength})
+	if strength >= 0.5: # Small pops only draw a ring: constant grid ripples got noisy
+		if _waves.size() >= MAX_WAVES:
+			_waves.pop_front()
+		_waves.append({"pos": world_pos, "age": 0.0, "strength": strength})
 	var ring := RingFX.new()
 	ring.color = color
 	ring.max_radius = radius
@@ -66,3 +73,22 @@ func _add(node: Node2D, world_pos: Vector2):
 		return
 	scene.add_child(node)
 	node.global_position = world_pos
+
+## Safety net for effect nodes whose own cleanup never ran (tweens killed with their owner,
+## timers lost across pauses): frees finished one-shot particles and fully faded lines.
+func _sweep_orphans():
+	var scene := get_tree().current_scene
+	if not scene:
+		return
+	for n in scene.get_children():
+		# Two consecutive sightings (>= one interval apart) before freeing, so live effects are never cut short
+		var dead := false
+		if n is CPUParticles2D:
+			dead = n.one_shot and not n.emitting
+		elif n is Line2D:
+			dead = n.modulate.a <= 0.01
+		if dead:
+			if n.get_meta("sweep_seen", false):
+				n.queue_free()
+			else:
+				n.set_meta("sweep_seen", true)

@@ -87,12 +87,12 @@ func _update_trail():
 
 func _setup_glow():
 	var color: Color = sprite.color
-	Neon.add_glow(self, color, 40.0 if not fired_by_enemy else 56.0, 0.4)
-	sprite.color = color.lerp(Color.WHITE, 0.45)
+	Neon.add_glow(self, color, 30.0 if not fired_by_enemy else 40.0, 0.2)
+	sprite.color = color.lerp(Color.WHITE, 0.2)
 	trail = Line2D.new()
 	trail.top_level = true # Points are world-space; outlives the bullet for a fade-out
 	trail.material = Neon.additive_material()
-	trail.width = 7.0 * scale.x
+	trail.width = 4.5 * scale.x
 	trail.joint_mode = Line2D.LINE_JOINT_ROUND
 	trail.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	var curve := Curve.new()
@@ -100,7 +100,7 @@ func _setup_glow():
 	curve.add_point(Vector2(1.0, 1.0))
 	trail.width_curve = curve
 	var grad := Gradient.new()
-	grad.colors = PackedColorArray([Color(color.r, color.g, color.b, 0.0), Color(color.r * 1.6, color.g * 1.6, color.b * 1.6, 0.85)])
+	grad.colors = PackedColorArray([Color(color.r, color.g, color.b, 0.0), Color(color.r * 1.1, color.g * 1.1, color.b * 1.1, 0.5)])
 	trail.gradient = grad
 	trail.z_index = -1
 	get_parent().add_child(trail)
@@ -361,7 +361,9 @@ func spawn_lightning_visual(from: Vector2, to: Vector2):
 	lightning.default_color = Color(0.5, 0.5, 1.0, 0.8)
 	
 	# Delete after brief flash
-	var tween = create_tween()
+	# Tween lives on the lightning itself: the bullet is usually freed right after chaining,
+	# which would kill a bullet-bound tween and leave the arc on screen forever.
+	var tween = lightning.create_tween()
 	tween.tween_property(lightning, "modulate:a", 0.0, 0.15)
 	tween.tween_callback(lightning.queue_free)
 

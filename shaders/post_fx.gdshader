@@ -4,11 +4,11 @@ shader_type canvas_item;
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap, repeat_disable;
 uniform float aberration = 0.0015;
-uniform float bloom_strength = 0.6;
+uniform float bloom_strength = 0.26;
 uniform float vignette = 0.32;
 uniform vec4 danger_color : source_color = vec4(1.0, 0.05, 0.1, 1.0);
 uniform float danger = 0.0;
-uniform float scanline = 0.035;
+uniform float scanline = 0.018;
 uniform float time = 0.0;
 
 void fragment() {
@@ -27,7 +27,7 @@ void fragment() {
 		+ textureLod(screen_tex, uv, 3.0).rgb * 0.30
 		+ textureLod(screen_tex, uv, 4.0).rgb * 0.25
 		+ textureLod(screen_tex, uv, 5.0).rgb * 0.20;
-	b = max(b - 0.045, vec3(0.0));
+	b = max(b - 0.10, vec3(0.0));
 	col += b * bloom_strength * 2.2;
 
 	// Vignette + danger pulse at the edges
