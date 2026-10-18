@@ -297,7 +297,7 @@ func _input(event):
 			if spawner:
 				spawner.spawn_major_boss(180)
 				print("DEBUG: Boss 2 (Pulsar) Spawned")
-		if event.keycode == KEY_L:
+		if event.keycode == KEY_I:
 			var spawner = get_tree().get_first_node_in_group("spawner")
 			if spawner:
 				spawner.spawn_major_boss(600)
