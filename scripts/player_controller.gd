@@ -108,6 +108,7 @@ var overdrive_available: bool = false
 var is_in_overdrive: bool = false
 
 # Shield Meta Progression
+var last_hit_by: String = "" # What took the last heart, for the run summary
 var has_shield: bool = false
 var shield_node: Node2D = null
 var shield_regen_timer: float = 0.0
@@ -532,6 +533,10 @@ func _spawn_trail_visual(pos: Vector2, ttl: float):
 	t.tween_callback(blob.queue_free)
 
 ## Deflector: hostile bullets that reach the ring turn around and fight for you.
+func _boss_name(body: Node) -> String:
+	var base: String = body.get_script().resource_path.get_file().get_basename().replace("boss_", "") if body.get_script() else "boss"
+	return base.to_upper()
+
 func _deflect_bullets():
 	for b in get_tree().get_nodes_in_group("enemy_bullets"):
 		if not is_instance_valid(b) or b.global_position.distance_to(global_position) > DEFLECT_RADIUS:
@@ -1421,8 +1426,7 @@ func pause_game_fractured():
 	main_menu_btn.text = "BACK TO MAIN MENU"
 	setup_btn.call(main_menu_btn, 24, canvas)
 	main_menu_btn.pressed.connect(func():
-		get_tree().paused = false
-		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+		Transition.go("res://scenes/main_menu.tscn")
 	)
 	menu_ui.add_child(main_menu_btn)
 	
@@ -1532,7 +1536,7 @@ func heal(amount: int):
 	tween.tween_property(sprite, "modulate", Color(0, 5, 0, 1), 0.1) # Green flash
 	tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
 
-func take_damage(_amount: float):
+func take_damage(_amount: float, source: String = ""):
 	if iframe_timer > 0:
 		return
 		
@@ -1562,6 +1566,8 @@ func take_damage(_amount: float):
 			
 		return
 
+	if source != "":
+		last_hit_by = source
 	current_hearts -= 1
 	health_changed.emit(current_hearts, max_hearts)
 	
@@ -1726,6 +1732,8 @@ func die():
 	
 	var gd = GlobalData
 	gd.run_time = spawner.time_passed if spawner else 0.0
+	gd.daily_submit_state = ""
+	var prev_records: Dictionary = gd.records.duplicate()
 	if gd.has_upgrade("shard_multiplier"):
 		shards_earned = int(shards_earned * 1.5)
 	shards_earned = int(shards_earned * gd.protocol_multiplier())
@@ -1737,6 +1745,7 @@ func die():
 		gd.best_level = gd.run_level
 		gd.high_score = time_survived
 	gd.save_game()
+	var broken: Array = gd.update_records({"score": gd.run_score, "time": time_survived, "kills": gd.run_kills, "level": level, "combo": highest_combo_run})
 	var daily: Dictionary = gd.record_daily_result(gd.run_score)
 	if gd.run_mode == "daily":
 		gd.submit_daily_score(gd.run_score, gd.run_kills, gd.run_level, time_survived)
@@ -1754,7 +1763,15 @@ func die():
 		"shards": shards_earned,
 		"highest_combo": highest_combo_run,
 		"time": spawner.time_passed if spawner else 0.0,
-		"daily": daily
+		"daily": daily,
+		"score": gd.run_score,
+		"kills": gd.run_kills,
+		"broken": broken,
+		"prev": prev_records,
+		"killed_by": last_hit_by,
+		"protocols": gd.run_protocols.duplicate(),
+		"multiplier": gd.protocol_multiplier(),
+		"mode": gd.run_mode,
 	})
 	
 	# Pause the game instead of reloading
@@ -1855,7 +1872,7 @@ func check_contact_damage(_delta: float):
 	var overlapping_areas = $Area2D.get_overlapping_areas()
 	for area in overlapping_areas:
 		if area.is_in_group("enemy_bullets"):
-			take_damage(1)
+			take_damage(1, str(area.get_meta("source", "ENEMY FIRE")))
 			area.queue_free()
 			return # Exit after taking damage
 
@@ -1867,7 +1884,7 @@ func check_contact_damage(_delta: float):
 			if "is_dying" in body and body.is_dying:
 				continue
 			
-			take_damage(1)
+			take_damage(1, body.display_name() if body.has_method("display_name") else _boss_name(body))
 			break
 
 # Collision with enemies (mostly for Dash now)

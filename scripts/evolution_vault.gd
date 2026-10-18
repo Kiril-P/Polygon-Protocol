@@ -197,5 +197,5 @@ func _on_back_pressed():
 	t.tween_property(self, "modulate:a", 0.0, 0.3)
 	t.tween_callback(func():
 		GlobalData.next_scene_path = "res://scenes/main_menu.tscn"
-		get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
+		Transition.go("res://scenes/loading_screen.tscn")
 	)

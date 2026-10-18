@@ -322,7 +322,7 @@ func singularity_pulse():
 	t.parallel().tween_property(zone, "color:a", 0.35, 1.2)
 	t.tween_callback(func():
 		if is_instance_valid(player) and player.global_position.distance_to(global_position) < PULSE_RADIUS:
-			player.take_damage(1)
+			player.take_damage(1, "SINGULARITY")
 		VFX.shockwave(global_position, 3.0, HOT, PULSE_RADIUS * 2.2)
 		VFX.death_burst(global_position, HOT, 1.5)
 		PostFX.kick(0.008)

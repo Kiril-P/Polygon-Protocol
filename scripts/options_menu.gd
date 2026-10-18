@@ -170,7 +170,7 @@ func _on_back_button_pressed():
 	if close_callback.is_valid():
 		close_callback.call()
 	else:
-		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+		Transition.go("res://scenes/main_menu.tscn")
 
 func update_button_texts():
 	var gd = GlobalData

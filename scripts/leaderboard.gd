@@ -258,4 +258,4 @@ func _on_save_pressed():
 
 func _on_back_pressed():
 	GlobalData.next_scene_path = "res://scenes/main_menu.tscn"
-	get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
+	Transition.go("res://scenes/loading_screen.tscn")
