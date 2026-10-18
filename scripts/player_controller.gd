@@ -131,6 +131,7 @@ func _ready():
 	sprite.color = PLAYER_COLOR # Neon Cyan
 	_setup_aura()
 	add_child(DashRing.new())
+	add_child(TouchControls.new())
 	update_health_visuals()
 	
 	# Reset Run Stats
@@ -248,7 +249,7 @@ func show_full_tutorial():
 	canvas.add_child(label)
 	
 	var skip_label = Label.new()
-	skip_label.text = "[A TO SKIP]" if PadNav.using_pad else "[SPACE TO SKIP]"
+	skip_label.text = "[A TO SKIP]" if PadNav.using_pad else ("" if PadNav.touch_on() else "[SPACE TO SKIP]")
 	skip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	skip_label.add_theme_font_size_override("font_size", 18)
 	skip_label.modulate.a = 0.5
@@ -261,8 +262,8 @@ func show_full_tutorial():
 	canvas.add_child(skip_label)
 	
 	var lines = [
-		"USE LEFT STICK TO MOVE" if PadNav.using_pad else ("USE MOUSE TO MOVE" if use_mouse else "USE %s TO MOVE" % _move_keys_text()),
-		"HOLD RT TO DASH INTO ENEMIES" if PadNav.using_pad else "DASH INTO ENEMIES TO KILL",
+		"USE LEFT STICK TO MOVE" if PadNav.using_pad else ("DRAG ON THE LEFT TO MOVE" if PadNav.touch_on() else ("USE MOUSE TO MOVE" if use_mouse else "USE %s TO MOVE" % _move_keys_text())),
+		"HOLD RT TO DASH INTO ENEMIES" if PadNav.using_pad else ("HOLD THE DASH BUTTON TO DASH INTO ENEMIES" if PadNav.touch_on() else "DASH INTO ENEMIES TO KILL"),
 		"EVOLVE BEFORE YOU ARE OVERWHELMED"
 	]
 	
@@ -386,7 +387,7 @@ func _physics_process(delta: float):
 			check_contact_damage(delta)
 	
 	# DASH/BOOST INPUT
-	if (Input.is_action_pressed("dash") or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)) and current_energy > 0:
+	if (Input.is_action_pressed("dash") or (Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not PadNav.touch_on())) and current_energy > 0:
 		if not is_dashing:
 			is_dashing = true
 			PadNav.rumble(0.25, 0.0, 0.12)
@@ -820,7 +821,7 @@ func handle_movement(delta: float):
 	var input_dir = Vector2.ZERO
 	
 	var use_mouse = false
-	use_mouse = GlobalData.use_mouse_controls
+	use_mouse = GlobalData.use_mouse_controls and not PadNav.touch_on() # touch has its own stick
 
 	if use_mouse:
 		var mouse_pos = get_global_mouse_position()

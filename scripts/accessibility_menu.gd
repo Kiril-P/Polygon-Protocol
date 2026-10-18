@@ -14,6 +14,7 @@ var _flash_btn: Button
 var _palette_btn: Button
 var _size_btn: Button
 var _rumble_btn: Button
+var _touch_btn: Button
 var _key_buttons: Dictionary = {}
 var _status: Label
 var _capturing: String = ""
@@ -110,6 +111,10 @@ func _build():
 			get_node("/root/PadNav").rumble(0.7, 0.7, 0.25)
 		_refresh())
 	left.add_child(_rumble_btn)
+	_touch_btn = _button("", func():
+		gs.cycle_touch_pref()
+		_refresh())
+	left.add_child(_touch_btn)
 
 	# ---- Controls column
 	var right := VBoxContainer.new()
@@ -212,7 +217,8 @@ func _refresh():
 	_flash_btn.text = "REDUCED FLASH: " + ("ON" if gs.reduced_flash else "OFF")
 	_palette_btn.text = "COLOURS: " + gs.pal()["name"]
 	_size_btn.text = "HUD SIZE: " + gs.HUD_SIZES[gs.hud_size]["name"]
-	_rumble_btn.text = "CONTROLLER RUMBLE: " + ("ON" if gs.rumble else "OFF")
+	_rumble_btn.text = "VIBRATION: " + ("ON" if gs.rumble else "OFF")
+	_touch_btn.text = "TOUCH CONTROLS: " + ["AUTO", "ON", "OFF"][gs.touch_pref]
 	for action in _key_buttons:
 		var b: Button = _key_buttons[action]
 		b.text = "PRESS A KEY..." if _capturing == action else gs.key_name(action)

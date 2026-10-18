@@ -4,18 +4,49 @@ extends Node
 ## D-pad and A button work everywhere without touching each menu script. Autoload: PadNav.
 
 signal using_pad_changed(on: bool)
+signal touch_changed(on: bool)
 
 const AXIS_THRESHOLD := 0.55
 const POLL_INTERVAL := 0.12
 
 var using_pad := false
+var _touch_seen := false
+var _touch_effective := false
 var _poll := 0.0
 var _touched: Array = [] # Controls whose focus_mode we raised while on a pad
 
 func _ready():
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_touch_seen = DisplayServer.is_touchscreen_available() or "--touch" in OS.get_cmdline_user_args()
+	get_node("/root/GameSettings").changed.connect(_refresh_touch)
+	_refresh_touch.call_deferred()
+
+## Touch controls are shown when the player chose ON, or in AUTO once a finger has been seen
+## (and no real mouse since). Emulated mouse events from touches don't count as a mouse.
+func touch_on() -> bool:
+	var pref: int = get_node("/root/GameSettings").touch_pref
+	return pref == 1 or (pref == 0 and _touch_seen)
+
+## A finger was seen (called from here and from the overlay, which receives input first).
+func note_touch():
+	if not _touch_seen:
+		_touch_seen = true
+		_refresh_touch()
+	_set_pad(false)
+
+func _refresh_touch():
+	var now := touch_on()
+	if now != _touch_effective:
+		_touch_effective = now
+		touch_changed.emit(now)
 
 func _input(event: InputEvent):
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:
+		note_touch()
+		return
+	if _touch_seen and (event is InputEventMouseButton or event is InputEventMouseMotion) and event.device != InputEvent.DEVICE_ID_EMULATION:
+		_touch_seen = false
+		_refresh_touch()
 	if event is InputEventJoypadButton and event.pressed:
 		_set_pad(true)
 	elif event is InputEventJoypadMotion and absf(event.axis_value) > AXIS_THRESHOLD:
@@ -134,7 +165,12 @@ func _ensure_focus():
 
 ## Vibrates the active pad (no-op off a pad or when rumble is switched off).
 func rumble(weak: float, strong: float, seconds: float):
-	if not using_pad or not get_node("/root/GameSettings").rumble:
+	if not get_node("/root/GameSettings").rumble:
+		return
+	if touch_on():
+		Input.vibrate_handheld(int(seconds * 1000.0))
+		return
+	if not using_pad:
 		return
 	var pads := Input.get_connected_joypads()
 	if pads.is_empty():

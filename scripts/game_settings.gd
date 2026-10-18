@@ -35,7 +35,8 @@ var glow: float = 1.0           # 0..1.5, multiplier on bloom and glow sprites
 var shake: float = 1.0          # 0..1.5, multiplier on screen shake
 var reduced_flash: bool = false
 var palette: int = 0
-var rumble: bool = true         # controller vibration
+var rumble: bool = true         # controller / phone vibration
+var touch_pref: int = 0         # 0 auto, 1 always on, 2 off
 var hud_size: int = 0
 var bindings: Dictionary = {}   # action -> physical keycode (only overrides)
 
@@ -104,6 +105,10 @@ func set_hud_size(i: int):
 
 func set_rumble(on: bool):
 	rumble = on
+	_changed()
+
+func cycle_touch_pref():
+	touch_pref = (touch_pref + 1) % 3
 	_changed()
 
 func reset_display():
@@ -217,6 +222,7 @@ func save_settings():
 	cfg.set_value("display", "palette", palette)
 	cfg.set_value("display", "hud_size", hud_size)
 	cfg.set_value("controls", "rumble", rumble)
+	cfg.set_value("controls", "touch_pref", touch_pref)
 	for action in bindings:
 		cfg.set_value("keys", action, bindings[action])
 	cfg.save(PATH)
@@ -231,6 +237,7 @@ func load_settings():
 	palette = clampi(int(cfg.get_value("display", "palette", 0)), 0, PALETTES.size() - 1)
 	hud_size = clampi(int(cfg.get_value("display", "hud_size", 0)), 0, HUD_SIZES.size() - 1)
 	rumble = bool(cfg.get_value("controls", "rumble", true))
+	touch_pref = clampi(int(cfg.get_value("controls", "touch_pref", 0)), 0, 2)
 	bindings.clear()
 	if cfg.has_section("keys"):
 		for action in cfg.get_section_keys("keys"):
