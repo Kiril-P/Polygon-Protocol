@@ -13,6 +13,7 @@ var _shake_label: Label
 var _flash_btn: Button
 var _palette_btn: Button
 var _size_btn: Button
+var _rumble_btn: Button
 var _key_buttons: Dictionary = {}
 var _status: Label
 var _capturing: String = ""
@@ -103,6 +104,12 @@ func _build():
 		gs.set_hud_size(gs.hud_size + 1)
 		_refresh())
 	left.add_child(_size_btn)
+	_rumble_btn = _button("", func():
+		gs.set_rumble(not gs.rumble)
+		if gs.rumble:
+			get_node("/root/PadNav").rumble(0.7, 0.7, 0.25)
+		_refresh())
+	left.add_child(_rumble_btn)
 
 	# ---- Controls column
 	var right := VBoxContainer.new()
@@ -125,7 +132,7 @@ func _build():
 		right.add_child(row)
 		_key_buttons[action] = btn
 	_status = Label.new()
-	_status.text = "Click a key, then press the new one. ESC cancels."
+	_status.text = "Click a key, then press the new one. ESC cancels. Controller: stick / D-pad + A, B to close."
 	_status.add_theme_font_size_override("font_size", 15)
 	_status.add_theme_color_override("font_color", Color(0.6, 0.75, 0.9))
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -205,6 +212,7 @@ func _refresh():
 	_flash_btn.text = "REDUCED FLASH: " + ("ON" if gs.reduced_flash else "OFF")
 	_palette_btn.text = "COLOURS: " + gs.pal()["name"]
 	_size_btn.text = "HUD SIZE: " + gs.HUD_SIZES[gs.hud_size]["name"]
+	_rumble_btn.text = "CONTROLLER RUMBLE: " + ("ON" if gs.rumble else "OFF")
 	for action in _key_buttons:
 		var b: Button = _key_buttons[action]
 		b.text = "PRESS A KEY..." if _capturing == action else gs.key_name(action)
@@ -252,11 +260,13 @@ func _input(event: InputEvent):
 					_status.text = "That key is reserved."
 				_capturing = ""
 			_refresh()
-		elif event is InputEventMouseButton and event.pressed:
+		elif (event is InputEventMouseButton or event is InputEventJoypadButton) and event.pressed:
 			_capturing = ""
+			_status.text = "Cancelled."
 			_refresh()
 		return
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+	if (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE) \
+			or (event is InputEventJoypadButton and event.pressed and (event.button_index == JOY_BUTTON_B or event.button_index == JOY_BUTTON_START)):
 		get_viewport().set_input_as_handled()
 		close_menu()
 

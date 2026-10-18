@@ -35,6 +35,7 @@ var glow: float = 1.0           # 0..1.5, multiplier on bloom and glow sprites
 var shake: float = 1.0          # 0..1.5, multiplier on screen shake
 var reduced_flash: bool = false
 var palette: int = 0
+var rumble: bool = true         # controller vibration
 var hud_size: int = 0
 var bindings: Dictionary = {}   # action -> physical keycode (only overrides)
 
@@ -99,6 +100,10 @@ func set_palette(i: int):
 
 func set_hud_size(i: int):
 	hud_size = posmod(i, HUD_SIZES.size())
+	_changed()
+
+func set_rumble(on: bool):
+	rumble = on
 	_changed()
 
 func reset_display():
@@ -170,6 +175,38 @@ func apply_bindings():
 				var a := InputEventKey.new()
 				a.physical_keycode = alt as Key
 				InputMap.action_add_event(action, a)
+	apply_pad_bindings()
+
+## Controller mapping (not rebindable): left stick or D-pad to move, RT / RB / X to dash,
+## Start to pause. A stays free so it can confirm menus without also dashing.
+func apply_pad_bindings():
+	var motion := func(axis: JoyAxis, value: float) -> InputEventJoypadMotion:
+		var e := InputEventJoypadMotion.new()
+		e.device = -1 # any connected pad
+		e.axis = axis
+		e.axis_value = value
+		return e
+	var button := func(index: JoyButton) -> InputEventJoypadButton:
+		var e := InputEventJoypadButton.new()
+		e.device = -1
+		e.button_index = index
+		return e
+	var map := {
+		"move_left": [motion.call(JOY_AXIS_LEFT_X, -1.0), button.call(JOY_BUTTON_DPAD_LEFT)],
+		"move_right": [motion.call(JOY_AXIS_LEFT_X, 1.0), button.call(JOY_BUTTON_DPAD_RIGHT)],
+		"move_up": [motion.call(JOY_AXIS_LEFT_Y, -1.0), button.call(JOY_BUTTON_DPAD_UP)],
+		"move_down": [motion.call(JOY_AXIS_LEFT_Y, 1.0), button.call(JOY_BUTTON_DPAD_DOWN)],
+		"dash": [motion.call(JOY_AXIS_TRIGGER_RIGHT, 1.0), button.call(JOY_BUTTON_RIGHT_SHOULDER), button.call(JOY_BUTTON_X)],
+		# Menus: A confirms, B backs out (also pauses in a run), Start pauses
+		"ui_accept": [button.call(JOY_BUTTON_A)],
+		"ui_cancel": [button.call(JOY_BUTTON_START), button.call(JOY_BUTTON_B)],
+	}
+	for action in map:
+		if not InputMap.has_action(action):
+			continue
+		for ev in map[action]:
+			if not InputMap.action_has_event(action, ev):
+				InputMap.action_add_event(action, ev)
 
 # ------------------------------------------------------------------ persistence
 func save_settings():
@@ -179,6 +216,7 @@ func save_settings():
 	cfg.set_value("display", "reduced_flash", reduced_flash)
 	cfg.set_value("display", "palette", palette)
 	cfg.set_value("display", "hud_size", hud_size)
+	cfg.set_value("controls", "rumble", rumble)
 	for action in bindings:
 		cfg.set_value("keys", action, bindings[action])
 	cfg.save(PATH)
@@ -192,6 +230,7 @@ func load_settings():
 	reduced_flash = bool(cfg.get_value("display", "reduced_flash", false))
 	palette = clampi(int(cfg.get_value("display", "palette", 0)), 0, PALETTES.size() - 1)
 	hud_size = clampi(int(cfg.get_value("display", "hud_size", 0)), 0, HUD_SIZES.size() - 1)
+	rumble = bool(cfg.get_value("controls", "rumble", true))
 	bindings.clear()
 	if cfg.has_section("keys"):
 		for action in cfg.get_section_keys("keys"):

@@ -248,7 +248,7 @@ func show_full_tutorial():
 	canvas.add_child(label)
 	
 	var skip_label = Label.new()
-	skip_label.text = "[SPACE TO SKIP]"
+	skip_label.text = "[A TO SKIP]" if PadNav.using_pad else "[SPACE TO SKIP]"
 	skip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	skip_label.add_theme_font_size_override("font_size", 18)
 	skip_label.modulate.a = 0.5
@@ -261,8 +261,8 @@ func show_full_tutorial():
 	canvas.add_child(skip_label)
 	
 	var lines = [
-		"USE MOUSE TO MOVE" if use_mouse else "USE %s TO MOVE" % _move_keys_text(),
-		"DASH INTO ENEMIES TO KILL",
+		"USE LEFT STICK TO MOVE" if PadNav.using_pad else ("USE MOUSE TO MOVE" if use_mouse else "USE %s TO MOVE" % _move_keys_text()),
+		"HOLD RT TO DASH INTO ENEMIES" if PadNav.using_pad else "DASH INTO ENEMIES TO KILL",
 		"EVOLVE BEFORE YOU ARE OVERWHELMED"
 	]
 	
@@ -291,6 +291,8 @@ func show_full_tutorial():
 func _input(event):
 	if is_tutorial_active:
 		if event is InputEventKey and event.keycode == KEY_SPACE and event.pressed:
+			skip_tutorial()
+		elif event is InputEventJoypadButton and event.button_index == JOY_BUTTON_A and event.pressed:
 			skip_tutorial()
 	
 	# DEBUG KEYS
@@ -387,6 +389,7 @@ func _physics_process(delta: float):
 	if (Input.is_action_pressed("dash") or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)) and current_energy > 0:
 		if not is_dashing:
 			is_dashing = true
+			PadNav.rumble(0.25, 0.0, 0.12)
 			modulate = Color(1.2, 1.8, 2.0, 1.0) # Cyber Cyan
 			
 			# DASH IMPACT POLISH
@@ -1417,6 +1420,7 @@ func pause_game_fractured():
 	# Resume Button
 	var resume_btn = Button.new()
 	resume_btn.text = "RESUME"
+	resume_btn.set_meta("pad_default", true)
 	setup_btn.call(resume_btn, 32, canvas)
 	resume_btn.pressed.connect(toggle_pause)
 	menu_ui.add_child(resume_btn)
@@ -1549,6 +1553,7 @@ func take_damage(_amount: float, source: String = ""):
 		has_shield = false
 		shield_regen_timer = 0.0
 		AudioManager.play_sfx("shield_break")
+		PadNav.rumble(0.4, 0.5, 0.2)
 		if is_instance_valid(shield_node):
 			# Shatter effect
 			var shatter_tween = create_tween()
@@ -1572,6 +1577,7 @@ func take_damage(_amount: float, source: String = ""):
 	health_changed.emit(current_hearts, max_hearts)
 	
 	AudioManager.play_sfx("player_hit")
+	PadNav.rumble(0.6, 1.0, 0.3)
 	
 	add_shake(60.0) # Massive hit impact
 	

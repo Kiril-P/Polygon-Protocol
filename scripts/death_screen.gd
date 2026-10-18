@@ -138,6 +138,7 @@ func _show_death_screen(stats: Dictionary):
 	
 	visible = true
 	stats_label.visible = false
+	restart_btn.set_meta("pad_default", true)
 	_build_summary(stats)
 	total_shards_label.text = "TOTAL SHARDS: " + str(GlobalData.total_shards)
 
