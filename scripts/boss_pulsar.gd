@@ -88,6 +88,13 @@ func setup_arena_border():
 	border.points = pts
 	border.width = 15.0
 	border.default_color = Color(0, 1, 1, 0.6)
+	border.material = Neon.additive_material()
+	var rim := Line2D.new()
+	rim.points = pts
+	rim.width = 3.0
+	rim.default_color = border.default_color.lerp(Color.WHITE, 0.7)
+	rim.material = Neon.additive_material()
+	border.add_child(rim)
 	add_child(border)
 	
 	var static_body = StaticBody2D.new()
@@ -128,6 +135,7 @@ func setup_lasers():
 		var laser = Line2D.new()
 		laser.width = 4.0 
 		laser.default_color = Color(0, 1, 1, 0.2) # Transparent Cyan warning
+		laser.material = Neon.additive_material()
 		laser.points = PackedVector2Array([Vector2.ZERO, Vector2(border_radius, 0)])
 		add_child(laser)
 		laser_nodes.append(laser)
@@ -137,6 +145,7 @@ func setup_lasers():
 		core.name = "Core"
 		core.width = 1.0
 		core.default_color = Color(1, 1, 1, 0.1)
+		core.material = Neon.additive_material()
 		core.points = laser.points
 		laser.add_child(core)
 		
@@ -203,8 +212,9 @@ func setup_platforms():
 			Vector2(-width/2, thickness/2)
 		])
 		platform_poly.color = Color(0.0, 1.0, 0.5, 0.4) # Slightly more opaque
-		platform_poly.modulate = Color(1.2, 2.0, 1.5) # Neon Glow
 		platform.add_child(platform_poly)
+		Neon.apply(platform_poly, Color(0.1, 1.0, 0.55), 0.22, 3.0)
+		Neon.add_glow(platform, Color(0.1, 1.0, 0.55), 260.0, 0.2)
 		
 		# Inner "Battery" Core Visual
 		var core = Polygon2D.new()
@@ -214,7 +224,8 @@ func setup_platforms():
 			Vector2(width/2 - 15, 10),
 			Vector2(-width/2 + 15, 10)
 		])
-		core.color = Color(1, 1, 1, 0.8)
+		core.color = Color(0.7, 1.0, 0.85, 0.8)
+		core.material = Neon.additive_material()
 		platform.add_child(core)
 		
 		# Collision for the Area2D (Refueling/Shelter Detection)

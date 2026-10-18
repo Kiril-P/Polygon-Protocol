@@ -9,6 +9,9 @@ func _ready():
 	add_to_group("upgrade_ui")
 	visible = false
 	process_mode = PROCESS_MODE_ALWAYS
+	NeonUI.style_title(title, NeonUI.CYAN, 56)
+	NeonUI.pulse(title, 0.2, 1.8)
+	$Control/BG.color = Color(0.0, 0.01, 0.04, 0.82)
 	
 	var manager = UpgradeManager
 	if manager:

@@ -26,19 +26,10 @@ func setup_visuals():
 	])
 	poly.polygon = pts
 	poly.color = heart_color
-	# Calculate a glow version of the color
-	var glow_color = heart_color * 2.5
-	glow_color.a = 1.0
-	poly.modulate = glow_color
 	add_child(poly)
-	
-	# Add an outline to make it pop even more
-	var outline = Line2D.new()
-	outline.points = pts
-	outline.add_point(pts[0]) # Close the loop
-	outline.width = 2.0
-	outline.default_color = Color.BLACK
-	poly.add_child(outline)
+	# Hot neon rim and halo so the weak points read instantly
+	Neon.apply(poly, heart_color, 0.35, 2.5)
+	Neon.add_glow(self, heart_color, 120.0, 0.45)
 	
 	# Add a collision shape
 	var shape = CollisionShape2D.new()

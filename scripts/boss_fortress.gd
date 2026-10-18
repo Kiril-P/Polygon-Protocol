@@ -66,6 +66,13 @@ func setup_arena_border():
 	border.points = pts
 	border.width = 12.0 # Thicker neon border
 	border.default_color = Color(1.0, 0.2, 0.4, 0.8) # Neon Pink
+	border.material = Neon.additive_material()
+	var rim := Line2D.new()
+	rim.points = pts
+	rim.width = 3.0
+	rim.default_color = border.default_color.lerp(Color.WHITE, 0.7)
+	rim.material = Neon.additive_material()
+	border.add_child(rim)
 	add_child(border)
 	
 	# Physics Barrier: Use SegmentShapes for a guaranteed "wall"

@@ -45,6 +45,9 @@ func _ready():
 		target_scene_path = "res://scenes/main_menu.tscn"
 	
 	# Cyberpunk Styling
+	NeonUI.style_title($CenterContainer/VBoxContainer/Title, NeonUI.CYAN)
+	NeonUI.pulse($CenterContainer/VBoxContainer/Title, 0.2, 1.6)
+	NeonUI.style_bar(progress_bar, NeonUI.CYAN)
 	status_label.add_theme_color_override("font_color", Color(0, 1, 1)) # Cyan
 	tip_label.add_theme_color_override("font_color", Color(1, 0, 1)) # Magenta
 	

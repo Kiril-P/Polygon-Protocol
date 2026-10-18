@@ -10,6 +10,7 @@ var rotation_speed: float = 0.0
 @onready var poly: Polygon2D = $Polygon2D
 @onready var collision: CollisionShape2D = $CollisionShape2D
 var particles: CPUParticles2D
+var outline: Line2D
 
 func _ready():
 	# Randomized glitchy shape
@@ -22,6 +23,10 @@ func _ready():
 	poly.polygon = points
 	poly.color = Color(1.0, 0.0, 0.2, 0.0) # Transparent red
 	poly.scale = Vector2.ZERO
+	# Neon rim + halo; widths are tiny because the polygon is scaled up to ~150x
+	outline = Neon.apply(poly, Color(1.0, 0.1, 0.3), 0.3, 0.05)
+	Neon.add_glow(poly, Color(1.0, 0.1, 0.3), 3.8, 0.28)
+	poly.color.a = 0.0
 	
 	# Setup Particles
 	particles = CPUParticles2D.new()
@@ -73,6 +78,8 @@ func _process(delta: float):
 	for i in range(points.size()):
 		points[i] = points[i].move_toward(points[i].normalized() * (1.0 + randf_range(-0.1, 0.1)), 0.1)
 	poly.polygon = points
+	if outline:
+		outline.points = points
 	
 	# Damage logic
 	damage_timer -= delta

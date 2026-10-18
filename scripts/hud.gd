@@ -233,8 +233,7 @@ func setup_warning_label():
 	warn.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	warn.grow_vertical = Control.GROW_DIRECTION_BOTH
 	warn.add_theme_font_size_override("font_size", 48)
-	warn.add_theme_color_override("font_color", Color.RED)
-	warn.add_theme_constant_override("outline_size", 12)
+	NeonUI.style_title(warn, NeonUI.RED, 48)
 	warn.visible = false
 	$Control.add_child(warn)
 

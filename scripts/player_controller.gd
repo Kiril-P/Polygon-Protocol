@@ -229,9 +229,7 @@ func show_full_tutorial():
 	label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	label.grow_vertical = Control.GROW_DIRECTION_BOTH
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 48)
-	label.add_theme_color_override("font_outline_color", Color.BLACK)
-	label.add_theme_constant_override("outline_size", 12)
+	NeonUI.style_title(label, NeonUI.CYAN, 48)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.add_child(label)
 	
@@ -524,10 +522,7 @@ func show_banner(text: String, color: Color):
 	add_child(layer)
 	var label = Label.new()
 	label.text = text
-	label.add_theme_font_size_override("font_size", 48)
-	label.add_theme_color_override("font_color", color)
-	label.add_theme_color_override("font_outline_color", Color.BLACK)
-	label.add_theme_constant_override("outline_size", 12)
+	NeonUI.style_title(label, color, 48)
 	label.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	label.position.y = 140
@@ -1152,41 +1147,12 @@ func pause_game_fractured():
 	var label = Label.new()
 	label.text = "PAUSED"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 64)
-	label.add_theme_color_override("font_outline_color", Color.BLACK)
-	label.add_theme_constant_override("outline_size", 16)
+	NeonUI.style_title(label, NeonUI.CYAN, 64)
 	menu_ui.add_child(label)
 	
 	# Helper for styling buttons
 	var style_btn = func(btn: Button):
-		var normal = StyleBoxFlat.new()
-		normal.bg_color = Color(0.1, 0.1, 0.2, 0.6)
-		normal.border_width_left = 4
-		normal.border_color = Color(0.0, 0.8, 1.0, 0.6)
-		normal.corner_radius_top_left = 2
-		normal.corner_radius_bottom_right = 15
-		normal.content_margin_left = 20
-		normal.content_margin_right = 20
-		
-		var hover = normal.duplicate()
-		hover.bg_color = Color(0.2, 0.2, 0.4, 0.8)
-		hover.border_color = Color(0.0, 1.0, 1.0, 1.0)
-		hover.shadow_color = Color(0.0, 1.0, 1.0, 0.3)
-		hover.shadow_size = 10
-		
-		var style_pressed = hover.duplicate()
-		style_pressed.bg_color = Color(0.3, 0.1, 0.4, 0.9)
-		style_pressed.border_color = Color(1.0, 0.0, 1.0, 1.0)
-		
-		btn.add_theme_stylebox_override("normal", normal)
-		btn.add_theme_stylebox_override("hover", hover)
-		btn.add_theme_stylebox_override("pressed", style_pressed)
-		btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-		
-		btn.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
-		btn.add_theme_color_override("font_hover_color", Color.WHITE)
-		btn.add_theme_constant_override("outline_size", 4)
-		btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
+		NeonUI.style_button(btn)
 
 	var setup_btn = func(btn: Button, size: int, canvas_ref: CanvasLayer):
 		style_btn.call(btn)

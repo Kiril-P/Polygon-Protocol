@@ -71,38 +71,7 @@ func style_all_buttons():
 		style_menu_button(btn)
 
 func style_menu_button(btn: Button):
-	# Normal Style
-	var normal = StyleBoxFlat.new()
-	normal.bg_color = Color(0.02, 0.05, 0.12, 0.62)
-	normal.border_width_left = 5
-	normal.border_width_bottom = 2
-	normal.border_color = Color(0.0, 0.8, 1.0, 0.7) # Cyan edge
-	normal.corner_radius_top_left = 0
-	normal.corner_radius_bottom_right = 18
-	normal.content_margin_left = 20
-	
-	# Hover Style
-	var hover = normal.duplicate()
-	hover.bg_color = Color(0.04, 0.2, 0.3, 0.75)
-	hover.border_color = Color(0.4, 1.0, 1.0, 1.0) # Bright Cyan
-	hover.shadow_color = Color(0.0, 1.0, 1.0, 0.45)
-	hover.shadow_size = 18
-	
-	# Pressed Style
-	var style_pressed = hover.duplicate()
-	style_pressed.bg_color = Color(0.3, 0.1, 0.4, 0.8)
-	style_pressed.border_color = Color(1.0, 0.0, 1.0, 1.0) # Magenta flash
-	
-	btn.add_theme_stylebox_override("normal", normal)
-	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", style_pressed)
-	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	
-	# Text styling
-	btn.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
-	btn.add_theme_color_override("font_hover_color", Color.WHITE)
-	btn.add_theme_constant_override("outline_size", 4)
-	btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
+	NeonUI.style_button(btn)
 
 func setup_button_animations():
 	var buttons = [start_button, upgrade_button, options_button, quit_button]

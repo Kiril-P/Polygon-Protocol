@@ -18,39 +18,29 @@ func _ready():
 	
 	style_all_buttons()
 	setup_animations()
+	_decorate()
+
+func _decorate():
+	NeonUI.living_background(self, $Background)
+	NeonUI.style_title($UI/Title, NeonUI.CYAN)
+	NeonUI.pulse($UI/Title, 0.12, 2.6)
+	stats_panel.add_theme_stylebox_override("panel", NeonUI.panel_style(NeonUI.GOLD, 0.7, 2, 14, 6))
+	var edit := $UI/NameEntry/LineEdit as LineEdit
+	var field := NeonUI.panel_style(NeonUI.CYAN, 0.8, 2, 4, 3)
+	edit.add_theme_stylebox_override("normal", field)
+	edit.add_theme_stylebox_override("focus", NeonUI.panel_style(NeonUI.CYAN, 0.9, 2, 14, 3))
+	edit.add_theme_color_override("font_color", Color.WHITE)
+	edit.add_theme_color_override("caret_color", NeonUI.CYAN)
+	NeonUI.style_title($UI/NameEntry/Label, NeonUI.CYAN, -1)
+	$UI/NameEntry/Label.add_theme_constant_override("outline_size", 3)
+	$UI/NameEntry/Label.add_theme_constant_override("shadow_outline_size", 8)
 
 func style_all_buttons():
 	for btn in [back_button, save_button]:
 		style_menu_button(btn)
 
 func style_menu_button(btn: Button):
-	var normal = StyleBoxFlat.new()
-	normal.bg_color = Color(0.1, 0.1, 0.2, 0.6)
-	normal.border_width_left = 4
-	normal.border_color = Color(0.0, 0.8, 1.0, 0.6)
-	normal.corner_radius_top_left = 2
-	normal.corner_radius_bottom_right = 15
-	normal.content_margin_left = 20
-	
-	var hover = normal.duplicate()
-	hover.bg_color = Color(0.2, 0.2, 0.4, 0.8)
-	hover.border_color = Color(0.0, 1.0, 1.0, 1.0)
-	hover.shadow_color = Color(0.0, 1.0, 1.0, 0.3)
-	hover.shadow_size = 10
-	
-	var style_pressed = hover.duplicate()
-	style_pressed.bg_color = Color(0.3, 0.1, 0.4, 0.9)
-	style_pressed.border_color = Color(1.0, 0.0, 1.0, 1.0)
-	
-	btn.add_theme_stylebox_override("normal", normal)
-	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", style_pressed)
-	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	
-	btn.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
-	btn.add_theme_color_override("font_hover_color", Color.WHITE)
-	btn.add_theme_constant_override("outline_size", 4)
-	btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
+	NeonUI.style_button(btn)
 
 func setup_animations():
 	for btn in [back_button, save_button]:

@@ -5,39 +5,47 @@ extends Button
 
 func setup(upgrade_data: Dictionary):
 	var is_special = upgrade_data.get("is_special", false)
+	var accent: Color = NeonUI.GOLD if is_special else NeonUI.CYAN
 	
 	if has_node("VBoxContainer/Title"):
 		$VBoxContainer/Title.text = upgrade_data["name"]
+		NeonUI.style_title($VBoxContainer/Title, accent)
+		$VBoxContainer/Title.add_theme_constant_override("outline_size", 4)
+		$VBoxContainer/Title.add_theme_constant_override("shadow_outline_size", 12)
 		if is_special:
-			$VBoxContainer/Title.modulate = Color(1.0, 0.8, 0.0) # Gold for special
 			$VBoxContainer/Title.add_theme_font_size_override("font_size", 28)
-		else:
-			$VBoxContainer/Title.modulate = Color(0.0, 0.8, 1.0) # Palette Cyan
 		
 	if has_node("VBoxContainer/Description"):
 		$VBoxContainer/Description.text = upgrade_data["description"]
-		$VBoxContainer/Description.modulate = Color(0.8, 0.8, 0.8) # Palette Grey
+		$VBoxContainer/Description.modulate = Color(0.82, 0.88, 0.95)
 	
 	if has_node("VBoxContainer/Icon") and upgrade_data.has("icon"):
 		var icon_rect = $VBoxContainer/Icon
 		if icon_rect is TextureRect:
 			icon_rect.texture = load(upgrade_data["icon"])
-			# Make icons pop a bit
+			# Tint stays under the bloom threshold so the rune remains legible
+			icon_rect.modulate = accent * Color(0.75, 0.75, 0.75, 1.0)
 			if is_special:
-				icon_rect.modulate = Color(1.5, 1.2, 0.5) # Glowing gold icon
 				icon_rect.custom_minimum_size = Vector2(180, 180)
-			else:
-				icon_rect.modulate = Color(0.5, 1.0, 1.0) # Palette Light Cyan
+			NeonUI.add_halo(icon_rect, accent, 0.45, 44.0)
 	
 	if is_special:
 		custom_minimum_size = Vector2(300, 450) # Larger button
-		if has_node("BG/Border"):
-			$BG/Border.border_color = Color(1.0, 0.8, 0.0) # Gold border
-			$BG/Border.border_width = 6.0
-		if has_node("BG"):
-			$BG.color = Color(0.2, 0.15, 0.05, 0.8) # Darker gold/bronze bg
 	
+	# Neon card replaces the old flat ColorRect background
+	flat = false
+	if has_node("BG"):
+		$BG.visible = false
+	for sep_name in ["HSeparator", "HSeparator2"]:
+		var sep := get_node_or_null("VBoxContainer/" + sep_name) as HSeparator
+		if sep:
+			var line := StyleBoxFlat.new()
+			line.bg_color = Color(accent.r, accent.g, accent.b, 0.55)
+			line.content_margin_top = 1
+			line.content_margin_bottom = 1
+			sep.add_theme_stylebox_override("separator", line)
 	style_menu_button(self, is_special)
+	NeonUI.add_halo(self, accent, 0.10, 26.0)
 	
 	# Clear the default button text as we use the container labels now
 	text = ""
@@ -60,26 +68,17 @@ func _on_button_up():
 	scale = Vector2(1.1, 1.1)
 
 func style_menu_button(btn: Button, is_special: bool):
-	var normal = StyleBoxFlat.new()
-	normal.bg_color = Color(0.1, 0.1, 0.2, 0.6) if not is_special else Color(0.2, 0.15, 0.05, 0.8)
-	normal.border_width_left = 4
-	normal.border_color = Color(0.0, 0.8, 1.0, 0.6) if not is_special else Color(1.0, 0.8, 0.0, 0.8)
-	normal.corner_radius_top_left = 2
-	normal.corner_radius_bottom_right = 15
-	
-	var hover = normal.duplicate()
-	hover.bg_color = Color(0.2, 0.2, 0.4, 0.8) if not is_special else Color(0.3, 0.2, 0.1, 0.9)
-	hover.border_color = Color(0.0, 1.0, 1.0, 1.0) if not is_special else Color(1.0, 1.0, 0.5, 1.0)
-	hover.shadow_color = Color(0.0, 1.0, 1.0, 0.2) if not is_special else Color(1.0, 0.8, 0.0, 0.2)
-	hover.shadow_size = 8
-	
-	var style_pressed = hover.duplicate()
-	style_pressed.bg_color = Color(0.3, 0.1, 0.4, 0.9)
-	style_pressed.border_color = Color(1.0, 0.0, 1.0, 1.0)
-	
+	var accent: Color = NeonUI.GOLD if is_special else NeonUI.CYAN
+	var normal := NeonUI.panel_style(accent, 0.8, 2, 8, 6)
+	normal.border_color = Color(accent.r, accent.g, accent.b, 0.8)
+	var hover := NeonUI.panel_style(accent, 0.9, 3, 22, 6)
+	hover.border_color = accent.lerp(Color.WHITE, 0.55)
+	var pressed := hover.duplicate() as StyleBoxFlat
+	pressed.border_color = NeonUI.MAGENTA.lerp(Color.WHITE, 0.3)
+	pressed.shadow_color = Color(NeonUI.MAGENTA.r, NeonUI.MAGENTA.g, NeonUI.MAGENTA.b, 0.5)
 	btn.add_theme_stylebox_override("normal", normal)
 	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", style_pressed)
+	btn.add_theme_stylebox_override("pressed", pressed)
 	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 
 func _on_mouse_entered():

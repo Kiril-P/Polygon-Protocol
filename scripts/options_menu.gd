@@ -17,6 +17,7 @@ func _ready():
 	setup_difficulty_selector()
 	setup_button_animations()
 	style_all_buttons()
+	_decorate()
 	
 	# Connect slider signals
 	if master_slider: master_slider.value_changed.connect(_on_master_volume_changed)
@@ -25,6 +26,17 @@ func _ready():
 	
 	is_setting_up = false
 
+func _decorate():
+	var panel := $CenterContainer/PanelContainer as PanelContainer
+	panel.add_theme_stylebox_override("panel", NeonUI.panel_style(NeonUI.CYAN, 0.82, 2, 24, 8))
+	var title := %BackButton.get_parent().get_node("Title") as Label
+	NeonUI.style_title(title, NeonUI.CYAN)
+	for s in [master_slider, music_slider, sfx_slider]:
+		if s: NeonUI.style_slider(s)
+	for l in find_children("Label", "Label", true, false):
+		if l != title:
+			l.add_theme_color_override("font_color", Color(0.75, 0.92, 1.0))
+
 func style_all_buttons():
 	var btns = [mouse_controls_btn, tutorial_btn, back_button]
 	for btn in btns:
@@ -32,33 +44,7 @@ func style_all_buttons():
 		style_menu_button(btn)
 
 func style_menu_button(btn: Button):
-	var normal = StyleBoxFlat.new()
-	normal.bg_color = Color(0.1, 0.1, 0.2, 0.6)
-	normal.border_width_left = 4
-	normal.border_color = Color(0.0, 0.8, 1.0, 0.6)
-	normal.corner_radius_top_left = 2
-	normal.corner_radius_bottom_right = 15
-	normal.content_margin_left = 20
-	
-	var hover = normal.duplicate()
-	hover.bg_color = Color(0.2, 0.2, 0.4, 0.8)
-	hover.border_color = Color(0.0, 1.0, 1.0, 1.0)
-	hover.shadow_color = Color(0.0, 1.0, 1.0, 0.3)
-	hover.shadow_size = 10
-	
-	var style_pressed = hover.duplicate()
-	style_pressed.bg_color = Color(0.3, 0.1, 0.4, 0.9)
-	style_pressed.border_color = Color(1.0, 0.0, 1.0, 1.0)
-	
-	btn.add_theme_stylebox_override("normal", normal)
-	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", style_pressed)
-	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	
-	btn.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
-	btn.add_theme_color_override("font_hover_color", Color.WHITE)
-	btn.add_theme_constant_override("outline_size", 4)
-	btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
+	NeonUI.style_button(btn)
 
 func setup_initial_values():
 	var gd = GlobalData

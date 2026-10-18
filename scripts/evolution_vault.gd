@@ -26,6 +26,13 @@ func _ready():
 	modulate.a = 0
 	create_tween().tween_property(self, "modulate:a", 1.0, 0.5)
 	style_back_button()
+	style_header()
+
+func style_header():
+	NeonUI.style_title($UI/TitleLabel, NeonUI.CYAN)
+	NeonUI.style_title(shard_label, NeonUI.GOLD, -1)
+	shard_label.add_theme_constant_override("shadow_outline_size", 12)
+	NeonUI.pulse($UI/TitleLabel, 0.15, 2.4)
 
 func style_back_button():
 	var back_btn = $UI/TopBar/BackButton # Assuming this is the path
@@ -34,33 +41,7 @@ func style_back_button():
 	setup_button_animations(back_btn)
 
 func style_menu_button(btn: Button):
-	var normal = StyleBoxFlat.new()
-	normal.bg_color = Color(0.1, 0.1, 0.2, 0.6)
-	normal.border_width_left = 4
-	normal.border_color = Color(0.0, 0.8, 1.0, 0.6)
-	normal.corner_radius_top_left = 2
-	normal.corner_radius_bottom_right = 15
-	normal.content_margin_left = 20
-	
-	var hover = normal.duplicate()
-	hover.bg_color = Color(0.2, 0.2, 0.4, 0.8)
-	hover.border_color = Color(0.0, 1.0, 1.0, 1.0)
-	hover.shadow_color = Color(0.0, 1.0, 1.0, 0.3)
-	hover.shadow_size = 10
-	
-	var style_pressed = hover.duplicate()
-	style_pressed.bg_color = Color(0.3, 0.1, 0.4, 0.9)
-	style_pressed.border_color = Color(1.0, 0.0, 1.0, 1.0)
-	
-	btn.add_theme_stylebox_override("normal", normal)
-	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", style_pressed)
-	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	
-	btn.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
-	btn.add_theme_color_override("font_hover_color", Color.WHITE)
-	btn.add_theme_constant_override("outline_size", 4)
-	btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
+	NeonUI.style_button(btn)
 
 func setup_button_animations(btn: Button):
 	btn.pivot_offset = btn.size / 2
@@ -88,29 +69,7 @@ func setup_button_animations(btn: Button):
 	)
 
 func setup_background():
-	# Create a techy/grid background
-	var bg_rect = ColorRect.new()
-	bg_rect.color = Color(0.05, 0.05, 0.1) # Deep space blue
-	bg_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-	background.add_child(bg_rect)
-	
-	var screen_size = get_viewport_rect().size
-	
-	# Add some "floating" particles for vibe
-	var particles = CPUParticles2D.new()
-	background.add_child(particles)
-	particles.position = screen_size / 2
-	particles.amount = 50
-	particles.lifetime = 10.0
-	particles.preprocess = 5.0
-	particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	particles.emission_rect_extents = screen_size / 2
-	particles.gravity = Vector2.ZERO
-	particles.initial_velocity_min = 5.0
-	particles.initial_velocity_max = 15.0
-	particles.scale_amount_min = 1.0
-	particles.scale_amount_max = 3.0
-	particles.color = Color(0.0, 0.8, 1.0, 0.2) # Dim Cyan dots
+	NeonUI.living_background(self, background)
 
 func update_ui():
 	var total = GlobalData.total_shards
@@ -131,18 +90,14 @@ func create_card(data, gd):
 	var panel = PanelContainer.new()
 	panel.custom_minimum_size = Vector2(250, 300)
 	
-	# Style the card
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.1, 0.15, 0.8)
-	style.border_width_left = 2
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 2
-	style.border_color = Color(0.2, 0.6, 1.0, 0.5)
-	style.corner_radius_top_left = 10
-	style.corner_radius_top_right = 10
-	style.corner_radius_bottom_left = 10
-	style.corner_radius_bottom_right = 10
+	# Style the card: colour reflects state (owned/active, disabled, affordable, too expensive)
+	var owned_now: bool = gd.has_upgrade(data["id"])
+	var card_color := NeonUI.CYAN
+	if owned_now:
+		card_color = NeonUI.GREEN if gd.is_upgrade_active(data["id"]) else NeonUI.RED
+	elif gd.total_shards >= data["cost"]:
+		card_color = NeonUI.GOLD
+	var style := NeonUI.panel_style(card_color, 0.78, 2, 12, 6)
 	panel.add_theme_stylebox_override("panel", style)
 	
 	var v = VBoxContainer.new()
@@ -155,14 +110,19 @@ func create_card(data, gd):
 	icon.texture = load(data["icon"])
 	icon.custom_minimum_size = Vector2(64, 64)
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.modulate = Color(0.0, 0.8, 1.0)
+	icon.custom_minimum_size = Vector2(72, 72)
+	icon.modulate = card_color * Color(0.7, 0.7, 0.7, 1.0) # Keep below bloom clipping so the rune stays readable
 	v.add_child(icon)
+	NeonUI.add_halo(icon, card_color, 0.5, 38.0)
 	
 	# Title
 	var title = Label.new()
 	title.text = data["name"]
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 20)
+	NeonUI.style_title(title, card_color)
+	title.add_theme_constant_override("outline_size", 4)
+	title.add_theme_constant_override("shadow_outline_size", 10)
 	v.add_child(title)
 	
 	# Desc
@@ -183,10 +143,8 @@ func create_card(data, gd):
 	if owned:
 		if active:
 			btn.text = "ACTIVE"
-			style.border_color = Color(0.0, 1.0, 0.5, 0.8) # Green glow for active
 		else:
 			btn.text = "DISABLED"
-			style.border_color = Color(1.0, 0.2, 0.2, 0.8) # Red glow for disabled
 			panel.modulate.a = 0.7
 	elif data["id"] == "shield_regen" and not gd.has_upgrade("energy_shield"):
 		btn.text = "LOCKED"
@@ -196,7 +154,7 @@ func create_card(data, gd):
 		btn.text = str(data["cost"]) + " SHARDS"
 		btn.disabled = not can_afford
 	
-	style_menu_button(btn)
+	NeonUI.style_button(btn, card_color)
 	setup_button_animations(btn)
 	
 	btn.pressed.connect(func():
