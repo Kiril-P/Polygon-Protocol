@@ -412,7 +412,7 @@ func check_laser_collision(laser: Line2D):
 		var closest_point = laser_dir * projection
 		if player.global_position.distance_to(global_position + closest_point) < 35.0:
 			if player.has_method("take_damage"):
-				player.take_damage(1)
+				player.take_damage(1, "PULSAR")
 
 func remove_one_platform():
 	if platform_nodes.is_empty(): return

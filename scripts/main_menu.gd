@@ -36,6 +36,21 @@ func _ready():
 	style_all_buttons()
 	animate_splash_text()
 	add_controls_hint()
+	_play_title_sequence()
+
+## Opening title, once per launch. The menu buttons fade in as the sequence ends.
+func _play_title_sequence():
+	var gd = GlobalData
+	if gd.title_seen:
+		return
+	gd.title_seen = true
+	var ui: Control = $VBoxContainer
+	ui.modulate.a = 0.0
+	var seq := TitleSequence.new()
+	add_child(seq)
+	seq.finished.connect(func():
+		var t := create_tween()
+		t.tween_property(ui, "modulate:a", 1.0, 0.35))
 
 func add_controls_hint():
 	var hint = Label.new()
@@ -331,7 +346,7 @@ func _start_game(is_quick: bool):
 	tween.tween_callback(func():
 		AudioManager.set_music_menu_mode(false)
 		GlobalData.next_scene_path = "res://scenes/game.tscn"
-		get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
+		Transition.go("res://scenes/loading_screen.tscn")
 	)
 
 func _on_upgrade_button_pressed():
@@ -342,7 +357,7 @@ func _on_upgrade_button_pressed():
 	t.set_parallel(false)
 	t.tween_callback(func():
 		GlobalData.next_scene_path = "res://scenes/evolution_vault.tscn"
-		get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
+		Transition.go("res://scenes/loading_screen.tscn")
 	)
 
 func _on_leaderboard_pressed():
@@ -378,7 +393,7 @@ func _on_leaderboard_pressed():
 	tween.set_parallel(false)
 	tween.tween_callback(func():
 		GlobalData.next_scene_path = "res://scenes/leaderboard.tscn"
-		get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
+		Transition.go("res://scenes/loading_screen.tscn")
 	)
 
 func _on_options_button_pressed():

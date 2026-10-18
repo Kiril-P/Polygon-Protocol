@@ -69,7 +69,7 @@ func explode():
 	is_dying = true
 	
 	if player and global_position.distance_to(player.global_position) < 80.0 and player.has_method("take_damage"):
-		player.take_damage(1) # 1 heart
+		player.take_damage(1, "KAMIKAZE") # 1 heart
 	
 	AudioManager.play_sfx("bullet_explosion")
 	spawn_death_particles()

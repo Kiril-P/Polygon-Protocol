@@ -52,6 +52,15 @@ func _process(delta: float):
 	if heal_block > 0.0:
 		heal_block = maxf(heal_block - delta, 0.0)
 
+## Short name for the run summary ("terminated by ...").
+func display_name() -> String:
+	if enemy_id == "healer":
+		return "MENDER"
+	if enemy_id != "":
+		return enemy_id.to_upper()
+	var base: String = get_script().resource_path.get_file().get_basename().replace("enemy_", "")
+	return "CHASER" if base == "enemy" or base == "" else base.to_upper()
+
 ## Restores up to `amount` health (never above max). Returns what was actually healed.
 func heal(amount: float) -> float:
 	if is_dying or heal_block > 0.0 or max_health <= 0.0 or health >= max_health:
@@ -149,6 +158,7 @@ func fire_bullet(dir: Vector2, bullet_speed: float, bullet_damage: float, color:
 	bullet.speed = bullet_speed
 	bullet.damage = bullet_damage
 	bullet.add_to_group("enemy_bullets")
+	bullet.set_meta("source", display_name())
 	# Only collide with world (layer 1) and player (layer 2)
 	bullet.collision_mask = 0
 	bullet.set_collision_mask_value(1, true)

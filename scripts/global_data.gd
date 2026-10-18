@@ -40,6 +40,12 @@ var player_name: String = "Player"
 var player_id: String = "" # Unique ID to identify the local player's entry
 
 var seen_intel: Array = [] # Enemy types whose intro card was shown (never shown twice)
+# Personal records over all runs (separate from the best-score run kept in high_score_*)
+var records := {"score": 0, "time": 0.0, "kills": 0, "level": 1, "combo": 0}
+var daily_submit_state: String = "" # "", "pending", "ok", "failed" for the run just played
+## The trailer capture sets this so scripted footage never touches the real save.
+var saving_disabled: bool = false
+var title_seen: bool = false # Opening title plays once per launch (not saved)
 # --- Run setup (protocols / daily). run_* is per run, the rest is saved.
 var run_mode: String = "standard" # "standard" or "daily"
 var run_protocols: Array = []
@@ -68,6 +74,16 @@ func set_run(mode: String, protocols: Array):
 		last_protocols = run_protocols.duplicate()
 		save_game()
 
+## Folds a finished run into the records. Returns the list of record keys it broke.
+func update_records(run: Dictionary) -> Array:
+	var broken: Array = []
+	for k in records.keys():
+		if run.has(k) and run[k] > records[k]:
+			records[k] = run[k]
+			broken.append(k)
+	save_game()
+	return broken
+
 ## Called when a run ends. Returns {daily_best: bool, streak: int} (empty for standard runs).
 func record_daily_result(score: int) -> Dictionary:
 	if run_mode != "daily":
@@ -91,6 +107,7 @@ func submit_daily_score(score: int, kills: int, level: int, time: float):
 	if run_mode != "daily" or _daily_submit_open:
 		return
 	_daily_submit_open = true
+	daily_submit_state = "pending"
 	var key := run_daily_key
 	var sw := get_node_or_null("/root/SilentWolf")
 	if sw == null or not online_submit_enabled:
@@ -105,6 +122,7 @@ func _finish_daily_submit(success: bool):
 	if not _daily_submit_open:
 		return
 	_daily_submit_open = false
+	daily_submit_state = "ok" if success else "failed"
 	daily_submit_finished.emit(success)
 
 var deactivated_upgrades = [] # IDs of upgrades the player turned off
@@ -200,6 +218,8 @@ func update_leaderboard(p_name: String, score: int, kills: int, level: int, time
 	save_game()
 
 func save_game():
+	if saving_disabled:
+		return
 	var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file:
 		var data = {
@@ -214,6 +234,7 @@ func save_game():
 			"deactivated_upgrades": deactivated_upgrades,
 			"seen_intel": seen_intel,
 			"last_protocols": last_protocols,
+			"records": records,
 			"daily_best_key": daily_best_key,
 			"daily_best_score": daily_best_score,
 			"daily_streak": daily_streak,
@@ -254,6 +275,7 @@ func load_game():
 				deactivated_upgrades = data.get("deactivated_upgrades", [])
 				seen_intel = data.get("seen_intel", [])
 				last_protocols = data.get("last_protocols", [])
+				records = data.get("records", {"score": high_score_points, "time": high_score, "kills": best_kills, "level": best_level, "combo": 0})
 				daily_best_key = data.get("daily_best_key", "")
 				daily_best_score = data.get("daily_best_score", 0)
 				daily_streak = data.get("daily_streak", 0)
