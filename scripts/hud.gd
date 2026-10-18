@@ -153,6 +153,23 @@ func setup_top_bar():
 	level_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	level_label.add_theme_constant_override("outline_size", 6)
 	level_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0))
+	_add_protocol_chip()
+
+## Reminder under the level counter of the protocols this run is played with.
+func _add_protocol_chip():
+	var gd = GlobalData
+	if gd.run_protocols.is_empty() and gd.run_mode != "daily":
+		return
+	var chip := Label.new()
+	chip.name = "ProtocolChip"
+	var head: String = ("DAILY " + gd.run_daily_key.substr(5) + "  ") if gd.run_mode == "daily" else ""
+	chip.text = "%s%s  x%.2f" % [head, Protocols.names(gd.run_protocols), gd.protocol_multiplier()]
+	chip.position = Vector2(24, 46)
+	chip.add_theme_font_size_override("font_size", 15)
+	chip.add_theme_color_override("font_color", NeonUI.GOLD.lerp(Color.WHITE, 0.3))
+	chip.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	chip.add_theme_constant_override("outline_size", 5)
+	$Control.add_child(chip)
 
 func setup_dash_overlay():
 	var overlay = ColorRect.new()

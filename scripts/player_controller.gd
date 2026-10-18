@@ -149,6 +149,8 @@ func _ready():
 	if GlobalData.is_upgrade_active("dash_mastery"):
 		energy_consumption *= 0.75 # 25% reduction
 	
+	_apply_protocols()
+	
 	# Intro Particle Burst
 	spawn_intro_particles()
 	AudioManager.play_sfx("player_spawn")
@@ -1692,6 +1694,20 @@ func update_health_visuals():
 	if current_hearts > 1:
 		sprite.modulate.a = 1.0
 
+## Run modifiers chosen on the pre-run screen (see Protocols).
+func _apply_protocols():
+	var gd = GlobalData
+	if gd.protocol_active("glass"):
+		max_hearts = 2
+		current_hearts = 2
+		damage_multiplier += 0.5
+		health_changed.emit(current_hearts, max_hearts)
+		update_health_visuals()
+	if gd.protocol_active("low_power"):
+		max_energy *= 0.6
+		current_energy = max_energy
+		energy_changed.emit(current_energy, max_energy)
+
 func die():
 	if is_dead: return
 	is_dead = true
@@ -1712,6 +1728,7 @@ func die():
 	gd.run_time = spawner.time_passed if spawner else 0.0
 	if gd.has_upgrade("shard_multiplier"):
 		shards_earned = int(shards_earned * 1.5)
+	shards_earned = int(shards_earned * gd.protocol_multiplier())
 		
 	gd.add_shards(shards_earned)
 	if gd.run_score > gd.high_score_points:
@@ -1720,6 +1737,9 @@ func die():
 		gd.best_level = gd.run_level
 		gd.high_score = time_survived
 	gd.save_game()
+	var daily: Dictionary = gd.record_daily_result(gd.run_score)
+	if gd.run_mode == "daily":
+		gd.submit_daily_score(gd.run_score, gd.run_kills, gd.run_level, time_survived)
 
 	# Play SFX
 	AudioManager.set_low_health(false)
@@ -1733,7 +1753,8 @@ func die():
 		"level": level,
 		"shards": shards_earned,
 		"highest_combo": highest_combo_run,
-		"time": spawner.time_passed if spawner else 0.0
+		"time": spawner.time_passed if spawner else 0.0,
+		"daily": daily
 	})
 	
 	# Pause the game instead of reloading

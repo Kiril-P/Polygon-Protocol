@@ -276,7 +276,13 @@ func spawn_menu_bullet(pos: Vector2, rot: float, col: Color):
 	tween.tween_callback(bullet.queue_free)
 
 func _on_start_button_pressed():
-	_start_game(false)
+	var gd = GlobalData
+	# First run: straight in. Afterwards pick a protocol (or today's daily) before deploying.
+	if gd.is_first_run:
+		gd.set_run("standard", [])
+		_start_game(false)
+		return
+	ProtocolMenu.open(self, func(): _start_game(false))
 
 func _start_game(is_quick: bool):
 	# Cool "Warp" Animation

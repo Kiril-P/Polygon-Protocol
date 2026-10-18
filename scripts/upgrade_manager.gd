@@ -259,6 +259,8 @@ func get_random_upgrades(count: int = 3) -> Array:
 			continue
 		if upgrade.has("counters") and not upgrade["counters"] in seen_enemies:
 			continue
+		if upgrade["id"] == "heal" and GlobalData.protocol_active("no_repairs"):
+			continue
 		if upgrade.get("needs_missing_heart", false) and player and player.current_hearts >= player.max_hearts:
 			continue
 
