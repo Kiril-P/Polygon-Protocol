@@ -57,8 +57,11 @@ func setup_visuals():
 		var angle = (TAU / 32.0) * i
 		pts.append(Vector2(100, 0).rotated(angle))
 	poly.polygon = pts
-	poly.color = Color(0.05, 0.05, 0.1) # Dark Void
-	poly.modulate = Color(0, 1.5, 2.0) # Neon Cyan Glow
+	poly.color = Color(0.0, 0.9, 1.0)
+	poly.modulate = Color.WHITE
+	Neon.apply(poly, Color(0.0, 0.9, 1.0), 0.08, 7.0) # Dark void, cyan outline
+	Neon.add_glow(self, Color(0.0, 0.9, 1.0), 640.0, 0.2)
+	VFX.shockwave(global_position, 2.0, Color(0.0, 0.9, 1.0), 560.0)
 	
 	# Pupils/Inner Core
 	var inner = Polygon2D.new()
@@ -66,8 +69,9 @@ func setup_visuals():
 	for i in range(16):
 		in_pts.append(Vector2(40, 0).rotated((TAU / 16.0) * i))
 	inner.polygon = in_pts
-	inner.color = Color(1, 1, 1)
+	inner.color = Color(0.7, 1.0, 1.0)
 	poly.add_child(inner)
+	Neon.apply(inner, Color(0.7, 1.0, 1.0), 0.9, 3.0)
 
 func setup_arena_border():
 	# If another boss already has an arena, don't create a second one
@@ -436,7 +440,7 @@ func take_damage(amount: float):
 	# Visual Flash
 	var t = create_tween()
 	poly.modulate = Color(5, 5, 5, 1)
-	var target_col = Color(0, 1.5, 2.0, 1.0) if phase < 3 else Color(2.0, 0.0, 5.0, 1.0)
+	var target_col = Color.WHITE
 	t.tween_property(poly, "modulate", target_col, 0.1)
 	
 	# Phase Transitions based on health (each set of 3 hearts is 1/3 of max health)
@@ -458,7 +462,9 @@ func take_damage(amount: float):
 	elif health_percent < 0.34 and phase == 2:
 		phase = 3
 		laser_speed *= 1.2
-		poly.color = Color(0.1, 0.0, 0.2) # Deep Purple Void
+		Neon.apply(poly, Color(0.85, 0.2, 1.0), 0.08, 7.0) # Deep purple void
+		VFX.shockwave(global_position, 2.6, Color(0.85, 0.2, 1.0), 700.0)
+		PostFX.kick(0.01)
 		setup_lasers()
 		remove_one_platform() # Second platform gone
 		AudioManager.play_sfx("boss_spawn", 1.5)
@@ -506,7 +512,7 @@ func start_death_sequence():
 			poly.modulate = Color(15, 15, 15, 1) # Super white flash
 		)
 		death_tween.tween_interval(0.08)
-		death_tween.tween_property(poly, "modulate", Color(0, 1.5, 2.0, 1.0), 0.04)
+		death_tween.tween_property(poly, "modulate", Color.WHITE, 0.04)
 	
 	# 4. Final massive explosion and reward
 	death_tween.tween_callback(die)
@@ -541,6 +547,10 @@ func die():
 	
 	# Big explosion particles
 	spawn_death_particles()
+	VFX.death_burst(global_position, Color(0.0, 0.9, 1.0), 3.0)
+	VFX.shockwave(global_position, 3.0, Color(0.3, 1.0, 1.0), 1000.0)
+	VFX.hit_stop(0.15)
+	PostFX.kick(0.014)
 	
 	# Rewards
 	if player:

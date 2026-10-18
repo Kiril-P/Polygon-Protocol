@@ -92,6 +92,12 @@ func _ready():
 	if dash_bar:
 		style_neon_bar(dash_bar, Color(0.0, 0.8, 1.0)) # Neon Cyan
 		
+	# Corner brackets framing the playfield
+	var frame := Control.new()
+	frame.set_script(load("res://scripts/hud_frame.gd"))
+	$Control.add_child(frame)
+	$Control.move_child(frame, 0)
+	
 	# Setup Arena Border
 	setup_arena_border()
 	
@@ -416,32 +422,26 @@ func trigger_intro_fade():
 		cam.zoom = original_zoom * 0.5
 		create_tween().tween_property(cam, "zoom", original_zoom, 1.0).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
 
-func _on_player_health_changed(current_health: int, _max_health: int):
-	# Update hearts
-	if heart_container:
-		# Clear existing hearts
-		for child in heart_container.get_children():
-			child.queue_free()
-		
-		# Only add as many hearts as the player currently has
-		for i in range(current_health):
-			var heart = TextureRect.new()
-			# Use the rune icon for the heart visual
-			heart.texture = load("res://assets/kenney_rune-pack/PNG/Blue/Tile (outline)/runeBlue_tileOutline_007.png")
-			heart.custom_minimum_size = Vector2(32, 32)
-			heart.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			heart.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			
-			# Neon Red Glow for active hearts
-			heart.modulate = Color(2.5, 0.2, 0.2)
-			
-			# Add a simple pulsing animation
-			var t_heart_pulse = heart.create_tween().set_loops().bind_node(heart)
-			t_heart_pulse.tween_property(heart, "scale", Vector2(1.1, 1.1), 0.6).set_trans(Tween.TRANS_SINE)
-			t_heart_pulse.tween_property(heart, "scale", Vector2(1.0, 1.0), 0.6).set_trans(Tween.TRANS_SINE)
-			heart.pivot_offset = Vector2(16, 16)
-			
-			heart_container.add_child(heart)
+var _last_health: int = -1
+
+func _on_player_health_changed(current_health: int, max_health: int):
+	if not heart_container:
+		return
+	for child in heart_container.get_children():
+		child.queue_free()
+	for i in range(max_health):
+		var heart := HudHeart.new()
+		heart.filled = i < current_health
+		heart_container.add_child(heart)
+		if heart.filled:
+			var pulse = heart.create_tween().set_loops().bind_node(heart)
+			pulse.tween_property(heart, "scale", Vector2(1.08, 1.08), 0.6).set_trans(Tween.TRANS_SINE)
+			pulse.tween_property(heart, "scale", Vector2(1.0, 1.0), 0.6).set_trans(Tween.TRANS_SINE)
+		elif _last_health >= 0 and i == current_health and current_health < _last_health:
+			# The slot that was just lost: flare and settle
+			heart.scale = Vector2(1.6, 1.6)
+			heart.create_tween().tween_property(heart, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK)
+	_last_health = current_health
 
 func setup_combo_ui():
 	# We create the nodes here, but they will be reparented in setup_bottom_ui
@@ -450,8 +450,8 @@ func setup_combo_ui():
 	combo_label.text = ""
 	combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	combo_label.add_theme_font_size_override("font_size", 24) # Smaller for bottom HUD
-	combo_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	combo_label.add_theme_constant_override("outline_size", 8)
+	combo_label.add_theme_color_override("font_outline_color", Color(0.2, 0.8, 1.0, 0.5))
+	combo_label.add_theme_constant_override("outline_size", 10)
 	$Control.add_child(combo_label)
 	
 	var combo_bar = ProgressBar.new()
@@ -464,30 +464,18 @@ func setup_combo_ui():
 
 func style_neon_bar(bar: ProgressBar, color: Color):
 	var bg = StyleBoxFlat.new()
-	bg.bg_color = Color(0.05, 0.05, 0.1, 0.6) # Dark background
-	bg.border_width_left = 2
-	bg.border_width_top = 2
-	bg.border_width_right = 2
-	bg.border_width_bottom = 2
-	bg.border_color = color.lerp(Color.BLACK, 0.5)
-	bg.corner_radius_top_left = 4
-	bg.corner_radius_top_right = 4
-	bg.corner_radius_bottom_left = 4
-	bg.corner_radius_bottom_right = 4
+	bg.bg_color = Color(0.02, 0.03, 0.08, 0.75) # Dark background
+	bg.set_border_width_all(2)
+	bg.border_color = color.lerp(Color.BLACK, 0.45)
+	bg.set_corner_radius_all(1) # Sharp, technical edges
 	
 	var fg = StyleBoxFlat.new()
-	fg.bg_color = color
-	fg.border_width_left = 1
-	fg.border_width_top = 1
-	fg.border_width_right = 1
-	fg.border_width_bottom = 1
-	fg.border_color = Color.WHITE
-	fg.corner_radius_top_left = 4
-	fg.corner_radius_top_right = 4
-	fg.corner_radius_bottom_left = 4
-	fg.corner_radius_bottom_right = 4
-	fg.shadow_color = color.lerp(Color.TRANSPARENT, 0.5)
-	fg.shadow_size = 8 # Neon Glow
+	fg.bg_color = color.lerp(Color.WHITE, 0.15)
+	fg.set_border_width_all(1)
+	fg.border_color = color.lerp(Color.WHITE, 0.8)
+	fg.set_corner_radius_all(1)
+	fg.shadow_color = Color(color.r, color.g, color.b, 0.55)
+	fg.shadow_size = 12 # Neon glow
 	
 	bar.add_theme_stylebox_override("background", bg)
 	bar.add_theme_stylebox_override("fill", fg)
@@ -524,10 +512,14 @@ func _on_player_combo_changed(combo: int, progress: float):
 		tween.tween_property(combo_label_node, "scale", Vector2(1, 1), 0.2).set_trans(Tween.TRANS_BACK)
 		tween.tween_property(combo_label_node, "modulate", Color.WHITE, 0.2)
 		
-		# Change color based on combo depth
-		if combo > 50: combo_label_node.modulate = Color(1, 0.5, 0) # Orange
-		elif combo > 20: combo_label_node.modulate = Color(1, 1, 0) # Yellow
-		elif combo > 10: combo_label_node.modulate = Color(0, 1, 1) # Cyan
+		# Escalating colour tiers, applied as font colour + glow outline so the pop flash still reads
+		var tier := Color(0.85, 0.95, 1.0)
+		if combo > 50: tier = Color(1.0, 0.45, 0.1) # Orange
+		elif combo > 20: tier = Color(1.0, 0.9, 0.2) # Yellow
+		elif combo > 10: tier = Color(0.2, 1.0, 1.0) # Cyan
+		combo_label_node.add_theme_color_override("font_color", tier)
+		combo_label_node.add_theme_color_override("font_outline_color", Color(tier.r, tier.g, tier.b, 0.55))
+		combo_label_node.add_theme_font_size_override("font_size", 28 + mini(combo / 10, 14))
 
 func _on_player_xp_changed(current_xp: float, max_xp: float):
 	if xp_bar:

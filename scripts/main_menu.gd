@@ -30,6 +30,7 @@ func _ready():
 		else:
 			quit_button.text = "QUIT"
 			
+	setup_neon_background()
 	create_menu_juice()
 	setup_button_animations()
 	style_all_buttons()
@@ -72,19 +73,20 @@ func style_all_buttons():
 func style_menu_button(btn: Button):
 	# Normal Style
 	var normal = StyleBoxFlat.new()
-	normal.bg_color = Color(0.1, 0.1, 0.2, 0.4)
-	normal.border_width_left = 4
-	normal.border_color = Color(0.0, 0.8, 1.0, 0.6) # Cyan edge
-	normal.corner_radius_top_left = 2
-	normal.corner_radius_bottom_right = 15
+	normal.bg_color = Color(0.02, 0.05, 0.12, 0.62)
+	normal.border_width_left = 5
+	normal.border_width_bottom = 2
+	normal.border_color = Color(0.0, 0.8, 1.0, 0.7) # Cyan edge
+	normal.corner_radius_top_left = 0
+	normal.corner_radius_bottom_right = 18
 	normal.content_margin_left = 20
 	
 	# Hover Style
 	var hover = normal.duplicate()
-	hover.bg_color = Color(0.2, 0.2, 0.4, 0.6)
-	hover.border_color = Color(0.0, 1.0, 1.0, 1.0) # Bright Cyan
-	hover.shadow_color = Color(0.0, 1.0, 1.0, 0.3)
-	hover.shadow_size = 10
+	hover.bg_color = Color(0.04, 0.2, 0.3, 0.75)
+	hover.border_color = Color(0.4, 1.0, 1.0, 1.0) # Bright Cyan
+	hover.shadow_color = Color(0.0, 1.0, 1.0, 0.45)
+	hover.shadow_size = 18
 	
 	# Pressed Style
 	var style_pressed = hover.duplicate()
@@ -137,6 +139,23 @@ func setup_button_animations():
 			btn.scale = Vector2(1.1, 1.1)
 		)
 
+## Swap the flat menu backdrop for the same living neon grid used in-game.
+func setup_neon_background():
+	$Background.visible = false
+	var bg = load("res://scenes/background.tscn").instantiate()
+	add_child(bg)
+	var grid = bg.get_node("Grid")
+	grid.auto_scroll = Vector2(22, 12)
+	# Occasional ripples keep the grid alive behind the title
+	var timer := Timer.new()
+	timer.wait_time = 2.4
+	timer.autostart = true
+	timer.timeout.connect(func():
+		var size := get_viewport_rect().size
+		var xform := get_viewport().get_canvas_transform().affine_inverse()
+		VFX.shockwave(xform * Vector2(randf() * size.x, randf() * size.y), 1.1, Color(0.3, 0.8, 1.0), 260.0))
+	add_child(timer)
+
 func create_menu_juice():
 	# Background elements: Mix of shapes and "Enemies"
 	for i in range(20): # Increased from 12
@@ -159,10 +178,10 @@ func spawn_menu_shape():
 	
 	poly.polygon = pts
 	# Palette: Neon Cyan, Neon Magenta, Neon Purple
-	var colors = [Color(0.0, 0.8, 1.0, 0.1), Color(1.0, 0.0, 1.0, 0.1), Color(0.7, 0.2, 1.0, 0.1)]
+	var colors = [Color(0.0, 0.8, 1.0), Color(1.0, 0.0, 1.0), Color(0.7, 0.2, 1.0)]
 	poly.color = colors[randi() % colors.size()]
-	# Add Glow to background shapes
-	poly.modulate = Color(1.5, 1.5, 1.5, 1.0)
+	Neon.apply(poly, poly.color, 0.08, 2.0)
+	poly.modulate = Color(1, 1, 1, 0.55)
 	
 	var screen_size = get_viewport_rect().size
 	poly.position = Vector2(randf_range(0, screen_size.x), randf_range(0, screen_size.y))
@@ -203,9 +222,10 @@ func spawn_menu_enemy():
 		pts.append(Vector2(e_size, 0).rotated(TAU/sides * s))
 	
 	poly.polygon = pts
-	poly.color = Color(1, 0.2, 0.2, 0.3) if not is_tank else Color(0.2, 0.8, 0.2, 0.3)
-	# Add Glow to menu enemies
-	poly.modulate = Color(2.0, 1.5, 1.5, 1.0) if not is_tank else Color(1.5, 2.0, 1.5, 1.0)
+	var base_color := Color(1.0, 0.15, 0.4) if not is_tank else Color(0.2, 1.0, 0.45)
+	poly.color = base_color
+	Neon.apply(poly, base_color, 0.25, 3.0)
+	Neon.add_glow(poly, base_color, 110.0, 0.18)
 	
 	var screen_size = get_viewport_rect().size
 	enemy.position = Vector2(randf_range(0, screen_size.x), randf_range(0, screen_size.y))
@@ -215,7 +235,7 @@ func spawn_menu_enemy():
 	# Detect Click
 	enemy.pressed.connect(func():
 		AudioManager.play_sfx("enemy_death", 0.0, 0.9, 1.1, 0.3)
-		spawn_menu_death_particles(enemy.position + poly.position, poly.color)
+		spawn_menu_death_particles(enemy.position + poly.position, base_color)
 		enemy.queue_free()
 		# Respawn another after a delay to keep the menu busy
 		get_tree().create_timer(0.5).timeout.connect(spawn_menu_enemy)
@@ -229,7 +249,7 @@ func spawn_menu_enemy():
 	fire_timer.wait_time = randf_range(0.5, 1.5)
 	fire_timer.timeout.connect(func(): 
 		if not is_instance_valid(enemy): return
-		spawn_menu_bullet(enemy.position + poly.position, poly.rotation, poly.color)
+		spawn_menu_bullet(enemy.position + poly.position, poly.rotation, base_color)
 	)
 	fire_timer.start()
 
@@ -274,8 +294,9 @@ func spawn_menu_bullet(pos: Vector2, rot: float, col: Color):
 	
 	var pts = PackedVector2Array([Vector2(8,0), Vector2(-4,4), Vector2(-4,-4)])
 	bullet.polygon = pts
-	bullet.color = col
-	bullet.modulate.a = 0.6
+	bullet.color = col.lerp(Color.WHITE, 0.4)
+	bullet.material = Neon.additive_material()
+	bullet.modulate = Color(1.6, 1.6, 1.6, 0.8)
 	bullet.position = pos
 	bullet.rotation = rot
 	

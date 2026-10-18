@@ -107,8 +107,11 @@ func setup_boss_visuals():
 	for i in range(8):
 		pts.append(Vector2(60, 0).rotated(TAU/8 * i))
 	poly.polygon = pts
-	poly.color = Color(0.1, 0.1, 0.15) # Dark Core
-	poly.modulate = Color(2.0, 0.2, 0.2) # Red Glow
+	poly.color = Color(1.0, 0.15, 0.25)
+	poly.modulate = Color.WHITE
+	Neon.apply(poly, Color(1.0, 0.15, 0.25), 0.12, 6.0) # Dark core, hot red outline
+	Neon.add_glow(self, Color(1.0, 0.2, 0.3), 520.0, 0.22)
+	VFX.shockwave(global_position, 2.0, Color(1.0, 0.2, 0.3), 520.0)
 	
 	# Add orbiting shields
 	for i in range(6):
@@ -120,6 +123,7 @@ func setup_boss_visuals():
 		shield.position = Vector2(120, 0).rotated(TAU/6 * i)
 		shield.rotation = TAU/6 * i
 		shield.color = Color(1.0, 0.1, 0.4) # Neon Pink
+		Neon.apply(shield, Color(1.0, 0.1, 0.4), 0.3, 4.0)
 		shield_container.add_child(shield)
 
 func _physics_process(delta: float):
@@ -304,15 +308,17 @@ func take_damage(amount: float):
 	if health < max_health * 0.67 and phase == 1:
 		phase = 2
 		# Drastic visual change for Phase 2
-		poly.color = Color(0.3, 0.0, 0.0) # Blood Red Core
-		poly.modulate = Color(5.0, 0.2, 1.0) # Purplish Rage Glow
+		poly.modulate = Color.WHITE
+		Neon.apply(poly, Color(1.0, 0.1, 0.9), 0.12, 6.0) # Purplish rage
+		VFX.shockwave(global_position, 2.6, Color(1.0, 0.1, 0.9), 650.0)
+		PostFX.kick(0.01)
 		AudioManager.play_sfx("boss_spawn", 1.2) # Re-use spawn sound for phase change
 		AudioManager.set_boss_music_mode(true, 2)
 
 	# Visual Flash
 	var t = create_tween()
 	poly.modulate = Color(5, 5, 5, 1)
-	t.tween_property(poly, "modulate", Color(2.0, 0.2, 0.2, 1.0), 0.1)
+	t.tween_property(poly, "modulate", Color.WHITE, 0.1)
 	
 	if health <= 0:
 		start_death_sequence()
@@ -354,7 +360,7 @@ func start_death_sequence():
 			poly.modulate = Color(10, 10, 10, 1) # Pure white flash
 		)
 		hectic_tween.tween_interval(0.1)
-		hectic_tween.tween_property(poly, "modulate", Color(2.0, 0.2, 0.2, 1.0), 0.05)
+		hectic_tween.tween_property(poly, "modulate", Color.WHITE, 0.05)
 	
 	# 4. Final massive explosion and reward
 	hectic_tween.tween_callback(die)
@@ -389,6 +395,10 @@ func die():
 	
 	# Big explosion particles
 	spawn_death_particles()
+	VFX.death_burst(global_position, Color(1.0, 0.2, 0.35), 3.0)
+	VFX.shockwave(global_position, 3.0, Color(1.0, 0.3, 0.4), 900.0)
+	VFX.hit_stop(0.12)
+	PostFX.kick(0.012)
 	
 	# Rewards
 	if player and player.has_method("add_xp"):
