@@ -43,6 +43,8 @@ var seen_intel: Array = [] # Enemy types whose intro card was shown (never shown
 # Personal records over all runs (separate from the best-score run kept in high_score_*)
 var records := {"score": 0, "time": 0.0, "kills": 0, "level": 1, "combo": 0}
 var daily_submit_state: String = "" # "", "pending", "ok", "failed" for the run just played
+## The trailer capture sets this so scripted footage never touches the real save.
+var saving_disabled: bool = false
 var title_seen: bool = false # Opening title plays once per launch (not saved)
 # --- Run setup (protocols / daily). run_* is per run, the rest is saved.
 var run_mode: String = "standard" # "standard" or "daily"
@@ -216,6 +218,8 @@ func update_leaderboard(p_name: String, score: int, kills: int, level: int, time
 	save_game()
 
 func save_game():
+	if saving_disabled:
+		return
 	var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file:
 		var data = {
