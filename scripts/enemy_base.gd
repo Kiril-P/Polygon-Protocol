@@ -103,6 +103,7 @@ func fire_bullet(dir: Vector2, bullet_speed: float, bullet_damage: float, color:
 	var bullet = bullet_scene.instantiate()
 	bullet.global_position = global_position + dir * spawn_offset
 	get_parent().add_child(bullet)
+	AudioManager.play_sfx("enemy_fire")
 	bullet.fired_by_enemy = true
 	bullet.direction = dir
 	bullet.speed = bullet_speed

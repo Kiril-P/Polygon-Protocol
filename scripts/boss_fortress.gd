@@ -319,7 +319,7 @@ func take_damage(amount: float):
 		Neon.apply(poly, Color(1.0, 0.1, 0.9), 0.12, 6.0) # Purplish rage
 		VFX.shockwave(global_position, 2.6, Color(1.0, 0.1, 0.9), 650.0)
 		PostFX.kick(0.01)
-		AudioManager.play_sfx("boss_spawn", 1.2) # Re-use spawn sound for phase change
+		AudioManager.play_sfx("boss_phase")
 		AudioManager.set_boss_music_mode(true, 2)
 
 	# Visual Flash
@@ -355,7 +355,8 @@ func start_death_sequence():
 	# 3. Dramatic visual sequence
 	# Muffle music/SFX for impact
 	AudioManager.set_muffled(true)
-	AudioManager.play_sfx("boss_spawn", 1.5, 0.5) # Low pitch boom
+	AudioManager.play_sfx("boss_death")
+	AudioManager.duck_music(10.0, 3.0, 1.5)
 
 	var hectic_tween = create_tween()
 	# Series of violent shakes and flashes
@@ -394,7 +395,7 @@ func spawn_small_explosion(pos: Vector2):
 func die():
 	# Final cleanup and rewards
 	AudioManager.set_muffled(false)
-	AudioManager.play_sfx("enemy_death", 10.0, 0.3, 0.6)
+	AudioManager.play_sfx("enemy_death_big", 0.0, 0.5, 0.6)
 
 	# Screen shake
 	if player and player.has_method("add_shake"):

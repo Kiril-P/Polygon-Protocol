@@ -57,7 +57,7 @@ func start_charge():
 	var t = create_tween()
 	t.tween_property(self, "scale", Vector2(1.2, 1.2), 0.2)
 	t.tween_property(self, "scale", Vector2(0.8, 0.8), 0.1)
-	AudioManager.play_sfx("boss_spawn", -10.0, 1.5, 2.0)
+	AudioManager.play_sfx("kamikaze_alert")
 
 func flash_white():
 	var t = create_tween()
@@ -71,7 +71,7 @@ func explode():
 	if player and global_position.distance_to(player.global_position) < 80.0 and player.has_method("take_damage"):
 		player.take_damage(1) # 1 heart
 	
-	AudioManager.play_sfx("bullet_explosion", -5.0)
+	AudioManager.play_sfx("bullet_explosion")
 	spawn_death_particles()
 	VFX.shockwave(global_position, 1.3, Color(1.0, 0.5, 0.1), 160.0)
 	if player and player.has_method("add_shake"):

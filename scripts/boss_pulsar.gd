@@ -467,7 +467,7 @@ func take_damage(amount: float):
 		laser_speed *= 1.2
 		setup_lasers()
 		remove_one_platform() # First platform gone
-		AudioManager.play_sfx("boss_spawn", 1.2)
+		AudioManager.play_sfx("boss_phase")
 		AudioManager.set_boss_music_mode(true, 2)
 		
 	elif health_percent < 0.34 and phase == 2:
@@ -478,7 +478,7 @@ func take_damage(amount: float):
 		PostFX.kick(0.01)
 		setup_lasers()
 		remove_one_platform() # Second platform gone
-		AudioManager.play_sfx("boss_spawn", 1.5)
+		AudioManager.play_sfx("boss_phase", 0.0, 1.05, 1.1)
 		AudioManager.set_boss_music_mode(true, 3)
 
 	if health <= 0:
@@ -511,7 +511,8 @@ func start_death_sequence():
 			
 	# 3. Dramatic visual sequence
 	AudioManager.set_muffled(true)
-	AudioManager.play_sfx("boss_spawn", 2.0, 0.4) # Very deep boom
+	AudioManager.play_sfx("boss_death")
+	AudioManager.duck_music(10.0, 3.0, 1.5)
 
 	var death_tween = create_tween()
 	# Series of violent shakes and flashes (More intense for Pulsar)
@@ -550,7 +551,7 @@ func spawn_small_explosion(pos: Vector2):
 func die():
 	# Final cleanup and rewards
 	AudioManager.set_muffled(false)
-	AudioManager.play_sfx("enemy_death", 15.0, 0.2, 0.5)
+	AudioManager.play_sfx("enemy_death_big", 0.0, 0.5, 0.6)
 
 	# Screen shake
 	if player and player.has_method("add_shake"):

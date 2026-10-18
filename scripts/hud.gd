@@ -1,9 +1,10 @@
 extends CanvasLayer
 
-@onready var heart_container = $Control/HeartContainer
 @onready var xp_bar = $Control/XPBar
-@onready var dash_bar = $Control/DashBar
 @onready var level_label = $Control/LevelLabel
+
+var vitals: HudVitals
+var alert: HudAlert
 
 func show_dash_nerf_warning():
 	var warn = $Control.get_node_or_null("BossWarning")
@@ -61,51 +62,73 @@ func show_corruption_warning():
 
 func _ready():
 	add_to_group("hud")
-	# Create nodes first
 	setup_boss_pointer()
+	setup_vitals()
+	setup_top_bar()
 	setup_combo_ui()
 	setup_boss_bar()
-	setup_bottom_ui() # This initializes heart_container
 	
 	# Wait a frame to ensure all nodes are in groups
 	await get_tree().process_frame
 	
-	# Find player and connect signals
 	var player = get_tree().get_first_node_in_group("player")
 	if player:
 		player.health_changed.connect(_on_player_health_changed)
 		player.xp_changed.connect(_on_player_xp_changed)
 		player.energy_changed.connect(_on_player_energy_changed)
 		player.combo_changed.connect(_on_player_combo_changed)
-		# Initialize values
 		_on_player_health_changed(player.current_hearts, player.max_hearts)
 		_on_player_xp_changed(player.xp, player.xp_to_next_level)
 		_on_player_energy_changed(player.current_energy, player.max_energy)
-		level_label.text = "Level " + str(player.level)
 	
-	# Kill Counter UI
-	setup_kill_counter()
-	
-	# Initial Styling
-	if xp_bar:
-		style_neon_bar(xp_bar, Color(0.2, 1.0, 0.2)) # Neon Green
-	if dash_bar:
-		style_neon_bar(dash_bar, Color(0.0, 0.8, 1.0)) # Neon Cyan
-		
 	# Corner brackets framing the playfield
 	var frame := Control.new()
 	frame.set_script(load("res://scripts/hud_frame.gd"))
 	$Control.add_child(frame)
 	$Control.move_child(frame, 0)
 	
-	# Setup Arena Border
-	setup_arena_border()
-	
-	# Setup Dash Blur Overlay
 	setup_dash_overlay()
-
-	# INTRO ANIMATION: "Reverse Warp"
 	trigger_intro_fade()
+
+## Hearts + dash stamina: a single dark plate at the bottom centre.
+func setup_vitals():
+	alert = HudAlert.new()
+	alert.name = "Alert"
+	$Control.add_child(alert)
+	$Control.move_child(alert, 0)
+	vitals = HudVitals.new()
+	vitals.name = "Vitals"
+	vitals.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	vitals.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	vitals.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	vitals.offset_left = -HudVitals.PANEL_SIZE.x / 2.0
+	vitals.offset_right = HudVitals.PANEL_SIZE.x / 2.0
+	vitals.offset_top = -HudVitals.PANEL_SIZE.y - 22.0
+	vitals.offset_bottom = -22.0
+	$Control.add_child(vitals)
+
+## XP is a thin strip along the very top edge; level sits quietly beside it.
+func setup_top_bar():
+	xp_bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	xp_bar.offset_left = 0
+	xp_bar.offset_right = 0
+	xp_bar.offset_top = 0
+	xp_bar.offset_bottom = 7
+	xp_bar.custom_minimum_size = Vector2(0, 7)
+	style_neon_bar(xp_bar, Color(0.25, 1.0, 0.45))
+	xp_bar.get_theme_stylebox("fill").shadow_size = 0
+	xp_bar.get_theme_stylebox("background").bg_color = Color(0, 0, 0, 0.55)
+	level_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	level_label.offset_left = 24
+	level_label.offset_top = 16
+	level_label.offset_right = 160
+	level_label.offset_bottom = 46
+	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	level_label.add_theme_font_size_override("font_size", 20)
+	level_label.add_theme_color_override("font_color", Color(0.75, 1.0, 0.82))
+	level_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	level_label.add_theme_constant_override("outline_size", 6)
+	level_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0))
 
 func setup_dash_overlay():
 	var overlay = ColorRect.new()
@@ -133,80 +156,6 @@ func trigger_dash_effect(duration: float):
 		t.tween_method(func(v): mat.set_shader_parameter("strength", v), 0.08, 0.0, duration)
 		t.tween_callback(func(): overlay.visible = false)
 
-func setup_arena_border():
-	var border = ReferenceRect.new()
-	border.name = "ArenaBorder"
-	border.set_anchors_preset(Control.PRESET_FULL_RECT)
-	border.editor_only = false
-	border.border_color = Color(0.0, 1.0, 1.0, 0.3) # Cyan faint
-	border.border_width = 4.0
-	$Control.add_child(border)
-	$Control.move_child(border, 0) # Behind other HUD elements
-	
-	# Add a second thicker border for glow
-	var glow = ReferenceRect.new()
-	glow.name = "ArenaGlow"
-	glow.set_anchors_preset(Control.PRESET_FULL_RECT)
-	glow.editor_only = false
-	glow.border_color = Color(0.0, 1.0, 1.0, 0.1)
-	glow.border_width = 12.0
-	$Control.add_child(glow)
-	$Control.move_child(glow, 0)
-	
-	# Pulse animation
-	var t_border = create_tween().set_loops().bind_node(border)
-	t_border.tween_property(border, "border_color:a", 0.6, 1.5).set_trans(Tween.TRANS_SINE)
-	t_border.tween_property(border, "border_color:a", 0.2, 1.5).set_trans(Tween.TRANS_SINE)
-	
-	var t_glow = create_tween().set_loops().bind_node(glow)
-	t_glow.tween_property(glow, "border_color:a", 0.3, 2.0).set_trans(Tween.TRANS_SINE)
-	t_glow.tween_property(glow, "border_color:a", 0.05, 2.0).set_trans(Tween.TRANS_SINE)
-
-func setup_bottom_ui():
-	var bottom_container = VBoxContainer.new()
-	bottom_container.name = "BottomUI"
-	bottom_container.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	bottom_container.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	bottom_container.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	bottom_container.offset_bottom = -20
-	bottom_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	bottom_container.add_theme_constant_override("separation", 10)
-	$Control.add_child(bottom_container)
-	
-	# Combo Section (On top of hearts)
-	var combo_container = VBoxContainer.new()
-	combo_container.name = "ComboContainer"
-	combo_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	combo_container.add_theme_constant_override("separation", 2)
-	bottom_container.add_child(combo_container)
-	
-	# Move Combo elements into bottom UI
-	var combo_label = $Control.get_node_or_null("ComboLabel")
-	var combo_bar = $Control.get_node_or_null("ComboBar")
-	
-	if combo_label:
-		if combo_label.get_parent():
-			combo_label.get_parent().remove_child(combo_label)
-		combo_container.add_child(combo_label)
-		
-	if combo_bar:
-		if combo_bar.get_parent():
-			combo_bar.get_parent().remove_child(combo_bar)
-		combo_container.add_child(combo_bar)
-	
-	# Heart Section (Bottom-most)
-	if has_node("Control/HeartContainer"):
-		heart_container = $Control/HeartContainer
-		if heart_container.get_parent():
-			heart_container.get_parent().remove_child(heart_container)
-	else:
-		heart_container = HBoxContainer.new()
-		heart_container.name = "HeartContainer"
-	
-	bottom_container.add_child(heart_container)
-	heart_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	heart_container.add_theme_constant_override("separation", 10)
-
 func setup_kill_counter():
 	# Removed Kills, Score, and Timer labels from HUD as requested.
 	# They are now in the Pause Menu / Options Screen.
@@ -217,9 +166,9 @@ func setup_boss_bar():
 	boss_container.name = "BossBarsContainer"
 	boss_container.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	boss_container.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	boss_container.offset_top = 110 # Adjusted position
+	boss_container.offset_top = 22
 	boss_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	boss_container.add_theme_constant_override("separation", 5)
+	boss_container.add_theme_constant_override("separation", 4)
 	$Control.add_child(boss_container)
 	
 	setup_warning_label()
@@ -229,9 +178,9 @@ func setup_warning_label():
 	warn.name = "BossWarning"
 	warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	warn.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	warn.set_anchors_preset(Control.PRESET_CENTER)
+	warn.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	warn.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	warn.grow_vertical = Control.GROW_DIRECTION_BOTH
+	warn.offset_top = 150
 	warn.add_theme_font_size_override("font_size", 48)
 	NeonUI.style_title(warn, NeonUI.RED, 48)
 	warn.visible = false
@@ -245,7 +194,7 @@ func show_boss_phase(text: String):
 	NeonUI.style_title(label, Color(0.85, 0.35, 1.0), 56)
 	label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE)
 	label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	label.position.y = 230
+	label.position.y = 210
 	label.pivot_offset = Vector2(label.size.x / 2.0, 30)
 	label.modulate = Color(1.6, 1.0, 1.8, 0.0)
 	label.scale = Vector2(1.6, 1.6)
@@ -335,13 +284,15 @@ func _process(_delta):
 				var new_label = Label.new()
 				new_label.name = "Label"
 				new_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				new_label.add_theme_font_size_override("font_size", 14)
+				new_label.add_theme_font_size_override("font_size", 20)
+				new_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+				new_label.add_theme_constant_override("outline_size", 6)
 				boss_ui.add_child(new_label)
 				
 				var new_bar = ProgressBar.new()
 				new_bar.name = "Bar"
 				new_bar.show_percentage = false
-				new_bar.custom_minimum_size = Vector2(500, 12)
+				new_bar.custom_minimum_size = Vector2(640, 16)
 				boss_ui.add_child(new_bar)
 				
 				# Style based on boss type
@@ -349,6 +300,7 @@ func _process(_delta):
 				if "heart_color" in boss_node_ref:
 					color = boss_node_ref.heart_color
 				style_neon_bar(new_bar, color)
+				new_bar.get_theme_stylebox("fill").shadow_size = 0
 				
 				bar_node = boss_ui
 			
@@ -444,45 +396,47 @@ func trigger_intro_fade():
 		cam.zoom = original_zoom * 0.5
 		create_tween().tween_property(cam, "zoom", original_zoom, 1.0).set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
 
-var _last_health: int = -1
-
 func _on_player_health_changed(current_health: int, max_health: int):
-	if not heart_container:
+	if not vitals:
 		return
-	for child in heart_container.get_children():
-		child.queue_free()
-	for i in range(max_health):
-		var heart := HudHeart.new()
-		heart.filled = i < current_health
-		heart_container.add_child(heart)
-		if heart.filled:
-			var pulse = heart.create_tween().set_loops().bind_node(heart)
-			pulse.tween_property(heart, "scale", Vector2(1.08, 1.08), 0.6).set_trans(Tween.TRANS_SINE)
-			pulse.tween_property(heart, "scale", Vector2(1.0, 1.0), 0.6).set_trans(Tween.TRANS_SINE)
-		elif _last_health >= 0 and i == current_health and current_health < _last_health:
-			# The slot that was just lost: flare and settle
-			heart.scale = Vector2(1.6, 1.6)
-			heart.create_tween().tween_property(heart, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK)
-	_last_health = current_health
+	if alert and vitals.hearts > current_health and vitals.max_hearts > 0:
+		alert.flash_hit()
+	vitals.set_hearts(current_health, max_health)
+	if alert:
+		alert.low_hp = current_health <= 1 and max_health > 0
+	AudioManager.set_low_health(current_health <= 1 and max_health > 0)
 
 func setup_combo_ui():
-	# We create the nodes here, but they will be reparented in setup_bottom_ui
+	# Bottom-right, clear of the vitals plate and the player's field of view.
+	var box := VBoxContainer.new()
+	box.name = "ComboBox"
+	box.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	box.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	box.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	box.offset_right = -60
+	box.offset_bottom = -44
+	box.alignment = BoxContainer.ALIGNMENT_END
+	box.add_theme_constant_override("separation", 4)
+	$Control.add_child(box)
+	
 	var combo_label = Label.new()
 	combo_label.name = "ComboLabel"
 	combo_label.text = ""
-	combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	combo_label.add_theme_font_size_override("font_size", 24) # Smaller for bottom HUD
-	combo_label.add_theme_color_override("font_outline_color", Color(0.2, 0.8, 1.0, 0.5))
-	combo_label.add_theme_constant_override("outline_size", 10)
-	$Control.add_child(combo_label)
+	combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	combo_label.add_theme_font_size_override("font_size", 34)
+	combo_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	combo_label.add_theme_constant_override("outline_size", 8)
+	combo_label.pivot_offset = Vector2(160, 20)
+	box.add_child(combo_label)
 	
 	var combo_bar = ProgressBar.new()
 	combo_bar.name = "ComboBar"
 	combo_bar.show_percentage = false
-	combo_bar.custom_minimum_size = Vector2(200, 6)
+	combo_bar.custom_minimum_size = Vector2(190, 6)
 	combo_bar.visible = false
-	style_neon_bar(combo_bar, Color(1, 0.2, 0.4)) # Magenta
-	$Control.add_child(combo_bar)
+	style_neon_bar(combo_bar, Color(1, 0.3, 0.5))
+	combo_bar.get_theme_stylebox("fill").shadow_size = 0
+	box.add_child(combo_bar)
 
 func style_neon_bar(bar: ProgressBar, color: Color):
 	var bg = StyleBoxFlat.new()
@@ -497,7 +451,7 @@ func style_neon_bar(bar: ProgressBar, color: Color):
 	fg.border_color = color.lerp(Color.WHITE, 0.8)
 	fg.set_corner_radius_all(1)
 	fg.shadow_color = Color(color.r, color.g, color.b, 0.55)
-	fg.shadow_size = 12 # Neon glow
+	fg.shadow_size = 4
 	
 	bar.add_theme_stylebox_override("background", bg)
 	bar.add_theme_stylebox_override("fill", fg)
@@ -524,10 +478,11 @@ func _on_player_combo_changed(combo: int, progress: float):
 	combo_bar_node.value = progress * 100
 	
 	var old_text = combo_label_node.text
-	combo_label_node.text = str(combo) + "x COMBO"
+	combo_label_node.text = "x%d COMBO" % combo
 	
 	# Only pop when the number actually changes
 	if combo_label_node.text != old_text:
+		AudioManager.play_sfx("combo_tick", 0.0, 1.0 + minf(combo, 40) * 0.015)
 		combo_label_node.scale = Vector2(1.5, 1.5)
 		combo_label_node.modulate = Color(2, 2, 2, 1) # Bright flash
 		var tween = create_tween().set_parallel(true)
@@ -540,8 +495,7 @@ func _on_player_combo_changed(combo: int, progress: float):
 		elif combo > 20: tier = Color(1.0, 0.9, 0.2) # Yellow
 		elif combo > 10: tier = Color(0.2, 1.0, 1.0) # Cyan
 		combo_label_node.add_theme_color_override("font_color", tier)
-		combo_label_node.add_theme_color_override("font_outline_color", Color(tier.r, tier.g, tier.b, 0.55))
-		combo_label_node.add_theme_font_size_override("font_size", 28 + mini(combo / 10, 14))
+		combo_label_node.add_theme_font_size_override("font_size", 30 + mini(combo / 10, 10))
 
 func _on_player_xp_changed(current_xp: float, max_xp: float):
 	if xp_bar:
@@ -551,9 +505,8 @@ func _on_player_xp_changed(current_xp: float, max_xp: float):
 	# Update level label if it exists
 	var player = get_tree().get_first_node_in_group("player")
 	if player and level_label:
-		level_label.text = "Level " + str(player.level)
+		level_label.text = "LEVEL " + str(player.level)
 
 func _on_player_energy_changed(current: float, max_energy: float):
-	if dash_bar:
-		dash_bar.max_value = max_energy
-		dash_bar.value = current
+	if vitals:
+		vitals.set_energy(current, max_energy)

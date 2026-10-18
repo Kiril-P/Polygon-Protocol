@@ -80,7 +80,7 @@ func _on_upgrade_selected(upgrade_data: Dictionary, session: int = -1):
 	if _selecting or (session != -1 and session != _session):
 		return # Double-clicks must not apply two upgrades
 	_selecting = true
-	AudioManager.play_sfx("click")
+	AudioManager.play_sfx("upgrade_select")
 	for btn in container.get_children():
 		if btn is Button:
 			btn.disabled = true

@@ -48,6 +48,7 @@ func _process(delta: float):
 			var hud = get_tree().get_first_node_in_group("hud")
 			if hud and hud.has_method("show_boss_warning"):
 				hud.show_boss_warning(10)
+				AudioManager.play_sfx("boss_warning")
 		
 		if int(time_passed) == m and not bosses_spawned.has(m):
 			if m == 360 and not choice_made_360:
@@ -242,7 +243,7 @@ func _spawn_event(ev: Dictionary):
 	
 	match ev.get("type", ""):
 		"elite":
-			AudioManager.play_sfx("boss_spawn")
+			AudioManager.play_sfx("elite_spawn")
 			_spawn_enemy_at(index, origin + Vector2(radius, 0).rotated(base_angle), {
 				"scale_mult": ev.get("scale_mult", 1.0),
 				"health_mult": ev.get("health_mult", 1.0),
@@ -330,8 +331,8 @@ func spawn_major_boss(milestone: int, forced_pos: Vector2 = Vector2.ZERO):
 	boss.set_collision_mask_value(1, true) # World
 	boss.set_collision_mask_value(2, true) # Player (to avoid overlapping too much if desired)
 	
-	AudioManager.play_sfx("boss_spawn", 4.0) 
-	AudioManager.set_boss_music_mode(true, 1) 
+	AudioManager.play_sfx("boss_spawn")
+	AudioManager.set_boss_music_mode(true, 1, AudioManager.boss_id_from_node(boss))
 	
 	get_parent().add_child(boss)
 	
@@ -356,7 +357,7 @@ func spawn_6min_choice():
 	# Pause the game for the choice
 	get_tree().paused = true
 	
-	AudioManager.play_sfx("boss_spawn", 2.0)
+	AudioManager.play_sfx("boss_phase")
 	AudioManager.set_muffled(true)
 
 	# Spawn Choice 1: Boss Fight
@@ -402,7 +403,7 @@ func _on_choice_endless_selected():
 	_cleanup_choices()
 	
 	# Visual feedback for endless
-	AudioManager.play_sfx("level_up", 2.0)
+	AudioManager.play_sfx("level_up")
 
 func _cleanup_choices():
 	for node in get_tree().get_nodes_in_group("choice_nodes"):

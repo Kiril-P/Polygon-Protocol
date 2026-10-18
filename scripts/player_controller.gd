@@ -121,6 +121,7 @@ func _ready():
 	# Set Player Palette
 	sprite.color = PLAYER_COLOR # Neon Cyan
 	_setup_aura()
+	add_child(DashRing.new())
 	update_health_visuals()
 	
 	# Reset Run Stats
@@ -143,6 +144,7 @@ func _ready():
 	# Intro Particle Burst
 	spawn_intro_particles()
 	AudioManager.play_sfx("player_spawn")
+	AudioManager.set_music_menu_mode(false)
 
 	# PHYSICS SETUP (Fixes sticking)
 	# Player is Layer 2. Mask 1 (World). NO Mask 3 (Enemies).
@@ -341,8 +343,8 @@ func _physics_process(delta: float):
 	
 	# Low health tremble & flash
 	if current_hearts == 1:
-		add_shake(5.0) # Very noticeable panicked tremble
-		sprite.modulate.a = 0.5 + abs(sin(Time.get_ticks_msec() * 0.01)) * 0.5
+		add_shake(1.5) # Slight tremble; the HUD edge pulse carries the warning
+		sprite.modulate.a = 0.75 + abs(sin(Time.get_ticks_msec() * 0.008)) * 0.25
 		
 		# Occasional glitch red color
 		if randf() < 0.05:
@@ -386,7 +388,8 @@ func _physics_process(delta: float):
 			kick_tween.tween_property(camera, "zoom", base_zoom, 0.2).set_delay(0.1)
 			
 			# Lower volume (-10db) and start persistent loop
-			AudioManager.start_persistent_sfx("player_dash", "dash", -10.0)
+			AudioManager.play_sfx("player_dash")
+			AudioManager.start_persistent_sfx("dash_loop", "dash")
 	
 		# Screen rumble for dashing
 		add_shake(2.0)
@@ -406,12 +409,14 @@ func _physics_process(delta: float):
 			modulate = Color(1, 1, 1, 1)
 			regen_delay_timer = 1.0 if dash_nerf_active else 0.5
 			AudioManager.stop_persistent_sfx("dash")
+			AudioManager.play_sfx("dash_empty")
 		energy_changed.emit(current_energy, max_energy)
 	else:
 		if is_dashing:
 			is_dashing = false
 			modulate = Color(1, 1, 1, 1)
 			AudioManager.stop_persistent_sfx("dash")
+			AudioManager.play_sfx("dash_end")
 	
 	if current_energy < max_energy:
 			if regen_delay_timer > 0:
@@ -518,7 +523,8 @@ func activate_synergy(id: String, title: String):
 	synergies[id] = true
 	if id == "hunter_killer":
 		bullet_pierce += 1
-	AudioManager.play_sfx("level_up", 4.0)
+	AudioManager.play_sfx("level_up")
+	AudioManager.duck_music(5.0, 0.5, 0.9)
 	show_banner("SYNERGY: " + title, Color(1.0, 0.8, 0.0))
 
 func show_banner(text: String, color: Color):
@@ -814,7 +820,7 @@ func shoot():
 
 func reset_combo():
 	if combo_count > 10:
-		AudioManager.play_sfx("combo_break", -10.0, 0.8, 1.2)
+		AudioManager.play_sfx("combo_break")
 	combo_count = 0
 	combo_timer = 0
 	speed_multiplier -= combo_speed_boost
@@ -1009,6 +1015,7 @@ func toggle_pause():
 		
 		# Clear muffled effect
 		AudioManager.set_muffled(false)
+		AudioManager.play_sfx("unpause")
 		
 		if has_node("PauseCanvas"):
 			var canvas = $PauseCanvas
@@ -1423,6 +1430,7 @@ func heal(amount: int):
 	
 	health_changed.emit(current_hearts, max_hearts)
 	update_health_visuals()
+	AudioManager.play_sfx("heal")
 	
 	# Visual feedback for healing
 	var tween = create_tween()
@@ -1462,7 +1470,7 @@ func take_damage(_amount: float):
 	current_hearts -= 1
 	health_changed.emit(current_hearts, max_hearts)
 	
-	AudioManager.play_sfx("player_hit", 4.0) # Reset from boost
+	AudioManager.play_sfx("player_hit")
 	
 	add_shake(60.0) # Massive hit impact
 	
@@ -1530,7 +1538,7 @@ func trigger_emergency_overdrive():
 	is_in_overdrive = true
 	
 	# Visual/Sound
-	AudioManager.play_sfx("level_up", 5.0, 1.5, 2.0)
+	AudioManager.play_sfx("level_up", 0.0, 1.3, 1.4)
 
 	# Boost stats
 	var original_speed = speed_multiplier
@@ -1621,6 +1629,9 @@ func die():
 	gd.save_game()
 
 	# Play SFX
+	AudioManager.set_low_health(false)
+	AudioManager.stop_persistent_sfx("dash", 0.05)
+	AudioManager.duck_music(8.0, 2.0, 1.5)
 	AudioManager.play_sfx("game_over")
 	AudioManager.set_muffled(true) # Muffle on death screen too
 

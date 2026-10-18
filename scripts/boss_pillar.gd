@@ -65,7 +65,7 @@ func die(hit_by_player: bool):
 		boss.take_damage(boss.max_health * damage_percent) 
 		
 		# Feedback sound and screen shake
-		AudioManager.play_sfx("enemy_death", 0.0, 1.2, 1.5)
+		AudioManager.play_sfx("pillar_hit")
 		
 		var player = get_tree().get_first_node_in_group("player")
 		if player and player.has_method("add_shake"):

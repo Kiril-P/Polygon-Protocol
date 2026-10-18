@@ -304,7 +304,7 @@ func _pick_blink_destination() -> Vector2:
 
 func singularity_pulse():
 	pulsing = true
-	AudioManager.play_sfx("boss_spawn", 0.0, 0.7)
+	AudioManager.play_sfx("boss_phase", 0.0, 0.8, 0.85)
 	var zone := Polygon2D.new()
 	zone.polygon = _ring_points(PULSE_RADIUS, 40)
 	zone.color = Color(HOT.r, HOT.g, HOT.b, 0.0)
@@ -419,7 +419,7 @@ func _enter_phase(new_phase: int):
 	VFX.hit_stop(0.1)
 	PostFX.kick(0.012)
 	if player: player.add_shake(18.0)
-	AudioManager.play_sfx("boss_spawn", 2.0, 0.6)
+	AudioManager.play_sfx("boss_phase")
 	AudioManager.set_boss_music_mode(true, new_phase)
 	Neon.apply(poly, col, 0.1, 7.0)
 	if gravity_ring:
@@ -454,7 +454,8 @@ func start_death_sequence():
 	if gravity_ring:
 		gravity_ring.queue_free()
 	AudioManager.set_muffled(true)
-	AudioManager.play_sfx("boss_spawn", 1.5, 0.5)
+	AudioManager.play_sfx("boss_death")
+	AudioManager.duck_music(10.0, 3.0, 1.5)
 
 	var t := create_tween()
 	for i in range(14):
@@ -470,7 +471,7 @@ func start_death_sequence():
 
 func die():
 	AudioManager.set_muffled(false)
-	AudioManager.play_sfx("enemy_death", 10.0, 0.3, 0.6)
+	AudioManager.play_sfx("enemy_death_big", 0.0, 0.5, 0.6)
 	if player and player.has_method("add_shake"):
 		player.add_shake(30.0)
 	VFX.death_burst(global_position, COLOR, 3.5)
