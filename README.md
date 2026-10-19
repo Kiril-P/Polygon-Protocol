@@ -1,6 +1,6 @@
 # Polygon Protocol
 
-![Chain reaction beams tearing through a swarm](docs/media/hero.gif)
+[![Chain reaction beams tearing through a swarm. Click to watch the trailer.](docs/media/hero.gif)](https://youtu.be/puj--GcC26g)
 
 <p align="center">
   <img src="docs/media/combat.png" alt="Polygon Protocol gameplay screenshot" width="900" />
@@ -18,6 +18,7 @@
 
 <p align="center">
   <a href="https://kirilp.itch.io/polygon-protocol"><img alt="Play on itch.io" src="https://img.shields.io/badge/Play_on_itch.io-fa5c5c?style=for-the-badge&logo=itchdotio&logoColor=white"></a>
+  <a href="https://youtu.be/puj--GcC26g"><img alt="Watch the trailer" src="https://img.shields.io/badge/Watch_the_trailer-ff0000?style=for-the-badge&logo=youtube&logoColor=white"></a>
   <a href="https://github.com/Kiril-P/Polygon-Protocol"><img alt="Source on GitHub" src="https://img.shields.io/badge/Source-GitHub-111111?style=for-the-badge&logo=github&logoColor=white"></a>
 </p>
 
