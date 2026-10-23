@@ -1,14 +1,14 @@
 extends Node
 ## Global audio: synthesized SFX (assets/audio/sfx, rendered by tools/audio),
 ## a voice-limited SFX pool, and an adaptive music system:
-##   menu  -> calm tracks (assets/music for game)
+##   menu  -> calm tracks (assets/audio/menu, rendered by tools/audio)
 ##   game  -> neon gameplay loops (assets/audio/music/game_*.ogg)
 ##   boss  -> layered stems per boss, phases fade extra layers in.
 ## Usage: AudioManager.play_sfx("player_fire")
 
 const SFX_DIR := "res://assets/audio/sfx/"
 const MUSIC_DIR := "res://assets/audio/music/"
-const MENU_DIR := "res://assets/music for game/"
+const MENU_DIR := "res://assets/audio/menu/"
 const POOL_SIZE := 28
 const SILENT := -80.0
 
