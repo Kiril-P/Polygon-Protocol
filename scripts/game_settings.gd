@@ -38,6 +38,8 @@ var palette: int = 0
 var rumble: bool = true         # controller / phone vibration
 var touch_pref: int = 0         # 0 auto, 1 always on, 2 off
 var hud_size: int = 0
+var hit_stop: bool = true       # freeze-frames on heavy kills, combo tiers and hits
+var share_run_data: bool = true # anonymous per-run telemetry (see Telemetry)
 var bindings: Dictionary = {}   # action -> physical keycode (only overrides)
 
 var modal_open: int = 0         # >0 while a settings overlay is up (blocks the pause toggle)
@@ -95,6 +97,14 @@ func set_reduced_flash(on: bool):
 	apply_glow()
 	_changed()
 
+func set_hit_stop(on: bool):
+	hit_stop = on
+	_changed()
+
+func set_share_run_data(on: bool):
+	share_run_data = on
+	_changed()
+
 func set_palette(i: int):
 	palette = posmod(i, PALETTES.size())
 	_changed()
@@ -117,6 +127,7 @@ func reset_display():
 	reduced_flash = false
 	palette = 0
 	hud_size = 0
+	hit_stop = true
 	apply_glow()
 	_changed()
 
@@ -223,6 +234,8 @@ func save_settings():
 	cfg.set_value("display", "reduced_flash", reduced_flash)
 	cfg.set_value("display", "palette", palette)
 	cfg.set_value("display", "hud_size", hud_size)
+	cfg.set_value("display", "hit_stop", hit_stop)
+	cfg.set_value("privacy", "share_run_data", share_run_data)
 	cfg.set_value("controls", "rumble", rumble)
 	cfg.set_value("controls", "touch_pref", touch_pref)
 	for action in bindings:
@@ -238,6 +251,8 @@ func load_settings():
 	reduced_flash = bool(cfg.get_value("display", "reduced_flash", false))
 	palette = clampi(int(cfg.get_value("display", "palette", 0)), 0, PALETTES.size() - 1)
 	hud_size = clampi(int(cfg.get_value("display", "hud_size", 0)), 0, HUD_SIZES.size() - 1)
+	hit_stop = bool(cfg.get_value("display", "hit_stop", true))
+	share_run_data = bool(cfg.get_value("privacy", "share_run_data", true))
 	rumble = bool(cfg.get_value("controls", "rumble", true))
 	touch_pref = clampi(int(cfg.get_value("controls", "touch_pref", 0)), 0, 2)
 	bindings.clear()

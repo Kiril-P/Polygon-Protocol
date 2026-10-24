@@ -9,6 +9,7 @@ var thickness: float = 6.0
 var _age: float = 0.0
 
 func _ready():
+	process_mode = Node.PROCESS_MODE_ALWAYS # Keeps rippling under the pause of the level-up and run-end screens
 	material = Neon.additive_material()
 	z_index = 4
 

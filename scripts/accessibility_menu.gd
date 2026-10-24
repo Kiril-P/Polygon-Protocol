@@ -11,6 +11,8 @@ var _preview_home: Vector2
 var _glow_label: Label
 var _shake_label: Label
 var _flash_btn: Button
+var _hitstop_btn: Button
+var _share_btn: Button
 var _palette_btn: Button
 var _size_btn: Button
 var _rumble_btn: Button
@@ -97,6 +99,10 @@ func _build():
 		gs.set_reduced_flash(not gs.reduced_flash)
 		_refresh())
 	left.add_child(_flash_btn)
+	_hitstop_btn = _button("", func():
+		gs.set_hit_stop(not gs.hit_stop)
+		_refresh())
+	left.add_child(_hitstop_btn)
 	_palette_btn = _button("", func():
 		gs.set_palette(gs.palette + 1)
 		_refresh())
@@ -115,6 +121,10 @@ func _build():
 		gs.cycle_touch_pref()
 		_refresh())
 	left.add_child(_touch_btn)
+	_share_btn = _button("", func():
+		gs.set_share_run_data(not gs.share_run_data)
+		_refresh())
+	left.add_child(_share_btn)
 
 	# ---- Controls column
 	var right := VBoxContainer.new()
@@ -215,6 +225,8 @@ func _refresh():
 	_glow_label.text = "%s   %d%%" % [_glow_label.get_meta("caption"), roundi(gs.glow * 100.0)]
 	_shake_label.text = "%s   %d%%" % [_shake_label.get_meta("caption"), roundi(gs.shake * 100.0)]
 	_flash_btn.text = "REDUCED FLASH: " + ("ON" if gs.reduced_flash else "OFF")
+	_hitstop_btn.text = "HIT STOP: " + ("ON" if gs.hit_stop else "OFF")
+	_share_btn.text = "SHARE ANONYMOUS RUN DATA: " + ("ON" if gs.share_run_data else "OFF")
 	_palette_btn.text = "COLOURS: " + gs.pal()["name"]
 	_size_btn.text = "HUD SIZE: " + gs.HUD_SIZES[gs.hud_size]["name"]
 	_rumble_btn.text = "VIBRATION: " + ("ON" if gs.rumble else "OFF")

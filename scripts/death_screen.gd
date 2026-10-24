@@ -134,7 +134,7 @@ var _daily_label: Label
 
 func _show_death_screen(stats: Dictionary):
 	# Wait a tiny bit for the player death explosion to finish
-	await get_tree().create_timer(1.0).timeout
+	await get_tree().create_timer(1.3).timeout
 	
 	visible = true
 	stats_label.visible = false
@@ -198,7 +198,17 @@ func _build_summary(stats: Dictionary):
 	var gold := NeonUI.GOLD
 	
 	var killer: String = stats.get("killed_by", "")
-	if killer != "":
+	var how: Dictionary = stats.get("how", {})
+	if not how.is_empty():
+		# "How you died": what hit you, then what to try next time
+		_summary.add_child(_label(str(how["headline"]), 24, Color(1.0, 0.45, 0.5)))
+		var detail := _label(str(how["detail"]), 18, Color(0.82, 0.9, 1.0))
+		detail.name = "HowDetail"
+		detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		detail.custom_minimum_size = Vector2(860, 0)
+		detail.add_theme_constant_override("outline_size", 4)
+		_summary.add_child(detail)
+	elif killer != "":
 		_summary.add_child(_label("TERMINATED BY  " + killer, 22, Color(1.0, 0.45, 0.5)))
 	
 	# Score, big

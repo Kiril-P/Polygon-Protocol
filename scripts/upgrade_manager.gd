@@ -407,8 +407,9 @@ func apply_upgrade(upgrade_data: Dictionary):
 	# Increment the pick count
 	var upgrade_id = upgrade_data["id"]
 	upgrade_counts[upgrade_id] = upgrade_counts.get(upgrade_id, 0) + 1
-	
 	var gd = GlobalData
+	Telemetry.note_pick(str(upgrade_id), int(gd.run_level))
+
 	var is_first_run_evolution = false
 	if first_upgrade_of_run:
 		first_upgrade_of_run = false

@@ -212,7 +212,7 @@ func _on_body_entered(body: Node):
 
 func hit_player(player_node: Node):
 	if player_node.has_method("take_damage"):
-		player_node.take_damage(damage, str(get_meta("source", "ENEMY FIRE")))
+		player_node.take_damage(damage, str(get_meta("source", "ENEMY FIRE")), "shot")
 		queue_free()
 
 func hit_enemy(enemy: Node):

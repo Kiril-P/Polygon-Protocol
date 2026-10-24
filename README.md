@@ -38,6 +38,10 @@
 - **Third boss and adaptive boss music**, a rebuilt HUD, rebuilt sound effects, a title sequence, screen transitions and a run-summary death screen with a "new best" moment.
 - **Accessibility**: glow and screen-shake sliders, reduced-flash mode, colour-blind-safe palettes, a bigger HUD option and full key rebinding.
 - **Controller and touch support**: gamepad with menu navigation and vibration, plus on-screen touch controls for phones and tablets in the browser build.
+- **Two-minute guided first run**: new players get five short lessons (move, dash, level up, shoot, combo) against slowed, hand-placed enemies before the real run starts at 0:00. It can be skipped.
+- **"How you died"**: the death screen says what hit you, how fast you went down, and one thing to try next time.
+- **Shape tree**: spend shards in the Evolution Vault to unlock starting shapes (Spark, Bastion, Comet, Hive). Each starts already evolved, with a trade-off for the run.
+- **Juice pass**: hit-stop on heavy and dash kills, an escalating combo meter (Chain, Surge, Frenzy, Overload, Singularity), a directional camera punch, and shattering death effects. Hit-stop and screen shake can be turned off in Accessibility.
 
 Polygon Protocol is a score-chasing survival game set in a hostile digital void. Every run pushes you to manage dash energy, route enemies cleanly, survive escalating waves, and build toward a form powerful enough to handle its boss fights. What starts as a minimalist arcade survival game quickly opens into build decisions, permanent upgrades, and a tighter risk/reward loop around movement and invulnerability.
 
@@ -120,6 +124,20 @@ scripts/   Core gameplay logic, bosses, player systems, upgrades, HUD, and persi
 - **Persistence**: local save data for settings, progression, and personal bests
 - **Leaderboard service**: SilentWolf for online score submission and retrieval
 - **Input support**: keyboard, mouse, gamepad and touch all drive the same input actions
+
+## Privacy and run data
+
+When a run ends, the game can send one small anonymous record to the SilentWolf board `telemetry_v1`: the protocols picked, the upgrades taken in order, what killed you, and headline numbers (time, level, kills, combo, starting shape, platform). It contains no player name, no player id and no install id. Turn it off with **Accessibility > Share anonymous run data**. Editor and debug runs never send anything. The same record is appended to `user://telemetry.jsonl` on your machine (last 100 runs); summarise it with `python3 tools/telemetry/report.py path/to/telemetry.jsonl`.
+
+## Tests
+
+Headless checks for the first run, shapes, telemetry, death report and juice:
+
+```text
+Godot --headless --path . res://tests/run_tests.tscn
+```
+
+They never touch your save, settings or the online boards.
 
 ## Roadmap Direction
 

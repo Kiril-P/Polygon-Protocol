@@ -9,6 +9,7 @@ const RingFX = preload("res://scripts/ring_fx.gd")
 
 var _waves: Array = [] # {pos: Vector2 (world), age: float, strength: float}
 var _hit_stop_token: int = 0
+var _last_stop_msec: int = -100000
 var _sweep_timer: float = 0.0
 const SWEEP_INTERVAL := 1.5
 
@@ -36,20 +37,29 @@ func shockwave(world_pos: Vector2, strength: float = 1.0, color: Color = Color(0
 	ring.thickness = 3.0 + 3.0 * strength
 	_add(ring, world_pos)
 
-## Burst of glowing shards, e.g. when an enemy dies.
-func death_burst(world_pos: Vector2, color: Color, size: float = 1.0):
+## Burst of glowing shards, e.g. when an enemy dies. `size` 1.0 is a regular enemy.
+func death_burst(world_pos: Vector2, color: Color, size: float = 1.0) -> Node2D:
 	var burst := ShardBurst.new()
 	burst.color = color
 	burst.shard_count = clampi(int(10 * size) + 4, 6, 30)
+	burst.ember_count = clampi(int(4 * size) + 2, 3, 12)
 	burst.speed = 260.0 + 140.0 * size
 	burst.shard_size = 6.0 + 4.0 * size
+	burst.lifetime = 0.7 + 0.12 * minf(size, 3.0)
 	_add(burst, world_pos)
+	return burst
 
-## Freeze-frame for impact. Uses real time so it always ends.
-func hit_stop(duration: float = 0.05):
-	if Engine.time_scale < 1.0:
+## Freeze-frame for impact. Uses real time so it always ends. `slow` is the time scale
+## while frozen, `min_gap` (seconds) stops frequent callers from chaining stops.
+## Returns without doing anything when the player switched hit stop off.
+func hit_stop(duration: float = 0.05, slow: float = 0.05, min_gap: float = 0.0):
+	if not GameSettings.hit_stop or Engine.time_scale < 1.0:
 		return
-	Engine.time_scale = 0.05
+	var now := Time.get_ticks_msec()
+	if min_gap > 0.0 and now - _last_stop_msec < int(min_gap * 1000.0):
+		return
+	_last_stop_msec = now
+	Engine.time_scale = slow
 	_hit_stop_token += 1
 	var token := _hit_stop_token
 	get_tree().create_timer(duration, true, false, true).timeout.connect(func():

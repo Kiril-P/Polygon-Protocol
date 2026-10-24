@@ -55,6 +55,11 @@ var daily_best_key: String = "" # Date of the stored daily best
 var daily_best_score: int = 0
 var daily_streak: int = 0
 var daily_last_played: String = ""
+# --- Starting shapes (see PlayerShapes): bought with shards, picked on the pre-run screen
+var unlocked_shapes: Array = ["circle"]
+var selected_shape: String = "circle"
+## Set once the scripted first run (FirstRun) was finished or skipped.
+var first_run_done: bool = false
 signal daily_submit_finished(success: bool)
 ## Tests flip this off so automated runs never post to the live leaderboard.
 var online_submit_enabled := true
@@ -65,6 +70,34 @@ func protocol_active(id: String) -> bool:
 
 func protocol_multiplier() -> float:
 	return Protocols.multiplier(run_protocols)
+
+## The starting shape for the run about to begin. The Daily Protocol always starts as the
+## circle so every score on its board comes from the same starting kit.
+func run_shape() -> String:
+	if run_mode == "daily" or not selected_shape in unlocked_shapes:
+		return "circle"
+	return selected_shape
+
+func has_shape(id: String) -> bool:
+	return id in unlocked_shapes
+
+## Spends shards on a shape if its prerequisites are owned. Returns true on success.
+func buy_shape(id: String) -> bool:
+	var def := PlayerShapes.get_def(id)
+	if def.is_empty() or has_shape(id) or total_shards < int(def["cost"]):
+		return false
+	for req in def["requires"]:
+		if not has_shape(req):
+			return false
+	total_shards -= int(def["cost"])
+	unlocked_shapes.append(id)
+	save_game()
+	return true
+
+func select_shape(id: String):
+	if has_shape(id):
+		selected_shape = id
+		save_game()
 
 func set_run(mode: String, protocols: Array):
 	run_mode = mode
@@ -239,6 +272,9 @@ func save_game():
 			"daily_best_score": daily_best_score,
 			"daily_streak": daily_streak,
 			"daily_last_played": daily_last_played,
+			"unlocked_shapes": unlocked_shapes,
+			"selected_shape": selected_shape,
+			"first_run_done": first_run_done,
 			"use_mouse_controls": use_mouse_controls,
 			"show_tutorial": show_tutorial,
 			"difficulty_level": difficulty_level,
@@ -280,6 +316,10 @@ func load_game():
 				daily_best_score = data.get("daily_best_score", 0)
 				daily_streak = data.get("daily_streak", 0)
 				daily_last_played = data.get("daily_last_played", "")
+				unlocked_shapes = data.get("unlocked_shapes", ["circle"])
+				if not "circle" in unlocked_shapes:
+					unlocked_shapes.append("circle")
+				selected_shape = data.get("selected_shape", "circle")
 				use_mouse_controls = data.get("use_mouse_controls", false)
 				show_tutorial = data.get("show_tutorial", true)
 				difficulty_level = data.get("difficulty_level", 2)
@@ -288,6 +328,8 @@ func load_game():
 				player_name = data.get("player_name", "Player")
 				player_id = data.get("player_id", "")
 				is_first_run = data.get("is_first_run", true)
+				# Saves from before the scripted first run: anyone who already picked an upgrade has seen enough
+				first_run_done = data.get("first_run_done", not is_first_run)
 				
 				# Generate ID if missing
 				if player_id == "":

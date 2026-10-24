@@ -27,6 +27,25 @@ func _ready():
 	create_tween().tween_property(self, "modulate:a", 1.0, 0.5)
 	style_back_button()
 	style_header()
+	_add_shapes_button()
+
+## Opens the shape tree (starting shapes bought with shards).
+func _add_shapes_button():
+	var back_btn = $UI/TopBar/BackButton
+	var btn := Button.new()
+	btn.text = "SHAPE TREE"
+	btn.custom_minimum_size = Vector2(190, 0)
+	btn.add_theme_font_size_override("font_size", 20)
+	back_btn.get_parent().add_child(btn)
+	back_btn.get_parent().move_child(btn, back_btn.get_index())
+	NeonUI.style_button(btn, NeonUI.GOLD)
+	setup_button_animations(btn)
+	btn.pressed.connect(func():
+		var t = create_tween()
+		t.tween_property(self, "modulate:a", 0.0, 0.3)
+		t.tween_callback(func():
+			GlobalData.next_scene_path = "res://scenes/shape_tree.tscn"
+			Transition.go("res://scenes/loading_screen.tscn")))
 
 func style_header():
 	NeonUI.style_title($UI/TitleLabel, NeonUI.CYAN)

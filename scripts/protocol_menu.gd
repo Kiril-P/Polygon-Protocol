@@ -13,6 +13,8 @@ var _mode_buttons: Dictionary = {}
 var _deploy: Button
 var _toggles: Dictionary = {}
 var _closing := false
+var _shape_label: Label
+var _shape_glyph: ShapeGlyph
 
 static func open(host: Node, deploy_callback: Callable) -> ProtocolMenu:
 	var m := ProtocolMenu.new()
@@ -72,7 +74,7 @@ func _build():
 
 	_body = VBoxContainer.new()
 	_body.add_theme_constant_override("separation", 12)
-	_body.custom_minimum_size = Vector2(0, 330)
+	_body.custom_minimum_size = Vector2(0, 400)
 	root.add_child(_body)
 
 	_desc = Label.new()
@@ -143,6 +145,7 @@ func _refresh():
 	_update_footer()
 
 func _build_standard():
+	_build_shape_row()
 	var hint := Label.new()
 	hint.text = "Stack any protocols. Each makes the run harder and raises your score and shard multiplier."
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -170,6 +173,58 @@ func _build_standard():
 		grid.add_child(b)
 		_toggles[id] = b
 		_update_toggle(id)
+
+## Starting shape selector (only when a shape beyond the circle is unlocked).
+func _build_shape_row():
+	var gd = get_node("/root/GlobalData")
+	if gd.unlocked_shapes.size() <= 1:
+		var tip := Label.new()
+		tip.text = "Unlock new starting shapes with shards: Evolution Vault > Shape Tree."
+		tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tip.add_theme_font_size_override("font_size", 16)
+		tip.add_theme_color_override("font_color", Color(0.5, 0.65, 0.8))
+		_body.add_child(tip)
+		return
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 14)
+	_body.add_child(row)
+	var prev := _button("<", func(): _cycle_shape(-1))
+	prev.custom_minimum_size = Vector2(56, 52)
+	row.add_child(prev)
+	_shape_glyph = ShapeGlyph.new()
+	_shape_glyph.custom_minimum_size = Vector2(56, 52)
+	row.add_child(_shape_glyph)
+	_shape_label = Label.new()
+	_shape_label.custom_minimum_size = Vector2(600, 64)
+	_shape_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_shape_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_shape_label.add_theme_font_size_override("font_size", 17)
+	row.add_child(_shape_label)
+	var nxt := _button(">", func(): _cycle_shape(1))
+	nxt.custom_minimum_size = Vector2(56, 52)
+	row.add_child(nxt)
+	_update_shape_row()
+
+func _cycle_shape(dir: int):
+	var gd = get_node("/root/GlobalData")
+	var owned: Array = []
+	for id in PlayerShapes.ids():
+		if gd.has_shape(id):
+			owned.append(id)
+	var idx := owned.find(gd.selected_shape)
+	gd.select_shape(owned[posmod(idx + dir, owned.size())])
+	_update_shape_row()
+
+func _update_shape_row():
+	var gd = get_node("/root/GlobalData")
+	var def := PlayerShapes.get_def(gd.selected_shape)
+	if def.is_empty() or not is_instance_valid(_shape_label):
+		return
+	_shape_label.text = "START AS %s\n%s" % [def["name"], def["desc"]]
+	_shape_label.add_theme_color_override("font_color", NeonUI.GREEN.lerp(Color.WHITE, 0.3))
+	_shape_glyph.sides = int(def["sides"])
+	_shape_glyph.color = NeonUI.GREEN
 
 func _update_toggle(id: String):
 	var b: Button = _toggles[id]
