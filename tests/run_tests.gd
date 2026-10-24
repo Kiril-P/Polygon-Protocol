@@ -1,5 +1,5 @@
 extends Node
-## Headless checks for the first run, shapes, telemetry, death report, combo tiers and juice.
+## Headless checks for the first run, shapes, telemetry, death report, combo tiers, juice, bosses and waves.
 ##   Godot --headless --path . res://tests/run_tests.tscn
 ## Never writes the real save, settings or telemetry log, and never posts online.
 ## (Run as a scene, not with -s: scripts that name autoloads only compile once those exist.)
@@ -38,6 +38,10 @@ func _ready():
 	await test_death_and_telemetry(gd)
 	await test_juice(gd)
 	await test_layout(gd)
+	test_boss_table()
+	await test_bosses(gd)
+	await test_boss_schedule(gd)
+	test_waves(gd)
 
 	print("\n%d checks, %d failed" % [checks, failures])
 	get_tree().quit(1 if failures > 0 else 0)
@@ -431,3 +435,228 @@ func test_layout(gd):
 	var how: Label = screen_node.find_child("HowDetail", true, false)
 	check(how != null and how.get_line_count() <= 4, "how-you-died text wraps to at most 4 lines (%d)" % (how.get_line_count() if how else -1))
 	await _free_game(game)
+
+# ------------------------------------------------------------------ bosses & waves
+func _wait(sec: float):
+	await get_tree().create_timer(sec, true, false, true).timeout
+
+## A running game with a player that cannot die or level up mid-test, and the spawner released.
+func _boss_game(gd) -> Array:
+	gd.first_run_done = true
+	gd.set_run("standard", [])
+	var game := await _spawn_game()
+	var p = get_tree().get_first_node_in_group("player")
+	p.max_hearts = 999
+	p.current_hearts = 999
+	p.xp_to_next_level = 1.0e12
+	var sp = get_tree().get_first_node_in_group("spawner")
+	sp.tutorial_finished = true
+	return [game, p, sp]
+
+func _bosses_alive() -> int:
+	var n := 0
+	for b in get_tree().get_nodes_in_group("bosses"):
+		if is_instance_valid(b) and not b.is_queued_for_deletion():
+			n += 1
+	return n
+
+## Pops hearts the way the dash does, skipping the invulnerable beat between phases.
+func _pop_hearts(boss, count: int):
+	for i in count:
+		boss.transitioning = false
+		boss.heart_hit()
+
+func test_boss_table():
+	print("boss table")
+	for id in BossTable.ids():
+		var def := BossTable.get_def(id)
+		check(ResourceLoader.exists(def["script"]), "%s: script exists" % id)
+		check(AudioManager.BOSS_MAX_PHASE.has(id), "%s: has a music entry" % id)
+		for layer in AudioManager.BOSS_LAYERS:
+			check(ResourceLoader.exists("%sboss_%s_%s.ogg" % [AudioManager.MUSIC_DIR, id, layer]), "%s: %s stem exists" % [id, layer])
+	var sp := Spawner.new()
+	for i in 8:
+		for id in sp._encounter(i)["bosses"]:
+			check(BossTable.LIST.has(id), "encounter %d boss '%s' is in the table" % [i, id])
+	sp.free()
+
+func test_bosses(gd):
+	print("bosses")
+	var env := await _boss_game(gd)
+	var game: Node = env[0]
+	var p = env[1]
+	var sp = env[2]
+
+	for id in BossTable.ids():
+		var def := BossTable.get_def(id)
+		sp.spawn_encounter([id])
+		await _wait(0.4)
+		var boss = get_tree().get_first_node_in_group("bosses")
+		check(boss != null and boss.boss_id == id, "%s: spawns with its id" % id)
+		check(boss.boss_title == def["title"], "%s: title comes from the table" % id)
+		var arenas := get_tree().get_nodes_in_group("boss_arena_node")
+		check(arenas.size() == 1 and arenas[0].kind == def["arena"], "%s: one %s arena" % [id, def["arena"]])
+		check(p.dash_nerf_active, "%s: dash nerf on" % id)
+
+		# Chip damage can never finish a boss or trigger a phase by itself
+		var before: float = boss.health
+		boss.take_damage(1.0e9)
+		check(before - boss.health <= boss.max_health * BossBase.CHIP_CAP + 0.01, "%s: one chip hit takes at most %.2f%%" % [id, BossBase.CHIP_CAP * 100.0])
+		for i in 200:
+			boss.take_damage(1.0e9)
+		check(not boss.is_dying and boss.health >= boss.max_health / 18.0 - 0.01, "%s: chip alone leaves at least half a heart" % id)
+		boss.health = boss.max_health
+		boss.phase = 1
+
+		# Three hearts per phase, nine to kill, with no leftover sliver
+		_pop_hearts(boss, 3)
+		check(boss.phase == 2, "%s: phase 2 after 3 hearts" % id)
+		if boss.phase_thresholds.size() >= 2:
+			_pop_hearts(boss, 3)
+			check(boss.phase == 3, "%s: phase 3 after 6 hearts" % id)
+			_pop_hearts(boss, 2)
+			check(boss.health > 0.0 and not boss.is_dying, "%s: still alive after 8 hearts" % id)
+			_pop_hearts(boss, 1)
+		else:
+			_pop_hearts(boss, 5)
+			check(boss.health > 0.0 and not boss.is_dying, "%s: still alive after 8 hearts" % id)
+			_pop_hearts(boss, 1)
+		check(boss.is_dying and boss.health == 0.0, "%s: ninth heart kills exactly" % id)
+		await _wait(4.0)
+		check(_bosses_alive() == 0, "%s: gone after death" % id)
+		check(not p.dash_nerf_active, "%s: dash nerf cleared" % id)
+		await _wait(1.0)
+		check(get_tree().get_nodes_in_group("boss_arena_node").is_empty(), "%s: arena and barrier removed together" % id)
+		for n in game.get_children():
+			if n is StaticBody2D and n.name == "Barrier":
+				check(false, "%s: leaked a barrier" % id)
+		check(get_tree().get_nodes_in_group("boss_hearts").is_empty(), "%s: no hearts left behind" % id)
+
+	# Duo fight: one shared arena; the dash nerf survives the first boss dying
+	sp.spawn_encounter(["fortress", "pulsar"])
+	await _wait(0.4)
+	check(_bosses_alive() == 2, "duo: both bosses spawn")
+	check(get_tree().get_nodes_in_group("boss_arena_node").size() == 1, "duo: one arena for both")
+	var fortress = null
+	for b in get_tree().get_nodes_in_group("bosses"):
+		if b.boss_id == "fortress":
+			fortress = b
+	_pop_hearts(fortress, 9)
+	await _wait(3.5)
+	check(_bosses_alive() == 1, "duo: fortress died, pulsar lives")
+	check(p.dash_nerf_active, "duo: dash nerf stays while the other boss lives")
+	check(get_tree().get_nodes_in_group("boss_arena_node").size() == 1, "duo: arena stays while the other boss lives")
+	var pulsar = get_tree().get_first_node_in_group("bosses")
+	_pop_hearts(pulsar, 9)
+	await _wait(5.0)
+	check(_bosses_alive() == 0 and not p.dash_nerf_active, "duo: all clear after both die")
+
+	# Boss shards: multiplied, banked at once, counted for the summary
+	gd.total_shards = 0
+	gd.run_boss_shards = 0
+	gd.run_endless_bonus = 1.0
+	check(gd.add_boss_shards(100) == 100 and gd.total_shards == 100 and gd.run_boss_shards == 100, "boss shards bank immediately and are tracked")
+	gd.run_endless_bonus = 1.25
+	check(gd.add_boss_shards(100) == 125, "endless bonus applies to boss shards")
+	gd.run_endless_bonus = 1.0
+
+	# Prism walls: warn, then hurt, then reset
+	sp.spawn_encounter(["prism"])
+	await _wait(0.4)
+	var prism = get_tree().get_first_node_in_group("bosses")
+	var arena: BossArena = get_tree().get_first_node_in_group("boss_arena_node")
+	check(arena.kind == "prism" and arena.wall_count() == 6, "prism: hexagon arena with six walls")
+	check(arena.inner_radius() < arena.radius, "prism: inscribed radius is smaller than the corner radius")
+	arena.overload_walls([0], 0.6, 1.2)
+	check(arena.wall_state(0) == "warn", "prism: wall starts in warning")
+	p.global_position = arena.global_position + arena.wall_mid(0) * 0.97
+	var hearts_before: int = p.current_hearts
+	await _wait(0.4)
+	check(p.current_hearts == hearts_before, "prism: a warning wall does not hurt")
+	await _wait(0.5)
+	check(arena.wall_state(0) == "live", "prism: wall goes live")
+	await _wait(0.4)
+	check(p.current_hearts < hearts_before, "prism: a live wall hurts the player")
+	await _wait(1.0)
+	check(arena.wall_state(0) == "off", "prism: wall resets")
+	prism.start_death_sequence()
+	await _wait(5.0)
+	await _free_game(game)
+
+func test_boss_schedule(gd):
+	print("boss schedule")
+	var env := await _boss_game(gd)
+	var game: Node = env[0]
+	var sp = env[2]
+	check(sp._encounter(0)["at"] == 80 and sp._encounter(0)["bosses"] == ["fortress"], "first boss: Fortress at 1:20")
+	check(sp._encounter(2).get("choice", false), "the 6:00 duo offers a choice")
+	check(sp._encounter(4)["bosses"] == ["prism"] and sp._encounter(4)["at"] == 900, "Prism arrives at 15:00")
+	check(sp._encounter(5)["at"] > sp._encounter(4)["at"] and sp._encounter(5)["loop"] == 1, "the boss loop continues after the ladder")
+	check(sp._encounter(5 + BOSS_LOOP_LEN)["loop"] == 2, "loop lap counter grows")
+	sp.jump_to(350.0)
+	check(sp.encounter_index == 2, "jump_to(350) points at the 6:00 choice")
+
+	# The 10-second warning fires once, the fight spawns once
+	sp.jump_to(70.0)
+	check(sp.encounter_index == 0, "jump_to(70) points at the first boss")
+	sp._check_boss_schedule()
+	check(sp.warned_index == 0, "warning shown for encounter 0")
+	sp._check_boss_schedule()
+	check(sp.encounter_index == 0 and _bosses_alive() == 0, "no boss before its time")
+	sp.time_passed = 80.0
+	sp._check_boss_schedule()
+	await _wait(0.3)
+	check(_bosses_alive() == 1 and sp.encounter_index == 1, "boss spawns at 1:20 and the schedule advances")
+	sp._check_boss_schedule()
+	check(_bosses_alive() == 1, "it does not spawn twice")
+	for b in get_tree().get_nodes_in_group("bosses"):
+		b.queue_free()
+	await _wait(1.0)
+
+	# Declining the 6:00 boss is endless: no more bosses, bonus score
+	sp.jump_to(359.0)
+	sp.time_passed = 360.0
+	sp._check_boss_schedule()
+	check(sp.choice_active and get_tree().paused, "6:00 pauses for the choice")
+	check(get_tree().get_nodes_in_group("choice_nodes").size() == 2, "two choice nodes")
+	sp._on_choice_endless_selected()
+	check(not get_tree().paused and sp.bosses_done, "endless unpauses and ends the boss schedule")
+	sp.time_passed = 5000.0
+	sp._check_boss_schedule()
+	check(_bosses_alive() == 0, "no boss spawns after choosing endless")
+	check(not sp._near_boss_milestone(), "formations are not held back once bosses are over")
+	gd.run_score = 0
+	gd.add_score(100, 0)
+	check(gd.run_score == int(100 * gd.protocol_multiplier() * 1.25), "endless bonus applies to score (%d)" % gd.run_score)
+	gd.run_endless_bonus = 1.0
+	await _free_game(game)
+
+const BOSS_LOOP_LEN := 3
+
+func test_waves(gd):
+	print("waves")
+	var d := SpawnDirector.new()
+	d.load_data()
+	check(d.current_cap(0.0) == 70, "enemy cap starts at 70")
+	check(d.current_cap(600.0) == 110, "enemy cap grows with time, up to cap_max (110)")
+	check(d.current_cap(60000.0) == 110, "enemy cap never exceeds cap_max")
+	check(d.spawn_allowed(69, 0.0) and not d.spawn_allowed(70, 0.0), "spawn_allowed respects the cap")
+	d.rng.seed = 7
+	var heavy := ["tank", "sniper", "aegis", "healer", "spinner", "shooter"]
+	var early := 0
+	var late := 0
+	for i in 3000:
+		if d.pick_enemy(300.0) in heavy:
+			early += 1
+		if d.pick_enemy(700.0) in heavy:
+			late += 1
+	check(late > early, "late waves lean on the dangerous enemies (%d vs %d of 3000)" % [late, early])
+	d.sync_kills(40)
+	check(d._kill_times.is_empty(), "sync_kills drops the boss kill spree")
+	var sp := Spawner.new()
+	sp.time_passed = 0.0
+	check(is_equal_approx(sp.health_scale(), 1.0) and is_equal_approx(sp.speed_scale(), 1.0), "early enemies have base stats")
+	sp.time_passed = 1140.0
+	check(is_equal_approx(sp.health_scale(), 2.0), "enemy health doubles by 19:00")
+	check(sp.speed_scale() > 1.2 and sp.speed_scale() <= 1.3, "enemy speed saturates at +30%")
+	sp.free()

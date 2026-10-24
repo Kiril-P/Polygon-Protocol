@@ -17,8 +17,10 @@ const TIPS := {
 	"SNIPER": "The Sniper's aim locks when its beam flashes white. Move or dash the moment it flashes.",
 	"MENDER": "Menders heal everything near them. Kill the Mender first.",
 	"FORTRESS": "Boss fights drain your dash. Save it for dodging and hit the glowing hearts for big damage.",
-	"PULSAR": "Pulsar lasers flash a warning before they fire. Leave the lane when it flashes, then hit the hearts.",
+	"PULSAR": "Pulsar's lasers never stop turning. Stand on a green shelter platform to block them and refuel your dash, and dash through the hearts in the gaps.",
 	"SINGULARITY": "The Singularity blinks and pulls you in. Keep dash energy to escape the pull and watch for the gaps in its rings.",
+	"PRISM": "The Prism fires fans aimed at you. Keep moving sideways and watch the arena walls: a flashing amber wall turns deadly 1.4 seconds later.",
+	"ARENA WALL": "Prism walls flash amber before they overload. Stay away from a flashing wall and cut across the middle to reach the hearts.",
 	"DATA CORRUPTION": "Glitch zones grow for a few seconds. Leave the area as soon as one appears.",
 	"ENEMY FIRE": "Stray bullets add up. Dash through them: dashing makes you untouchable.",
 }

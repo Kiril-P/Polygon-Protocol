@@ -88,8 +88,18 @@ func event_count(ev: Dictionary, t: float) -> int:
 func start_breather():
 	_breather_left = float(cfg.get("breather_seconds", 0.0))
 
-func spawn_allowed(alive_enemies: int) -> bool:
-	return alive_enemies < int(cfg.get("enemy_cap", 9999))
+## The cap starts at `enemy_cap` and grows by `cap_per_minute` up to `cap_max`.
+func current_cap(t: float) -> int:
+	var cap := float(cfg.get("enemy_cap", 9999)) + float(cfg.get("cap_per_minute", 0.0)) * t / 60.0
+	return mini(int(cap), int(cfg.get("cap_max", 9999)))
+
+func spawn_allowed(alive_enemies: int, t: float = 0.0) -> bool:
+	return alive_enemies < current_cap(t)
+
+## Forget kills made while the wave clock was paused (boss fights).
+func sync_kills(total_kills: int):
+	_last_kills = total_kills
+	_kill_times.clear()
 
 ## Multiplier applied on top of the base spawn rate.
 func rate_multiplier() -> float:

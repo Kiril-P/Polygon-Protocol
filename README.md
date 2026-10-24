@@ -35,12 +35,15 @@
 - **Counters and synergies**: new upgrades answer the new threats, and stacking the right upgrades triggers named synergies (Storm Front, Chain Reaction, Cascade and more).
 - **Protocols**: pick risk/reward modifiers before a run (Swarm, Hunters, Glass Core, Low Power, Vanguard, No Repairs, Elite Tide) for a higher score and shard multiplier.
 - **Daily Protocol**: one seeded run per day, with the same enemy sequence for everyone, a streak counter and its own online leaderboard.
-- **Third boss and adaptive boss music**, a rebuilt HUD, rebuilt sound effects, a title sequence, screen transitions and a run-summary death screen with a "new best" moment.
+- **Four bosses, each with adaptive music**, a rebuilt HUD, rebuilt sound effects, a title sequence, screen transitions and a run-summary death screen with a "new best" moment.
 - **Accessibility**: glow and screen-shake sliders, reduced-flash mode, colour-blind-safe palettes, a bigger HUD option and full key rebinding.
 - **Controller and touch support**: gamepad with menu navigation and vibration, plus on-screen touch controls for phones and tablets in the browser build.
 - **Two-minute guided first run**: new players get five short lessons (move, dash, level up, shoot, combo) against slowed, hand-placed enemies before the real run starts at 0:00. It can be skipped.
 - **"How you died"**: the death screen says what hit you, how fast you went down, and one thing to try next time.
 - **Shape tree**: spend shards in the Evolution Vault to unlock starting shapes (Spark, Bastion, Comet, Hive). Each starts already evolved, with a trade-off for the run.
+- **Fourth boss and a new arena**: **Prism** fights inside a hexagon whose walls overload (amber flash, then deadly), with its own adaptive music. It arrives at 15:00.
+- **Bosses rebuilt on one system**: all four share an arena, heart and phase framework. Chip damage can no longer finish a boss (only hearts do), duo fights keep the dash nerf until both die, and every boss announces its phases.
+- **Endless mode and late waves**: declining the 6:00 boss now says what you get (no more bosses, +25% score and shards). Staying in means a boss pair every 6 minutes after 15:00, tougher each lap. Enemies get tougher over time instead of just more numerous, and the late mix leans on Tanks, Snipers, Aegis and Menders.
 - **Juice pass**: hit-stop on heavy and dash kills, an escalating combo meter (Chain, Surge, Frenzy, Overload, Singularity), a directional camera punch, and shattering death effects. Hit-stop and screen shake can be turned off in Accessibility.
 
 Polygon Protocol is a score-chasing survival game set in a hostile digital void. Every run pushes you to manage dash energy, route enemies cleanly, survive escalating waves, and build toward a form powerful enough to handle its boss fights. What starts as a minimalist arcade survival game quickly opens into build decisions, permanent upgrades, and a tighter risk/reward loop around movement and invulnerability.
@@ -52,7 +55,7 @@ Built in **Godot 4.5**, the project blends bullet hell pressure, dash-based aggr
 - **Shape evolution changes combat**: start as a circle, then evolve into multi-sided forms that add more firing angles and turn movement into offense.
 - **Dash-first survival**: your dash is both escape tool and kill tool, with invulnerability during use and an energy economy that forces commitment.
 - **Build variety every run**: level-up choices can push you toward faster fire, harder hits, bounce tech, gravity pull, explosive shots, or continuous beam play.
-- **Bosses with actual mechanics**: Fortress, Pulsar and Singularity are not simple health sponges. You need to hunt vulnerable boss hearts and break the pattern under pressure.
+- **Bosses with actual mechanics**: Fortress, Pulsar, Singularity and Prism are not simple health sponges. You need to hunt vulnerable boss hearts and break the pattern under pressure.
 - **Meta progression that matters**: earn Quantum Shards, spend them in the Evolution Vault, and unlock permanent upgrades that change future runs.
 - **Competitive layer**: local high scores and online leaderboard uploads are supported through SilentWolf integration.
 
@@ -131,7 +134,7 @@ When a run ends, the game can send one small anonymous record to the SilentWolf 
 
 ## Tests
 
-Headless checks for the first run, shapes, telemetry, death report and juice:
+Headless checks for the first run, shapes, telemetry, death report, juice, bosses and waves:
 
 ```text
 Godot --headless --path . res://tests/run_tests.tscn
@@ -143,7 +146,7 @@ They never touch your save, settings or the online boards.
 
 - Late-run balance passes based on player feedback
 - More upgrade interactions and stronger build identities
-- More bosses and endgame content
+- More bosses and arenas (a boss is one script plus one entry in `scripts/boss_table.gd`)
 - Continued polish on mobile and the browser build
 
 ## Repo Purpose

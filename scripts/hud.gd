@@ -229,11 +229,11 @@ func setup_warning_label():
 	$Control.add_child(warn)
 
 ## Big callout when a boss changes phase (own label so it never fights the warning tweens).
-func show_boss_phase(text: String):
+func show_boss_phase(text: String, color: Color = Color(0.85, 0.35, 1.0)):
 	var label := Label.new()
 	label.text = text
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	NeonUI.style_title(label, Color(0.85, 0.35, 1.0), 56)
+	NeonUI.style_title(label, color, 56)
 	label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE)
 	label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	label.position.y = 210
@@ -298,14 +298,15 @@ func _next_intel():
 	t.tween_callback(box.queue_free)
 	t.tween_callback(_next_intel)
 
-func show_boss_warning(seconds: int = 0):
+func show_boss_warning(seconds: int = 0, boss_title: String = ""):
 	var warn = $Control.get_node_or_null("BossWarning")
 	if warn:
 		warn.visible = true
+		var who := boss_title if boss_title != "" else "CORRUPTED PROTOCOL"
 		if seconds > 0:
-			warn.text = "CORRUPTED PROTOCOL INBOUND - %ds" % seconds
+			warn.text = "%s INBOUND - %ds" % [who, seconds]
 		else:
-			warn.text = "CORRUPTED PROTOCOL INBOUND"
+			warn.text = "%s INBOUND" % who
 		warn.modulate = Color(2.0, 0.2, 0.2, 0.0) # Intense Red Glow
 		warn.scale = Vector2(0.5, 0.5)
 		
@@ -403,15 +404,7 @@ func _process(_delta):
 				active_bar.max_value = boss_node_ref.max_health
 				active_bar.value = boss_node_ref.health
 				
-				var boss_display_name = "CORRUPTED PROTOCOL"
-				if boss_node_ref.get_script().resource_path.contains("boss_fortress"):
-					boss_display_name = "FORTRESS PROTOCOL"
-				elif boss_node_ref.get_script().resource_path.contains("boss_pulsar"):
-					boss_display_name = "PULSAR PROTOCOL"
-				elif boss_node_ref.get_script().resource_path.contains("boss_singularity"):
-					boss_display_name = "SINGULARITY PROTOCOL"
-				
-				active_label.text = boss_display_name
+				active_label.text = str(boss_node_ref.get("boss_title")) if boss_node_ref.get("boss_title") else "CORRUPTED PROTOCOL"
 		
 		# Cleanup bars for bosses that are gone
 		for child in existing_bars:

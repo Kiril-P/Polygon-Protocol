@@ -268,7 +268,7 @@ func _finish(skipped: bool):
 	gd.first_run_done = true
 	gd.save_game()
 	if is_instance_valid(spawner):
-		spawner.time_passed = 0.0
+		spawner.reset_clock()
 		spawner.spawn_timer = 10.0 # First wave right away, as after the old tutorial
 		spawner.tutorial_finished = true
 	if is_instance_valid(_layer):

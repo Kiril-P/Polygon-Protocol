@@ -59,10 +59,11 @@ func die(hit_by_player: bool):
 	is_dying = true
 	
 	if hit_by_player and boss and is_instance_valid(boss):
-		# Boss takes significant damage from heart destruction
-		var damage_percent = 0.111 # ~11% for Bosses (9 hearts total to kill)
-		
-		boss.take_damage(boss.max_health * damage_percent) 
+		# Nine hearts kill a boss; BossBase does the maths and the phase changes
+		if boss.has_method("heart_hit"):
+			boss.heart_hit()
+		else:
+			boss.take_damage(boss.max_health / 9.0)
 		
 		# Feedback sound and screen shake
 		AudioManager.play_sfx("pillar_hit")

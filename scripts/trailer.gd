@@ -93,7 +93,7 @@ func _run_timeline():
 	await _wait(3.0)
 	# Boss
 	_boss_started = true
-	spawner.spawn_major_boss(80)
+	spawner.spawn_major_boss("fortress")
 	await _wait(maxf(length - _clock - 6.5, 4.0))
 	await _end_card()
 	get_tree().quit()
