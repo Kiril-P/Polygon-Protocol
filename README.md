@@ -128,6 +128,10 @@ scripts/   Core gameplay logic, bosses, player systems, upgrades, HUD, and persi
 - More bosses and endgame content
 - Continued polish on mobile and the browser build
 
+## Credits
+
+All music and sound effects are original and generated from code (`tools/audio`). Third-party assets (Kenney packs under CC0, the SilentWolf plugin) are listed in [CREDITS.md](CREDITS.md).
+
 ## Repo Purpose
 
 This repository contains the source for Polygon Protocol, including gameplay systems, progression logic, exported builds, and the current structure used to keep expanding the game. If you want to follow development, play the latest public build, or inspect how the systems are put together in Godot, this is the place.
