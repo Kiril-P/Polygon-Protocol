@@ -24,5 +24,5 @@ Each Kenney pack ships with its own `License.txt`. CC0 needs no credit, but than
 - **Comfortaa Bold** (`addons/silent_wolf/assets/fonts/`) by Johan Aakerlund, bundled with SilentWolf, SIL Open Font License 1.1.
 - **Godot Engine** 4.5, MIT license, https://godotengine.org/.
 
-## Not covered by a license
-The repository itself has no `LICENSE` file, so the source code and art made for this game are all rights reserved by default.
+## License
+The original source code and art made for this game are under the MIT License (see `LICENSE`). Third-party assets listed above keep their own licenses.
