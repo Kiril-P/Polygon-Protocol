@@ -15,6 +15,9 @@ var run_kills: int = 0 # Current run kills
 var run_score: int = 0 # Current run score
 var run_level: int = 1 # Current run level
 var run_time: float = 0.0 # Current run survival time
+var run_boss_shards: int = 0 # Shards from bosses this run (already banked when earned)
+var bosses_killed: int = 0 # Bosses killed this run
+var run_endless_bonus: float = 1.0 # Score and shard bonus for declining the 6:00 boss fight
 var use_mouse_controls: bool = false # WASD by default
 var show_tutorial: bool = true
 var audio_settings = {
@@ -209,9 +212,29 @@ func add_shards(amount: int):
 	total_shards += amount
 	save_game()
 
+## Boss kills pay out immediately and get the same multipliers as the end-of-run shards.
+## Returns what was actually paid.
+func add_boss_shards(base: int) -> int:
+	var amount := base
+	if has_upgrade("shard_multiplier"):
+		amount = int(amount * 1.5)
+	amount = int(amount * protocol_multiplier() * run_endless_bonus)
+	run_boss_shards += amount
+	add_shards(amount)
+	return amount
+
+func reset_run_stats():
+	run_kills = 0
+	run_score = 0
+	run_level = 1
+	run_time = 0.0
+	run_boss_shards = 0
+	bosses_killed = 0
+	run_endless_bonus = 1.0
+
 func add_score(base_points: int, combo: int):
 	var multiplier = 1.0 + (combo * 0.1)
-	run_score += int(base_points * multiplier * protocol_multiplier())
+	run_score += int(base_points * multiplier * protocol_multiplier() * run_endless_bonus)
 
 func update_leaderboard(p_name: String, score: int, kills: int, level: int, time: float):
 	player_name = p_name

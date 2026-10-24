@@ -53,7 +53,7 @@ var SFX := {
 }
 
 ## Boss music: id -> highest phase (that phase gets every layer, including the lead).
-const BOSS_MAX_PHASE := {"fortress": 2, "pulsar": 3, "singularity": 3}
+const BOSS_MAX_PHASE := {"fortress": 2, "pulsar": 3, "singularity": 3, "prism": 3}
 const BOSS_LAYERS := ["found", "drums", "arp", "lead"]
 
 var sfx_streams: Dictionary = {}          # file base name -> AudioStream

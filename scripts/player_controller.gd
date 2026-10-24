@@ -149,10 +149,7 @@ func _ready():
 	
 	# Reset Run Stats
 	var _gd = GlobalData
-	_gd.run_kills = 0
-	_gd.run_score = 0
-	_gd.run_level = 1
-	_gd.run_time = 0.0
+	_gd.reset_run_stats()
 	overdrive_available = _gd.is_upgrade_active("emergency_overdrive")
 
 	UpgradeManager.reset_upgrades()
@@ -276,7 +273,7 @@ func show_full_tutorial():
 	var spawner = get_tree().get_first_node_in_group("spawner")
 	if spawner:
 		spawner.tutorial_finished = true
-		spawner.time_passed = 0.0
+		spawner.reset_clock()
 	
 	var label = Label.new()
 	var use_mouse = GlobalData.use_mouse_controls
@@ -343,30 +340,21 @@ func _input(event):
 			add_xp(xp_to_next_level)
 			print("DEBUG: Level Up Forced")
 		
-		# BOSS DEBUG SPAWNS
-		if event.keycode == KEY_K:
+		# BOSS DEBUG SPAWNS (K Fortress, J Pulsar, I Singularity, U Prism, H jump to the 6:00 choice)
+		var boss_keys := {KEY_K: "fortress", KEY_J: "pulsar", KEY_I: "singularity", KEY_U: "prism"}
+		if boss_keys.has(event.keycode):
 			var spawner = get_tree().get_first_node_in_group("spawner")
 			if spawner:
-				spawner.spawn_major_boss(80)
-				print("DEBUG: Boss 1 (Fortress) Spawned")
-		if event.keycode == KEY_J:
-			var spawner = get_tree().get_first_node_in_group("spawner")
-			if spawner:
-				spawner.spawn_major_boss(180)
-				print("DEBUG: Boss 2 (Pulsar) Spawned")
-		if event.keycode == KEY_I:
-			var spawner = get_tree().get_first_node_in_group("spawner")
-			if spawner:
-				spawner.spawn_major_boss(600)
-				print("DEBUG: Boss 3 (Singularity) Spawned")
+				spawner.spawn_major_boss(boss_keys[event.keycode], player_spawn_pos_for_debug())
+				print("DEBUG: boss spawned: ", boss_keys[event.keycode])
 		if event.keycode == KEY_H:
 			var spawner = get_tree().get_first_node_in_group("spawner")
 			if spawner:
-				spawner.time_passed = 350.0
-				spawner.bosses_spawned.erase(360)
-				spawner.choice_made_360 = false
-				spawner.choice_active = false
+				spawner.jump_to(350.0)
 				print("DEBUG: Fast-forward to 6-min Boss Choice")
+
+func player_spawn_pos_for_debug() -> Vector2:
+	return global_position + Vector2(840.0, 0).rotated(randf() * TAU)
 
 func skip_tutorial():
 	if tutorial_tween:
@@ -381,7 +369,7 @@ func finish_tutorial():
 	var spawner = get_tree().get_first_node_in_group("spawner")
 	if spawner and not spawner.tutorial_finished:
 		spawner.tutorial_finished = true
-		spawner.time_passed = 0.0 
+		spawner.reset_clock()
 		spawner.spawn_timer = 10.0 # Force immediate spawn after safety window
 
 func _physics_process(delta: float):
@@ -1348,7 +1336,7 @@ func pause_game_fractured():
 		
 		var time_label = Label.new()
 		var spawner = get_tree().get_first_node_in_group("spawner")
-		var t = spawner.time_passed if spawner else 0.0
+		var t = spawner.elapsed if spawner else 0.0
 		time_label.text = "TIME: %02d:%02d" % [int(t / 60), int(t) % 60]
 		time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		time_label.add_theme_font_size_override("font_size", 28)
@@ -1856,21 +1844,22 @@ func die():
 	# Calculate shards earned this run (e.g., 10 per level)
 	var shards_earned = level * 10
 	
-	# Update High Score
+	# Update High Score (real run clock: time spent in boss fights counts)
 	var time_survived = 0.0
 	var spawner = get_tree().get_first_node_in_group("spawner")
 	if spawner:
-		time_survived = spawner.time_passed
+		time_survived = spawner.elapsed
 	
 	var gd = GlobalData
-	gd.run_time = spawner.time_passed if spawner else 0.0
+	gd.run_time = time_survived
 	gd.daily_submit_state = ""
 	var prev_records: Dictionary = gd.records.duplicate()
 	if gd.has_upgrade("shard_multiplier"):
 		shards_earned = int(shards_earned * 1.5)
-	shards_earned = int(shards_earned * gd.protocol_multiplier())
+	shards_earned = int(shards_earned * gd.protocol_multiplier() * gd.run_endless_bonus)
 		
-	gd.add_shards(shards_earned)
+	gd.add_shards(shards_earned) # Boss shards were banked when each boss died
+	shards_earned += gd.run_boss_shards # ...but the summary shows the whole run
 	if gd.run_score > gd.high_score_points:
 		gd.high_score_points = gd.run_score
 		gd.best_kills = gd.run_kills
@@ -1902,7 +1891,7 @@ func die():
 		"level": level,
 		"shards": shards_earned,
 		"highest_combo": highest_combo_run,
-		"time": spawner.time_passed if spawner else 0.0,
+		"time": time_survived,
 		"daily": daily,
 		"score": gd.run_score,
 		"kills": gd.run_kills,

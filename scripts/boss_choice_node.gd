@@ -3,6 +3,7 @@ extends Area2D
 signal chosen
 
 var label_text: String = ""
+var sub_text: String = "" # Second line: what you get
 var is_boss_choice: bool = true
 var player: Node2D = null
 var visual_container: Node2D = null
@@ -40,6 +41,16 @@ func _ready():
 	label.position = Vector2(-200, -160) 
 	label.size = Vector2(400, 50)
 	add_child(label)
+	
+	if sub_text != "":
+		var sub := Label.new()
+		sub.text = sub_text
+		sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sub.add_theme_font_size_override("font_size", 20)
+		sub.modulate = color.lerp(Color.WHITE, 0.5)
+		sub.position = Vector2(-200, -118)
+		sub.size = Vector2(400, 60)
+		add_child(sub)
 	
 	# Dash Requirement Label
 	var dash_label = Label.new()

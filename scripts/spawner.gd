@@ -1,3 +1,4 @@
+class_name Spawner
 extends Node2D
 
 @export var enemy_types: Array[PackedScene] = []
@@ -13,15 +14,30 @@ var hazard_timer: float = 0.0
 const HAZARD_INTERVAL: float = 12.0
 
 var boss_active: bool = false
-var bosses_spawned: Array[int] = [] # Track which milestones were hit
 var corruption_warning_shown: bool = false
 var choice_active: bool = false
-var endless_chosen: bool = false # Declined the 6:00 boss fight, so no third boss either
-var choice_made_360: bool = false
+var choice_made: bool = false # The player answered the current encounter's choice
+var bosses_done: bool = false # Declined the 6:00 fight: endless mode, no more bosses
+var encounter_index: int = 0 # Next entry of the boss schedule (see _encounter)
+var warned_index: int = -1 # Encounter whose 10-second warning was already shown
+## Real run clock: ticks through boss fights too. `time_passed` is the "wave clock"
+## (it pauses during bosses, so enemy mix, events and boss times are measured in fighting time).
+var elapsed: float = 0.0
 
 # Index of each enemy in the `enemy_types` array (matches scenes/game.tscn)
 const ENEMY_INDEX := {"chaser": 0, "fairy": 1, "shooter": 2, "spinner": 3, "tank": 4, "zigzagger": 5, "kamikaze": 6, "aegis": 7, "splitter": 8, "sniper": 9, "healer": 10}
-const BOSS_MILESTONES := [80, 180, 360, 600]
+## Boss schedule in wave-clock seconds. `choice` offers the player a way out (endless mode).
+const BOSS_LADDER := [
+	{"at": 80, "bosses": ["fortress"]},
+	{"at": 180, "bosses": ["pulsar"]},
+	{"at": 360, "bosses": ["fortress", "pulsar"], "choice": true},
+	{"at": 600, "bosses": ["singularity"]},
+	{"at": 900, "bosses": ["prism"]},
+]
+## After the ladder a pair of bosses arrives every BOSS_LOOP_EVERY seconds, tougher each lap.
+const BOSS_LOOP_EVERY := 360.0
+const BOSS_LOOP := [["pulsar", "singularity"], ["fortress", "prism"], ["singularity", "prism"]]
+const ENDLESS_BONUS := 1.25
 
 var director := SpawnDirector.new()
 
@@ -38,44 +54,14 @@ func _ready():
 func _process(delta: float):
 	if not tutorial_finished:
 		return
-		
-	# BOSS MILESTONES: Pause timer at 80s (1:20), 180s (3:00), 360s (6:00) and 600s (10:00)
-	var milestone_times = BOSS_MILESTONES
-	for m in milestone_times:
-		if m == 600 and endless_chosen:
-			continue
-		# Show warning 10 seconds before (Trigger only once)
-		if int(time_passed) == m - 10 and not bosses_spawned.has(m):
-			var hud = get_tree().get_first_node_in_group("hud")
-			if hud and hud.has_method("show_boss_warning"):
-				hud.show_boss_warning(10)
-				AudioManager.play_sfx("boss_warning")
-		
-		if int(time_passed) == m and not bosses_spawned.has(m):
-			if m == 360 and not choice_made_360:
-				if not choice_active:
-					spawn_6min_choice()
-				return # Stop here until choice is made
-			
-			if m == 360:
-				# Spawn BOTH bosses at 6 minutes in the same spot
-				var angle = randf() * TAU
-				var spawn_pos = player.global_position + Vector2(spawn_radius * 1.2, 0).rotated(angle)
-				spawn_major_boss(80, spawn_pos) # Fortress
-				spawn_major_boss(180, spawn_pos) # Pulsar
-			else:
-				spawn_major_boss(m)
-			
-			bosses_spawned.append(m)
-			boss_active = true
-			
-	# Update boss_active state based on actual nodes in group
-	var active_bosses = get_tree().get_nodes_in_group("bosses")
-	boss_active = active_bosses.size() > 0 or choice_active
-	
+	elapsed += delta
+
+	boss_active = get_tree().get_nodes_in_group("bosses").size() > 0 or choice_active
 	if not boss_active:
 		time_passed += delta
-	
+		_check_boss_schedule()
+		boss_active = get_tree().get_nodes_in_group("bosses").size() > 0 or choice_active
+
 	# Reduced safety window after tutorial/start
 	var current_delay = spawn_delay
 	if GlobalData.is_first_run:
@@ -86,39 +72,37 @@ func _process(delta: float):
 	if time_passed < current_delay:
 		return
 
-	# Gradually increase spawn rate (Aggressive scaling after 60s)
-	var time_factor = (time_passed - spawn_delay) / 60.0 # Normalized to 1.0 at 60s
-	var scaling = 1.0 + (time_factor * 0.5) # Base scaling
-	
-	if time_passed > 60.0:
-		# Add exponential component after 60s (Slightly nerfed scaling)
-		var post_60_time = (time_passed - 60.0) / 60.0
-		scaling += pow(post_60_time, 1.4) * 1.2 
-		
-	var difficulty_mult = 1.0
-	var level = GlobalData.difficulty_level
-	# 1: 0.7x, 2: 1.0x, 3: 1.5x, 4: 2.0x, 5: 3.0x
+	# Spawn rate ramps up quickly until 4:00, then stays flat: from there the enemy cap is the
+	# limit, so late difficulty comes from enemy stats, the mix and the cap (see below).
+	var t_rate := minf(time_passed, 240.0)
+	var time_factor = (t_rate - spawn_delay) / 60.0
+	var scaling = 1.0 + (time_factor * 0.5)
+	if t_rate > 60.0:
+		scaling += pow((t_rate - 60.0) / 60.0, 1.4) * 1.2
+
 	var multipliers = [0.0, 0.7, 1.0, 1.5, 2.0, 3.0]
-	difficulty_mult = multipliers[level]
-	
+	var difficulty_mult: float = multipliers[GlobalData.difficulty_level]
+
 	var base_spawn_rate = spawn_rate * difficulty_mult * scaling
 	var hearts_ratio = 1.0
 	if player and is_instance_valid(player):
 		hearts_ratio = float(player.current_hearts) / maxf(1.0, float(player.max_hearts))
-	director.update(delta, time_passed, hearts_ratio, GlobalData.run_kills, base_spawn_rate)
+	if not boss_active:
+		# The director reads kill rate against a rate the cap can actually sustain
+		director.update(delta, time_passed, hearts_ratio, GlobalData.run_kills, minf(base_spawn_rate, 6.0))
 	var current_spawn_rate = base_spawn_rate * director.rate_multiplier()
 	if GlobalData.protocol_active("swarm"):
 		current_spawn_rate *= 1.4
-	
+
 	if not boss_active:
 		spawn_timer += delta
 		if spawn_timer >= 1.0 / current_spawn_rate:
 			spawn_timer = 0.0
-			if director.spawn_allowed(get_tree().get_nodes_in_group("enemies").size()):
+			if director.spawn_allowed(get_tree().get_nodes_in_group("enemies").size(), time_passed):
 				spawn_enemy()
-		
-		for ev in director.due_events(time_passed):
-			if not _near_boss_milestone():
+
+		if not _near_boss_milestone():
+			for ev in director.due_events(time_passed):
 				_spawn_event(ev)
 
 	if not boss_active:
@@ -172,13 +156,62 @@ func spawn_hazard():
 	hazard.monitorable = true
 	hazard.monitoring = true
 
-## True shortly before a boss milestone, so formations never stack on the boss warning.
+## True shortly before the next boss, so formations never stack on the boss warning.
 func _near_boss_milestone() -> bool:
+	if bosses_done:
+		return false
 	var buffer := float(director.cfg.get("event_boss_buffer_seconds", 12.0))
-	for m in BOSS_MILESTONES:
-		if not bosses_spawned.has(m) and time_passed >= m - buffer and time_passed < m + 1.0:
-			return true
-	return false
+	return time_passed >= float(_encounter(encounter_index)["at"]) - buffer
+
+## Boss schedule entry `i`: {at, bosses, choice, loop}. Past the ladder it repeats BOSS_LOOP.
+func _encounter(i: int) -> Dictionary:
+	if i < BOSS_LADDER.size():
+		var e: Dictionary = BOSS_LADDER[i].duplicate()
+		e["loop"] = 0
+		return e
+	var j := i - BOSS_LADDER.size()
+	return {
+		"at": float(BOSS_LADDER[BOSS_LADDER.size() - 1]["at"]) + BOSS_LOOP_EVERY * (j + 1),
+		"bosses": BOSS_LOOP[j % BOSS_LOOP.size()],
+		"loop": j / BOSS_LOOP.size() + 1,
+	}
+
+func _check_boss_schedule():
+	if bosses_done or not player or not is_instance_valid(player):
+		return
+	var enc := _encounter(encounter_index)
+	var at := float(enc["at"])
+	if warned_index != encounter_index and time_passed >= at - 10.0:
+		warned_index = encounter_index
+		var hud = get_tree().get_first_node_in_group("hud")
+		if hud and hud.has_method("show_boss_warning"):
+			hud.show_boss_warning(10, BossTable.get_def(enc["bosses"][0]).get("title", ""))
+			AudioManager.play_sfx("boss_warning")
+	if time_passed < at:
+		return
+	if enc.get("choice", false) and not choice_made:
+		if not choice_active:
+			spawn_6min_choice(enc["bosses"])
+		return
+	spawn_encounter(enc["bosses"], int(enc["loop"]))
+	encounter_index += 1
+	choice_made = false
+
+## Debug helper: moves both clocks and re-points the schedule at the next boss.
+func jump_to(seconds: float):
+	time_passed = seconds
+	elapsed = maxf(elapsed, seconds)
+	choice_active = false
+	choice_made = false
+	bosses_done = false
+	encounter_index = 0
+	while float(_encounter(encounter_index)["at"]) <= seconds:
+		encounter_index += 1
+	warned_index = -1
+
+func reset_clock():
+	time_passed = 0.0
+	elapsed = 0.0
 
 ## Distance from the player at which enemies appear (just off-screen, camera-zoom aware).
 func _current_spawn_radius() -> float:
@@ -225,17 +258,26 @@ func _spawn_enemy_at(index: int, pos: Vector2, mods: Dictionary = {}) -> Node:
 	if enemy.has_method("set_xp_value"):
 		enemy.set_xp_value(int(scaled_xp))
 	if "health" in enemy:
-		enemy.health *= mods.get("health_mult", 1.0)
+		enemy.health *= mods.get("health_mult", 1.0) * health_scale()
 		if GlobalData.protocol_active("swarm"):
 			enemy.health *= 0.75
 	
 	get_parent().add_child(enemy)
-	if "speed" in enemy and GlobalData.protocol_active("hunters"):
-		enemy.speed *= 1.25
+	if "speed" in enemy:
+		enemy.speed *= speed_scale()
+		if GlobalData.protocol_active("hunters"):
+			enemy.speed *= 1.25
 	# Enemy scripts set their own scale in _ready(), so apply size changes afterwards
 	if mods.has("scale_mult"):
 		enemy.scale *= mods["scale_mult"]
 	return enemy
+
+## Late-run toughness: the spawn rate stops growing at 4:00, so enemies get tougher instead.
+func health_scale() -> float:
+	return 1.0 + maxf(0.0, time_passed - 240.0) / 900.0 # 2x at 19:00
+
+func speed_scale() -> float:
+	return 1.0 + clampf((time_passed - 300.0) / 1200.0, 0.0, 0.3)
 
 ## Runs a scheduled event from spawn_waves.json (elite / ring / wall / pincer).
 func _spawn_event(ev: Dictionary):
@@ -283,76 +325,70 @@ func _spawn_event(ev: Dictionary):
 					var a = base_angle + side + (i - (count - 1) / 2.0) * 0.18
 					_spawn_enemy_at(index, origin + Vector2(radius, 0).rotated(a))
 
-func spawn_major_boss(milestone: int, forced_pos: Vector2 = Vector2.ZERO):
+## Starts a boss fight: one shared arena, then every boss of the encounter at the same spot.
+func spawn_encounter(ids: Array, loop: int = 0):
+	var center: Vector2 = player.global_position + Vector2(spawn_radius * 1.2, 0).rotated(randf() * TAU)
+	var arena_def := BossTable.get_def(ids[0])
+	for id in ids:
+		if BossTable.get_def(id).get("arena", "") == "prism":
+			arena_def = BossTable.get_def(id) # The Prism's walls need the hexagon
+	BossArena.ensure(get_parent(), center, arena_def["arena"], arena_def["color"])
+	for id in ids:
+		spawn_major_boss(id, center, loop)
+
+func spawn_major_boss(id: String, forced_pos: Vector2 = Vector2.ZERO, loop: int = 0):
+	var def := BossTable.get_def(id)
+	if def.is_empty():
+		push_error("Unknown boss id: " + id)
+		return
 	var boss = CharacterBody2D.new()
 	boss.add_to_group("bosses") # Add to group immediately
-	boss.add_to_group("enemies") # Add to enemies group immediately so it's ignored by the clear
-	
-	# KILL ALL ENEMIES ON BOSS SPAWN (Staggered for visual impact, but quieter)
+	boss.add_to_group("enemies") # ...so it is ignored by the clear below
+	boss.set_meta("loop", loop)
+
+	# Everything else on screen is wiped (staggered, quiet) when a boss arrives
 	var existing_enemies = get_tree().get_nodes_in_group("enemies")
-	
-	# Play a single "Sweep" sound if we had a lot of enemies
 	if existing_enemies.size() > 5:
 		AudioManager.play_sfx("glitch", -5.0, 0.8, 1.2)
-
 	for enemy in existing_enemies:
 		if is_instance_valid(enemy) and enemy != boss and not enemy.is_in_group("bosses"):
-			# Stagger the deaths slightly for a "wave" effect
-			var delay = randf_range(0.0, 0.5)
-			
-			# Use a tween bound to the enemy for safe execution
 			var t_kill = enemy.create_tween().bind_node(enemy)
-			t_kill.tween_interval(delay)
+			t_kill.tween_interval(randf_range(0.0, 0.5))
 			t_kill.tween_callback(func():
 				if is_instance_valid(enemy):
 					if enemy.has_method("spawn_death_particles"):
 						enemy.spawn_death_particles()
-					enemy.queue_free()
-			)
+					enemy.queue_free())
 
-	# Connect death signal to resume timer only if it's the last boss
 	boss.tree_exited.connect(_on_boss_tree_exited)
-	
-	if milestone == 180:
-		boss.set_script(load("res://scripts/boss_pulsar.gd"))
-	elif milestone == 600:
-		boss.set_script(load("res://scripts/boss_singularity.gd"))
-	else:
-		boss.set_script(load("res://scripts/boss_fortress.gd"))
-	
-	# Add Components
+	boss.set_script(load(def["script"]))
+
 	var poly = Polygon2D.new()
 	poly.name = "Polygon2D"
 	boss.add_child(poly)
-	
 	var shields = Node2D.new()
 	shields.name = "Shields"
 	boss.add_child(shields)
-	
 	var coll = CollisionShape2D.new()
 	coll.name = "CollisionShape2D"
 	var shape = CircleShape2D.new()
 	shape.radius = 80.0 # LARGE hit box for multi-directional shooting
 	coll.shape = shape
 	boss.add_child(coll)
-	
-	# Position and Grouping
-	if forced_pos != Vector2.ZERO:
-		boss.global_position = forced_pos
-	else:
-		var angle = randf() * TAU
-		boss.global_position = player.global_position + Vector2(spawn_radius * 1.2, 0).rotated(angle)
-	
+
+	var pos: Vector2 = forced_pos
+	if forced_pos == Vector2.ZERO:
+		pos = player.global_position + Vector2(spawn_radius * 1.2, 0).rotated(randf() * TAU)
+	boss.global_position = pos
 	boss.set_collision_layer_value(3, true) # Enemy layer
 	boss.set_collision_mask_value(1, true) # World
-	boss.set_collision_mask_value(2, true) # Player (to avoid overlapping too much if desired)
-	
+	boss.set_collision_mask_value(2, true) # Player
+
+	# The arena of this fight (spawn_encounter already built it; a lone debug spawn builds its own)
+	BossArena.ensure(get_parent(), pos, def["arena"], def["color"])
+
 	AudioManager.play_sfx("boss_spawn")
-	AudioManager.set_boss_music_mode(true, 1, AudioManager.boss_id_from_node(boss))
-	
 	get_parent().add_child(boss)
-	
-	# Clear bullets
 	clear_enemy_bullets()
 
 func clear_enemy_bullets():
@@ -364,62 +400,53 @@ func clear_enemy_bullets():
 			t.tween_property(bullet, "scale", Vector2.ZERO, 0.2)
 			t.tween_callback(bullet.queue_free)
 
-func spawn_6min_choice():
+func spawn_6min_choice(boss_ids: Array = []):
 	choice_active = true
-	
-	# Clear all enemies first
 	clear_all_enemies()
-	
-	# Pause the game for the choice
-	get_tree().paused = true
-	
+	get_tree().paused = true # The choice nodes keep running (process_mode ALWAYS)
 	AudioManager.play_sfx("boss_phase")
 	AudioManager.set_muffled(true)
 
-	# Spawn Choice 1: Boss Fight
-	var choice_boss = _create_choice_node("CHALLENGE BOSS", true)
+	var names: Array = []
+	for id in boss_ids:
+		names.append(str(BossTable.get_def(id).get("title", id)).replace(" PROTOCOL", ""))
+	var choice_boss = _create_choice_node("BOSS FIGHT", true, " + ".join(names) + "\nBig shard rewards, then harder bosses")
 	choice_boss.global_position = player.global_position + Vector2(-300, 0)
 	choice_boss.chosen.connect(_on_choice_boss_selected)
-	
-	# Spawn Choice 2: Endless
-	var choice_endless = _create_choice_node("CONTINUE ENDLESS", false)
+
+	var choice_endless = _create_choice_node("ENDLESS", false, "No more bosses\n+%d%% score and shards" % int((ENDLESS_BONUS - 1.0) * 100.0))
 	choice_endless.global_position = player.global_position + Vector2(300, 0)
 	choice_endless.chosen.connect(_on_choice_endless_selected)
 
-func _create_choice_node(text: String, is_boss: bool):
+func _create_choice_node(text: String, is_boss: bool, sub_text: String = ""):
 	var node = Area2D.new()
 	node.script = load("res://scripts/boss_choice_node.gd")
 	node.label_text = text
+	node.sub_text = sub_text
 	node.is_boss_choice = is_boss
 	node.add_to_group("choice_nodes")
-	# IMPORTANT: Add to the world root or a node that doesn't get paused 
-	# (though we set process_mode = ALWAYS on the node itself)
 	get_parent().add_child(node)
 	return node
 
 func _on_choice_boss_selected():
 	get_tree().paused = false
 	choice_active = false
-	choice_made_360 = true
-	
+	choice_made = true # _check_boss_schedule spawns the fight on the next frame
 	AudioManager.set_muffled(false)
-	
-	# The milestone logic in _process will now trigger the boss spawn on next frame
 	_cleanup_choices()
 
 func _on_choice_endless_selected():
 	get_tree().paused = false
 	choice_active = false
-	choice_made_360 = true
-	endless_chosen = true
-	bosses_spawned.append(360) # Mark as "spawned" so it doesn't trigger again
-	
+	choice_made = true
+	bosses_done = true
+	GlobalData.run_endless_bonus = ENDLESS_BONUS
 	AudioManager.set_muffled(false)
-	
 	_cleanup_choices()
-	
-	# Visual feedback for endless
 	AudioManager.play_sfx("level_up")
+	var hud = get_tree().get_first_node_in_group("hud")
+	if hud and hud.has_method("show_boss_phase"):
+		hud.show_boss_phase("ENDLESS: +%d%% SCORE AND SHARDS" % int((ENDLESS_BONUS - 1.0) * 100.0), Color(0.2, 1.0, 0.4))
 
 func _cleanup_choices():
 	for node in get_tree().get_nodes_in_group("choice_nodes"):
@@ -437,15 +464,14 @@ func clear_all_enemies():
 
 func _on_boss_tree_exited():
 	# SAFETY: Ensure spawner is still alive and in tree
-	if not is_inside_tree(): return
-	
-	# Wait a frame to ensure the group size is updated
-	await get_tree().process_frame
-	if not is_inside_tree(): return
-	
-	var active_bosses = get_tree().get_nodes_in_group("bosses")
-	if active_bosses.size() == 0:
+	if not is_inside_tree():
+		return
+	await get_tree().process_frame # The group is updated a frame later
+	if not is_inside_tree():
+		return
+	if get_tree().get_nodes_in_group("bosses").size() == 0:
 		boss_active = false
+		director.sync_kills(GlobalData.run_kills) # Boss kills must not look like a killing spree
 		director.start_breather()
 		if player:
 			player.dash_nerf_active = false
