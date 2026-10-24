@@ -17,6 +17,7 @@ signal energy_changed(current_energy: float, max_energy: float)
 signal level_up_ready
 signal game_over(stats: Dictionary)
 signal combo_changed(combo: int, time_left: float)
+signal combo_tier_changed(tier: int, previous: int) # see ComboTiers; fires on every tier change
 @export var dash_speed: float = 600.0
 @export var max_energy: float = 100.0
 @export var energy_consumption: float = 75.0 # Per second
@@ -101,6 +102,18 @@ var tutorial_tween: Tween = null
 var is_tutorial_active: bool = false
 
 var shake_intensity: float = 0.0
+# Camera punch: a damped spring on the camera offset. Unlike shake it has a direction,
+# so a kill pushes the view toward the hit and a heart loss pushes it away from the attacker.
+var punch_offset: Vector2 = Vector2.ZERO
+var punch_vel: Vector2 = Vector2.ZERO
+const PUNCH_STIFFNESS := 240.0
+const PUNCH_DAMPING := 19.0
+const PUNCH_LIMIT := 46.0
+var combo_tier: int = -1
+var run_clock: float = 0.0 # Seconds of play this run (pauses with the game)
+var last_hit_kind: String = "" # "shot" or "contact" for the last heart lost
+var shape_id: String = "circle"
+var first_run_script: Node = null
 var is_unpausing: bool = false # NEW: Prevent movement during unpause animation
 
 # Meta Upgrade Tracking
@@ -151,7 +164,9 @@ func _ready():
 	if GlobalData.is_upgrade_active("dash_mastery"):
 		energy_consumption *= 0.75 # 25% reduction
 	
+	_apply_start_shape() # Before the protocols: Glass Core sets hearts absolutely and wins
 	_apply_protocols()
+	Telemetry.begin_run()
 	
 	# Intro Particle Burst
 	spawn_intro_particles()
@@ -190,7 +205,11 @@ func _ready():
 	
 	# DASH TUTORIAL
 	get_tree().paused = false # Ensure game is unpaused at start
-	if GlobalData.show_tutorial:
+	if _wants_first_run():
+		# The scripted first run replaces the text-only tutorial and runs the spawner itself
+		first_run_script = FirstRun.new()
+		add_child(first_run_script)
+	elif GlobalData.show_tutorial:
 		show_full_tutorial()
 	else:
 		# If no tutorial, tell spawner it's okay to start
@@ -203,6 +222,28 @@ func _ready():
 	
 	if has_node("Area2D"):
 		$Area2D.body_entered.connect(_on_area_2d_body_entered)
+
+## The scripted first run (FirstRun) plays once, on a standard run, for a player who has not finished it.
+func _wants_first_run() -> bool:
+	var gd = GlobalData
+	return not gd.first_run_done and gd.run_mode == "standard" and gd.run_protocols.is_empty()
+
+## Starting shape picked on the pre-run screen: starts evolved, with that shape's trade-offs.
+func _apply_start_shape():
+	shape_id = GlobalData.run_shape()
+	var def := PlayerShapes.get_def(shape_id)
+	if def.is_empty() or int(def["sides"]) <= 0:
+		return
+	max_hearts = maxi(max_hearts + int(def["hearts"]), 1)
+	current_hearts = max_hearts
+	speed_multiplier *= float(def["speed"])
+	damage_multiplier *= float(def["damage"])
+	fire_rate *= float(def["fire_interval"])
+	energy_recovery *= float(def["energy_recovery"])
+	current_shape = int(def["sides"])
+	next_evolution_level = PlayerShapes.next_evolution_level(current_shape)
+	update_shape_visuals()
+	health_changed.emit(current_hearts, max_hearts)
 
 func spawn_intro_particles():
 	var particles = CPUParticles2D.new()
@@ -351,6 +392,8 @@ func _physics_process(delta: float):
 		return # Stop processing this frame to avoid double-triggers
 	
 	if get_tree().paused or is_unpausing:
+		if is_dead:
+			_death_camera(delta)
 		return
 		
 	iframe_timer -= delta
@@ -366,12 +409,15 @@ func _physics_process(delta: float):
 		else:
 			update_health_visuals() # Re-apply dimmed color
 	
-	# Camera shake
+	run_clock += delta
+	
+	# Camera shake + directional punch
+	var shake_vec := Vector2.ZERO
 	if shake_intensity > 0:
 		shake_intensity = lerp(shake_intensity, 0.0, 7.0 * delta) # Slower decay for more impact
-		camera.offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake_intensity
-	else:
-		camera.offset = Vector2.ZERO
+		shake_vec = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake_intensity
+	_step_punch(delta)
+	camera.offset = shake_vec + punch_offset
 	
 	if deflector_active:
 		_deflect_bullets()
@@ -912,6 +958,7 @@ func reset_combo():
 	speed_multiplier -= combo_speed_boost
 	combo_speed_boost = 0.0
 	combo_changed.emit(0, 0)
+	_update_combo_tier()
 
 func add_xp(amount: float):
 	xp += amount
@@ -934,6 +981,7 @@ func add_xp(amount: float):
 	speed_multiplier += combo_speed_boost
 	
 	combo_changed.emit(combo_count, 1.0)
+	_update_combo_tier()
 	
 	xp_changed.emit(xp, xp_to_next_level)
 	if xp >= xp_to_next_level:
@@ -1006,10 +1054,7 @@ func trigger_level_up_blast():
 	VFX.shockwave(global_position, 2.2, Color(0.6, 0.9, 1.0), 700.0)
 	PostFX.kick(0.006)
 	# 1. Hit Stop & Flash
-	Engine.time_scale = 0.05
-	# Force reset after real-time delay
-	var timer = get_tree().create_timer(0.15, true, false, true)
-	timer.timeout.connect(func(): Engine.time_scale = 1.0)
+	VFX.hit_stop(0.15)
 	
 	# 2. Visual Shockwave (Scale pop)
 	var blast_v = Polygon2D.new()
@@ -1087,6 +1132,66 @@ func add_shake(intensity: float):
 	shake_intensity = intensity * GameSettings.shake
 	if intensity >= 6.0:
 		PostFX.kick(intensity * 0.0001)
+
+## Directional camera kick. `strength` is the peak offset in pixels; follows the shake slider.
+func add_punch(dir: Vector2, strength: float):
+	if dir == Vector2.ZERO or GameSettings.shake <= 0.0:
+		return
+	var px := minf(strength * GameSettings.shake, PUNCH_LIMIT)
+	punch_vel += dir.normalized() * px * sqrt(PUNCH_STIFFNESS)
+
+## Keeps the camera moving after death: the game is paused for the run-end screen but the
+## final shake and punch should still play out behind it.
+func _death_camera(delta: float):
+	var shake_vec := Vector2.ZERO
+	if shake_intensity > 0.05:
+		shake_intensity = lerp(shake_intensity, 0.0, 5.0 * delta)
+		shake_vec = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake_intensity
+	_step_punch(delta)
+	camera.offset = shake_vec + punch_offset
+
+func _step_punch(delta: float):
+	if punch_offset == Vector2.ZERO and punch_vel == Vector2.ZERO:
+		return
+	# Semi-implicit Euler on a damped spring; slightly underdamped so it overshoots once.
+	punch_vel += (-PUNCH_STIFFNESS * punch_offset - PUNCH_DAMPING * punch_vel) * delta
+	punch_offset += punch_vel * delta
+	if punch_offset.length() < 0.05 and punch_vel.length() < 1.0:
+		punch_offset = Vector2.ZERO
+		punch_vel = Vector2.ZERO
+
+## Called by EnemyBase.die(): per-kill feedback that grows with the combo and the kind of kill.
+## `heavy` is true for big enemies (those already shake the screen).
+func kill_feedback(pos: Vector2, heavy: bool):
+	var dash_kill := is_dashing
+	var strength := 2.0 + minf(combo_count, 40) * 0.12
+	if dash_kill:
+		strength *= 1.6
+	if heavy:
+		strength *= 2.2
+	add_punch(pos - global_position, strength)
+	if heavy:
+		VFX.hit_stop(0.05, 0.05, 0.25)
+	elif dash_kill:
+		VFX.hit_stop(0.03, 0.12, 0.3) # Short and shallow: dashing through a pack must stay fluid
+
+func _update_combo_tier():
+	var tier := ComboTiers.tier_for(combo_count)
+	if tier == combo_tier:
+		return
+	var previous := combo_tier
+	combo_tier = tier
+	combo_tier_changed.emit(tier, previous)
+	if tier > previous and tier >= 0:
+		var col: Color = ComboTiers.color(tier)
+		VFX.shockwave(global_position, 0.6 + 0.25 * tier, col, 160.0 + 60.0 * tier)
+		VFX.hit_stop(0.04 + 0.01 * tier, 0.05, 0.0)
+		add_punch(Vector2.from_angle(randf() * TAU), 8.0 + 3.0 * tier)
+		if camera:
+			var base_zoom := camera.zoom
+			var zt := create_tween()
+			zt.tween_property(camera, "zoom", base_zoom * (1.02 + 0.01 * tier), 0.06)
+			zt.tween_property(camera, "zoom", base_zoom, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 ## Soft pulsing halo behind the player.
 func _setup_aura():
@@ -1541,7 +1646,7 @@ func heal(amount: int):
 	tween.tween_property(sprite, "modulate", Color(0, 5, 0, 1), 0.1) # Green flash
 	tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
 
-func take_damage(_amount: float, source: String = ""):
+func take_damage(_amount: float, source: String = "", kind: String = ""):
 	if iframe_timer > 0:
 		return
 		
@@ -1574,6 +1679,9 @@ func take_damage(_amount: float, source: String = ""):
 
 	if source != "":
 		last_hit_by = source
+	last_hit_kind = kind
+	Telemetry.note_hit(source if source != "" else "UNKNOWN", run_clock)
+	_punch_from_threat()
 	current_hearts -= 1
 	health_changed.emit(current_hearts, max_hearts)
 	
@@ -1606,6 +1714,21 @@ func take_damage(_amount: float, source: String = ""):
 	
 	if current_hearts <= 0:
 		die()
+
+## Pushes the camera away from the nearest enemy when a heart is lost.
+func _punch_from_threat():
+	var nearest: Node2D = null
+	var best := 600.0
+	for e in get_tree().get_nodes_in_group("enemies") + get_tree().get_nodes_in_group("enemy_bullets"):
+		if is_instance_valid(e) and e is Node2D:
+			var d := global_position.distance_to(e.global_position)
+			if d < best:
+				best = d
+				nearest = e
+	var dir := Vector2.from_angle(randf() * TAU)
+	if nearest:
+		dir = (global_position - nearest.global_position).normalized()
+	add_punch(dir, 34.0)
 
 func trigger_repulsive_pushback():
 	# Visual Shockwave
@@ -1674,8 +1797,9 @@ func trigger_hit_impact():
 	# 1. Hit-stop: Set time scale to slow
 	PostFX.kick(0.008)
 	VFX.shockwave(global_position, 1.5, Color(1.0, 0.2, 0.3), 260.0)
-	if Engine.time_scale < 1.0: return # Prevent overlapping hitstop
-	Engine.time_scale = 0.05
+	var stopped := GameSettings.hit_stop and Engine.time_scale >= 1.0
+	if stopped:
+		Engine.time_scale = 0.05
 	
 	# 2. Impact Frame: White flash on HUD
 	var flash = ColorRect.new()
@@ -1692,7 +1816,8 @@ func trigger_hit_impact():
 	# Using true for ignore_time_scale ensures this ALWAYS finishes in 0.08s real time
 	var timer = get_tree().create_timer(0.08, true, false, true)
 	timer.timeout.connect(func():
-		Engine.time_scale = 1.0 # Force back to normal
+		if stopped:
+			Engine.time_scale = 1.0 # Force back to normal
 		if is_instance_valid(flash):
 			flash.queue_free()
 	)
@@ -1765,7 +1890,15 @@ func die():
 	AudioManager.set_muffled(true) # Muffle on death screen too
 
 	add_shake(100.0) # Screen-shattering death shake
-	emit_signal("game_over", {
+	_death_sequence()
+	var how := DeathReport.build({
+		"killer": last_hit_by,
+		"kind": last_hit_kind,
+		"hits": Telemetry.hits(),
+		"run_time": time_survived,
+		"dash_empty": current_energy <= 1.0,
+	})
+	var stats := {
 		"level": level,
 		"shards": shards_earned,
 		"highest_combo": highest_combo_run,
@@ -1779,10 +1912,36 @@ func die():
 		"protocols": gd.run_protocols.duplicate(),
 		"multiplier": gd.protocol_multiplier(),
 		"mode": gd.run_mode,
-	})
+		"shape": shape_id,
+		"first_run": first_run_script != null,
+		"dash_empty": current_energy <= 1.0,
+		"how": how,
+	}
+	Telemetry.end_run(stats)
+	if first_run_script and is_instance_valid(first_run_script):
+		first_run_script.on_player_died()
+	emit_signal("game_over", stats)
 	
 	# Pause the game instead of reloading
 	get_tree().paused = true
+
+## Shatters the shape into shards, with a freeze-frame and a camera punch, then hides the body.
+func _death_sequence():
+	var shatter := DeathShatter.new()
+	shatter.polygon = sprite.polygon
+	shatter.color = PLAYER_COLOR
+	shatter.spin_base = rotation_speed
+	get_parent().add_child(shatter)
+	shatter.global_position = global_position
+	shatter.rotation = rotation
+	var burst = VFX.death_burst(global_position, PLAYER_COLOR, 3.0)
+	if burst:
+		burst.always_process = true
+		burst.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_punch(Vector2.from_angle(randf() * TAU), 40.0)
+	VFX.hit_stop(0.16, 0.04)
+	visible = false
+	PadNav.rumble(0.8, 1.0, 0.5)
 
 func apply_upgrade(upgrade_type: String, value: float):
 	print("Applying Upgrade: ", upgrade_type, " with value ", value)
@@ -1879,7 +2038,7 @@ func check_contact_damage(_delta: float):
 	var overlapping_areas = $Area2D.get_overlapping_areas()
 	for area in overlapping_areas:
 		if area.is_in_group("enemy_bullets"):
-			take_damage(1, str(area.get_meta("source", "ENEMY FIRE")))
+			take_damage(1, str(area.get_meta("source", "ENEMY FIRE")), "shot")
 			area.queue_free()
 			return # Exit after taking damage
 
@@ -1891,7 +2050,7 @@ func check_contact_damage(_delta: float):
 			if "is_dying" in body and body.is_dying:
 				continue
 			
-			take_damage(1, body.display_name() if body.has_method("display_name") else _boss_name(body))
+			take_damage(1, body.display_name() if body.has_method("display_name") else _boss_name(body), "contact")
 			break
 
 # Collision with enemies (mostly for Dash now)

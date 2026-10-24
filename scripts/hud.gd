@@ -77,6 +77,7 @@ func _ready():
 		player.xp_changed.connect(_on_player_xp_changed)
 		player.energy_changed.connect(_on_player_energy_changed)
 		player.combo_changed.connect(_on_player_combo_changed)
+		player.combo_tier_changed.connect(_on_combo_tier_changed)
 		_on_player_health_changed(player.current_hearts, player.max_hearts)
 		_on_player_xp_changed(player.xp, player.xp_to_next_level)
 		_on_player_energy_changed(player.current_energy, player.max_energy)
@@ -509,6 +510,15 @@ func setup_combo_ui():
 	box.add_theme_constant_override("separation", 4)
 	$Control.add_child(box)
 	
+	var tier_label := Label.new()
+	tier_label.name = "ComboTierLabel"
+	tier_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	tier_label.add_theme_font_size_override("font_size", 20)
+	tier_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	tier_label.add_theme_constant_override("outline_size", 6)
+	tier_label.pivot_offset = Vector2(160, 12)
+	box.add_child(tier_label)
+	
 	var combo_label = Label.new()
 	combo_label.name = "ComboLabel"
 	combo_label.text = ""
@@ -527,6 +537,14 @@ func setup_combo_ui():
 	style_neon_bar(combo_bar, Color(1, 0.3, 0.5))
 	combo_bar.get_theme_stylebox("fill").shadow_size = 0
 	box.add_child(combo_bar)
+	
+	var mult_label := Label.new()
+	mult_label.name = "ComboMultLabel"
+	mult_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	mult_label.add_theme_font_size_override("font_size", 16)
+	mult_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	mult_label.add_theme_constant_override("outline_size", 5)
+	box.add_child(mult_label)
 
 func style_neon_bar(bar: ProgressBar, color: Color):
 	var bg = StyleBoxFlat.new()
@@ -550,11 +568,15 @@ var combo_label_node: Label = null
 var combo_bar_node: ProgressBar = null
 var boss_bar_node: ProgressBar = null
 
+var _combo_tier_shown: int = -2
+
 func _on_player_combo_changed(combo: int, progress: float):
 	if not combo_label_node:
 		combo_label_node = find_child("ComboLabel", true, false)
 	if not combo_bar_node:
 		combo_bar_node = find_child("ComboBar", true, false)
+	var tier_label := find_child("ComboTierLabel", true, false) as Label
+	var mult_label := find_child("ComboMultLabel", true, false) as Label
 		
 	if not combo_label_node or not combo_bar_node:
 		return
@@ -562,10 +584,28 @@ func _on_player_combo_changed(combo: int, progress: float):
 	if combo < 2:
 		combo_label_node.text = ""
 		combo_bar_node.visible = false
+		if tier_label: tier_label.text = ""
+		if mult_label: mult_label.text = ""
+		_combo_tier_shown = -2
 		return
 		
 	combo_bar_node.visible = true
 	combo_bar_node.value = progress * 100
+	
+	var tier := ComboTiers.tier_for(combo)
+	var tier_color := ComboTiers.color(tier)
+	if tier != _combo_tier_shown:
+		# The meter restyles itself as the tier climbs: colour, width, thicker bar
+		_combo_tier_shown = tier
+		style_neon_bar(combo_bar_node, tier_color)
+		combo_bar_node.get_theme_stylebox("fill").shadow_size = 4 + 3 * maxi(tier, 0)
+		combo_bar_node.custom_minimum_size = Vector2(190 + 18 * maxi(tier, 0), 6 + 2 * maxi(tier, 0))
+		if tier_label:
+			tier_label.text = ComboTiers.tier_name(tier)
+			tier_label.add_theme_color_override("font_color", tier_color)
+	if mult_label:
+		mult_label.text = "SCORE x%.1f" % (1.0 + combo * 0.1)
+		mult_label.add_theme_color_override("font_color", tier_color.lerp(Color.WHITE, 0.35))
 	
 	var old_text = combo_label_node.text
 	combo_label_node.text = "x%d COMBO" % combo
@@ -573,19 +613,44 @@ func _on_player_combo_changed(combo: int, progress: float):
 	# Only pop when the number actually changes
 	if combo_label_node.text != old_text:
 		AudioManager.play_sfx("combo_tick", 0.0, 1.0 + minf(combo, 40) * 0.015)
-		combo_label_node.scale = Vector2(1.5, 1.5)
+		var pop := 1.35 + 0.08 * maxi(tier, 0)
+		combo_label_node.scale = Vector2(pop, pop)
 		combo_label_node.modulate = GameSettings.flash(Color(2, 2, 2, 1)) # Bright flash
 		var tween = create_tween().set_parallel(true)
 		tween.tween_property(combo_label_node, "scale", Vector2(1, 1), 0.2).set_trans(Tween.TRANS_BACK)
 		tween.tween_property(combo_label_node, "modulate", Color.WHITE, 0.2)
-		
-		# Escalating colour tiers, applied as font colour + glow outline so the pop flash still reads
-		var tier := Color(0.85, 0.95, 1.0)
-		if combo > 50: tier = Color(1.0, 0.45, 0.1) # Orange
-		elif combo > 20: tier = Color(1.0, 0.9, 0.2) # Yellow
-		elif combo > 10: tier = Color(0.2, 1.0, 1.0) # Cyan
-		combo_label_node.add_theme_color_override("font_color", tier)
+		if tier >= 2 and GameSettings.shake > 0.0:
+			# High tiers rattle the label a little
+			combo_label_node.rotation = randf_range(-0.05, 0.05) * GameSettings.shake * (tier - 1)
+			create_tween().tween_property(combo_label_node, "rotation", 0.0, 0.15)
+		combo_label_node.add_theme_color_override("font_color", tier_color)
 		combo_label_node.add_theme_font_size_override("font_size", 30 + mini(combo / 10, 10))
+
+## Big tier name across the top of the screen when a new combo tier is reached.
+func _on_combo_tier_changed(tier: int, previous: int):
+	if tier <= previous or tier < 0:
+		return
+	var color := ComboTiers.color(tier)
+	var banner := Label.new()
+	banner.text = ComboTiers.tier_name(tier)
+	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	NeonUI.style_title(banner, color, 44 + 6 * tier)
+	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	banner.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	banner.position.y = 150
+	banner.pivot_offset = Vector2(banner.size.x / 2.0, 30)
+	banner.scale = Vector2(1.8, 1.8)
+	banner.modulate.a = 0.0
+	$Control.add_child(banner)
+	AudioManager.play_sfx("level_up", -8.0, 1.0 + 0.12 * tier, 1.0 + 0.12 * tier)
+	var t := banner.create_tween().set_parallel(true)
+	t.tween_property(banner, "modulate:a", 1.0, 0.08)
+	t.tween_property(banner, "scale", Vector2.ONE, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var out := banner.create_tween()
+	out.tween_interval(0.7)
+	out.tween_property(banner, "modulate:a", 0.0, 0.35)
+	out.tween_callback(banner.queue_free)
 
 func _on_player_xp_changed(current_xp: float, max_xp: float):
 	if xp_bar:

@@ -123,8 +123,8 @@ func die():
 	is_dying = true
 	AudioManager.play_sfx("enemy_death", 0.0, 0.9, 1.1, 0.3) # Cut off after 0.3s
 	spawn_death_particles()
-	if death_shake >= 8.0:
-		VFX.hit_stop(0.05) # Heavy enemies land a freeze-frame
+	if player and player.has_method("kill_feedback"):
+		player.kill_feedback(global_position, death_shake >= 8.0) # Punch, and a freeze-frame on heavy or dash kills
 	if player and death_shake > 0.0 and player.has_method("add_shake"):
 		player.add_shake(death_shake)
 	if player and player.has_method("add_xp"):

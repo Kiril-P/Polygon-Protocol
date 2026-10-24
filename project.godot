@@ -28,6 +28,7 @@ VFX="*res://scripts/vfx.gd"
 PostFX="*res://scripts/post_fx.gd"
 Transition="*res://scripts/transition.gd"
 PadNav="*res://scripts/pad_nav.gd"
+Telemetry="*res://scripts/telemetry.gd"
 SilentWolf="*res://addons/silent_wolf/SilentWolf.gd"
 
 [display]

@@ -33,6 +33,7 @@ func _ready():
 	gd.online_submit_enabled = false
 	gd.show_tutorial = false
 	gd.is_first_run = false
+	gd.first_run_done = true
 	gd.title_seen = true
 	gd.use_mouse_controls = false
 	gd.difficulty_level = 2
