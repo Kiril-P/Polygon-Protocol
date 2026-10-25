@@ -106,7 +106,7 @@ func _pulse():
 			_beam_to(e)
 	VFX.shockwave(global_position, 0.15, _pulse_color, PULSE_RADIUS)
 	if healed > 0:
-		AudioManager.play_sfx("heal", -8.0, 1.2, 1.4)
+		AudioManager.play_sfx("heal", -4.0, 1.0, 1.1)
 
 func _beam_to(target: Node2D):
 	var beam := Line2D.new()

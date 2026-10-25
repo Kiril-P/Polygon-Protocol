@@ -67,8 +67,8 @@ def kamikaze_alert():
     out = np.zeros(int(0.5 * SR))
     for i, st in enumerate((0.0, 0.2)):
         d = 0.12
-        tone = square(1450.0, d) * 0.3 + sine(1450.0 * 2, d) * 0.1
-        tone = lp(tone * adsr(d, 0.002, 0.02, 0.8, 0.03, total=d), 4200)
+        tone = sine(980.0, d) * 0.3 + sine(980.0 * 2, d) * 0.05
+        tone = lp(tone * adsr(d, 0.01, 0.03, 0.7, 0.05, total=d), 2200)
         mix_into(out, tone, int(st * SR))
     return out
 
@@ -90,7 +90,7 @@ def shield_break():
         d = 0.35 - 0.04 * k
         s_ = sine(fr * (1 + 0.01 * k), d) * expdecay(d, 0.09)
         mix_into(parts, s_ * 0.3, int(k * 0.012 * SR))
-    nz = hp(noise(dur), 2500) * expdecay(dur, 0.08) * 0.7
+    nz = lp(hp(noise(dur), 2500), 5200) * expdecay(dur, 0.08) * 0.45
     low = sine(sweep(260, 70, dur, 0.4)) * expdecay(dur, 0.12) * 0.6
     return fade(parts + nz + low, 0.0005, 0.04)
 
@@ -313,7 +313,7 @@ def glitch():
         x[pos:pos + len(tone)] += tone[:len(x) - pos]
         pos += seg + int(rng.uniform(0, 0.02) * SR)
     x = bitcrush(x, 5, 3) * adsr(dur * 0.8, 0.002, 0.05, 0.9, 0.08, total=dur)
-    return hp(x, 150, 1)
+    return lp(hp(x, 150, 1), 4500)
 
 
 def pillar_hit():

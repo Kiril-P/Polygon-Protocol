@@ -126,7 +126,7 @@ func _overload_walls() -> void:
 			flip = 1 - flip
 			pick = [flip, flip + 2, flip + 4]
 	arena.overload_walls(pick, 1.4, 2.5)
-	AudioManager.play_sfx("glitch", -2.0, 0.7, 0.9)
+	AudioManager.play_sfx("glitch", -4.0, 0.8, 1.0)
 
 func _nearest_wall_to_player() -> int:
 	var best := 0

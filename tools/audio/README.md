@@ -7,6 +7,8 @@ python3 -m venv .venv && .venv/bin/pip install numpy scipy pyloudnorm matplotlib
 cd tools/audio
 ../../.venv/bin/python render_sfx.py      # -> assets/audio/sfx/*.wav
 ../../.venv/bin/python render_music.py    # -> assets/audio/music/*.ogg and assets/audio/menu/*.ogg  (needs ffmpeg)
+../../.venv/bin/python render_sfx.py glitch shield_break           # re-render only these
+../../.venv/bin/python loudness.py         # peak / RMS / brightness of every SFX as the game plays it
 ../../.venv/bin/python plot.py out.png player_fire_0 level_up   # waveform/spectrogram sheet
 ```
 

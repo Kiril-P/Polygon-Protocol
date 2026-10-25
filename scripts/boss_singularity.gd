@@ -194,7 +194,7 @@ func blink() -> void:
 	blinking = true
 	var dest := _pick_blink_destination()
 	VFX.shockwave(dest, 1.2, HOT, 220.0)
-	AudioManager.play_sfx("glitch", 0.0, 1.0, 1.4)
+	AudioManager.play_sfx("glitch", -3.0, 0.9, 1.1)
 	var t := create_tween().bind_node(self)
 	t.tween_property(self, "modulate:a", 0.15, 0.55)
 	t.tween_callback(func():

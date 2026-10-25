@@ -104,6 +104,17 @@ Keys can be rebound, and glow, screen shake, reduced flash, colour palette, HUD 
 3. Open `project.godot` in Godot.
 4. Press `F5` to run the project.
 
+From the project root, without opening the editor:
+
+```text
+tools/run.sh            launch the game (extra arguments go to Godot)
+tools/test.sh           headless test suite, exit code 0 when everything passes
+tools/web/build.sh      export the web build and zip it for itch.io
+tools/web/serve.sh      serve the web build at http://localhost:8000
+tools/web/deploy.sh     build and publish the web build to Vercel (see the script header)
+tools/telemetry/report.py  summarise the anonymous run data (`--remote` for the live board)
+```
+
 Export presets are already configured for:
 
 - `Web`
@@ -130,7 +141,7 @@ scripts/   Core gameplay logic, bosses, player systems, upgrades, HUD, and persi
 
 ## Privacy and run data
 
-When a run ends, the game can send one small anonymous record to the SilentWolf board `telemetry_v1`: the protocols picked, the upgrades taken in order, what killed you, and headline numbers (time, level, kills, combo, starting shape, platform). It contains no player name, no player id and no install id. Turn it off with **Accessibility > Share anonymous run data**. Editor and debug runs never send anything. The same record is appended to `user://telemetry.jsonl` on your machine (last 100 runs); summarise it with `python3 tools/telemetry/report.py path/to/telemetry.jsonl`.
+When a run ends, the game can send one small anonymous record to the SilentWolf board `telemetry_v1`: the protocols picked, the upgrades taken in order, what killed you, and headline numbers (time, level, kills, combo, starting shape, platform). It contains no player name, no player id and no install id. Turn it off with **Accessibility > Share anonymous run data**. Editor and debug runs never send anything. The same record is appended to `user://telemetry.jsonl` on your machine (last 100 runs); summarise it with `python3 tools/telemetry/report.py path/to/telemetry.jsonl`, or read the live board with `python3 tools/telemetry/report.py --remote`.
 
 ## Tests
 

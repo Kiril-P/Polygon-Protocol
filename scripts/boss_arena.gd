@@ -146,7 +146,7 @@ func overload_walls(indices: Array, warn: float = 1.4, live: float = 2.5):
 			line.width = 26.0
 			line.default_color = Color(1.0, 0.25, 0.2, 1.0)
 			line.modulate = Color(2.2, 1.6, 1.4)
-			AudioManager.play_sfx("glitch", 0.0, 1.2, 1.5))
+			AudioManager.play_sfx("glitch", -4.0, 0.9, 1.1))
 		seq.tween_interval(live)
 		seq.tween_callback(func():
 			_walls[i]["state"] = "off"

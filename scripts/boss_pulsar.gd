@@ -114,7 +114,7 @@ func setup_lasers() -> void:
 			var pulse := create_tween().set_loops().bind_node(laser)
 			pulse.tween_property(laser, "width", 18.0, 0.08).set_trans(Tween.TRANS_SINE)
 			pulse.tween_property(laser, "width", 12.0, 0.08).set_trans(Tween.TRANS_SINE)
-		AudioManager.play_sfx("glitch", 5.0, 1.2, 1.5))
+		AudioManager.play_sfx("glitch", -1.0, 0.9, 1.1))
 
 func setup_platforms() -> void:
 	for p in platform_nodes:
@@ -230,7 +230,7 @@ func remove_one_platform() -> void:
 	t.parallel().tween_property(p, "scale", Vector2.ZERO, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	t.parallel().tween_property(p, "modulate:a", 0.0, 0.3)
 	t.tween_callback(p.queue_free)
-	AudioManager.play_sfx("glitch", 2.0, 0.8, 1.2)
+	AudioManager.play_sfx("glitch", -2.0, 0.8, 1.0)
 
 func _on_death_start() -> void:
 	for l in laser_nodes:

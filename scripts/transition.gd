@@ -59,7 +59,7 @@ func _swap(do_swap: Callable, speed: float):
 	_mat.set_shader_parameter("tint", Color(0.0, 0.85, 1.0, 1.0))
 	_mat.set_shader_parameter("reveal", 0.0)
 	_mat.set_shader_parameter("progress", 0.0)
-	AudioManager.play_sfx("glitch", -6.0, 1.3, 1.6)
+	AudioManager.play_sfx("glitch", -10.0, 0.9, 1.1)
 	var t := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	t.tween_method(func(v): _mat.set_shader_parameter("progress", v), 0.0, 1.0, 0.32 / speed).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	await t.finished
