@@ -70,7 +70,7 @@ func _physics_process(delta: float):
 		_timer = 0.0
 		_aim = dir
 		_line.visible = true
-		AudioManager.play_sfx("glitch", -14.0, 2.0, 2.4)
+		AudioManager.play_sfx("glitch", -8.0, 1.0, 1.2)
 
 func _charge(delta: float, to_player: Vector2):
 	velocity = Vector2.ZERO

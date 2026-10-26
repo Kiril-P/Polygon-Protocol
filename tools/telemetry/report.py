@@ -6,8 +6,9 @@
 
 Local input is the game's user://telemetry.jsonl (one JSON record per run).
 --remote reads the SilentWolf board "telemetry_v1" with the public client key from
-scripts/global_data.gd. SilentWolf returns a board's top scores first, so a remote read is
-biased toward high-scoring runs; use it for build and upgrade trends, not for death rates.
+scripts/global_data.gd. A remote read returns at most --max rows, highest score first, so once the
+board holds more runs than that it is biased toward high-scoring runs; use it for build and upgrade
+trends, not for death rates, and read local logs for those.
 """
 import argparse
 import json
@@ -37,19 +38,23 @@ def load_remote(maximum):
     key = re.search(r'"api_key":\s*"([^"]+)"', src).group(1)
     game = re.search(r'"game_id":\s*"([^"]+)"', src).group(1)
     url = f"https://api.silentwolf.com/get_scores/{game}?max={maximum}&ldboard_name={BOARD}&period_offset=0"
-    req = urllib.request.Request(url, headers={"x-api-key": key, "x-sw-game-id": game})
+    req = urllib.request.Request(url, headers={
+        "x-api-key": key, "x-sw-game-id": game,
+        # Without these two (and a non-default User-Agent) the API answers 403.
+        "x-sw-plugin-version": "0.9.5", "x-sw-godot-version": "4.5",
+        "User-Agent": "polygon-protocol-telemetry/1"})
     try:
         with urllib.request.urlopen(req, timeout=20) as r:
             data = json.load(r)
     except urllib.error.HTTPError as e:
         sys.exit(f"remote read failed (HTTP {e.code}). The board may not exist yet (it is created by the first posted "
-                 "run) or SilentWolf wants extra headers; this path is untested. Use the local telemetry.jsonl instead.")
+                 "run) or the SilentWolf headers changed. Use the local telemetry.jsonl instead.")
     runs = []
-    for s in data.get("scores", []):
-        meta = s.get("metadata") or {}
+    for s in data.get("top_scores", []):
+        meta = s.get("md") or {}
         if isinstance(meta, str):
             meta = json.loads(meta)
-        if meta:
+        if meta and meta.get("build") != "selftest":
             runs.append(meta)
     return runs
 

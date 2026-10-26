@@ -30,7 +30,10 @@ items.update({
     "glitch": (sfx.glitch, -4), "pillar_hit": (sfx.pillar_hit, -3), "heartbeat": (sfx.heartbeat, -4),
 })
 report = []
+only = set(sys.argv[1:])  # optional: render just these names
 for name, (fn, peak) in items.items():
+    if only and name not in only:
+        continue
     x = fn()
     x = np.nan_to_num(x)
     if name != "dash_loop":

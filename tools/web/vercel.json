@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "cleanUrls": true,
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Content-Security-Policy", "value": "frame-ancestors 'self' https://kirilpetrovski.com https://*.kirilpetrovski.com" }
+      ]
+    },
+    { "source": "/index.wasm", "headers": [{ "key": "Content-Type", "value": "application/wasm" }] },
+    { "source": "/index.pck", "headers": [{ "key": "Content-Type", "value": "application/octet-stream" }] }
+  ]
+}

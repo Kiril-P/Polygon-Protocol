@@ -123,7 +123,7 @@ func spawn_hazard():
 				hud.show_corruption_warning()
 		corruption_warning_shown = true
 
-	AudioManager.play_sfx("glitch", 5.0, 0.5, 0.8) # Increased volume from -5.0 to 5.0
+	AudioManager.play_sfx("glitch", -2.0, 0.8, 1.0) # One cue per hazard event; the per-type plays below were doubling it
 
 	# Spawn hazard somewhere nearby but not right on top of player
 	var angle = randf() * TAU
@@ -300,11 +300,9 @@ func _spawn_event(ev: Dictionary):
 				"xp_mult": ev.get("xp_mult", 1.0),
 			})
 		"ring":
-			AudioManager.play_sfx("glitch", -3.0, 0.9, 1.1)
 			for i in count:
 				_spawn_enemy_at(index, origin + Vector2(radius, 0).rotated(base_angle + TAU * i / count))
 		"wall":
-			AudioManager.play_sfx("glitch", -3.0, 0.9, 1.1)
 			var spacing: float = ev.get("spacing", 90.0)
 			var center = origin + Vector2(radius, 0).rotated(base_angle)
 			var along = Vector2.RIGHT.rotated(base_angle + PI / 2.0)
@@ -312,14 +310,12 @@ func _spawn_event(ev: Dictionary):
 				_spawn_enemy_at(index, center + along * spacing * (i - (count - 1) / 2.0))
 		"squad":
 			# A Mender with an escort fanned out around it
-			AudioManager.play_sfx("glitch", -3.0, 0.9, 1.1)
 			var escort: int = ENEMY_INDEX.get(ev.get("escort", "chaser"), 0)
 			var centre = origin + Vector2(radius, 0).rotated(base_angle)
 			_spawn_enemy_at(index, centre)
 			for i in count:
 				_spawn_enemy_at(escort, centre + Vector2(90.0, 0).rotated(TAU * i / maxi(count, 1)))
 		"pincer":
-			AudioManager.play_sfx("glitch", -3.0, 0.9, 1.1)
 			for side in [0.0, PI]:
 				for i in count:
 					var a = base_angle + side + (i - (count - 1) / 2.0) * 0.18
@@ -349,7 +345,7 @@ func spawn_major_boss(id: String, forced_pos: Vector2 = Vector2.ZERO, loop: int 
 	# Everything else on screen is wiped (staggered, quiet) when a boss arrives
 	var existing_enemies = get_tree().get_nodes_in_group("enemies")
 	if existing_enemies.size() > 5:
-		AudioManager.play_sfx("glitch", -5.0, 0.8, 1.2)
+		AudioManager.play_sfx("glitch", -8.0, 0.8, 1.0)
 	for enemy in existing_enemies:
 		if is_instance_valid(enemy) and enemy != boss and not enemy.is_in_group("bosses"):
 			var t_kill = enemy.create_tween().bind_node(enemy)
